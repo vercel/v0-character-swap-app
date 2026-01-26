@@ -283,6 +283,8 @@ export default function Home() {
                 hiddenDefaultIds={hiddenDefaultIds}
                 onHideDefault={hideDefaultCharacter}
                 canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
+                hasVideo={!!recordedVideo}
+                hasCharacter={!!selectedCharacter}
                 onGenerate={handleProcess}
                 sendViaEmail={sendViaEmail}
                 onSendViaEmailChange={setSendViaEmail}
@@ -350,6 +352,8 @@ export default function Home() {
                 hiddenDefaultIds={hiddenDefaultIds}
                 onHideDefault={hideDefaultCharacter}
                 canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
+                hasVideo={!!recordedVideo}
+                hasCharacter={!!selectedCharacter}
                 onGenerate={handleProcess}
                 sendViaEmail={sendViaEmail}
                 onSendViaEmailChange={setSendViaEmail}

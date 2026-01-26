@@ -23,6 +23,8 @@ interface CharacterGridProps {
   children?: React.ReactNode
   // Generate video CTA props
   canGenerate?: boolean
+  hasVideo?: boolean
+  hasCharacter?: boolean
   onGenerate?: () => void
   sendViaEmail?: boolean
   onSendViaEmailChange?: (value: boolean) => void
@@ -39,6 +41,8 @@ export function CharacterGrid({
   onHideDefault,
   children,
   canGenerate = false,
+  hasVideo = false,
+  hasCharacter = false,
   onGenerate,
   sendViaEmail = true,
   onSendViaEmailChange,
@@ -49,6 +53,7 @@ export function CharacterGrid({
   const [isDragOver, setIsDragOver] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
   const [showAiPrompt, setShowAiPrompt] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
   
   const visibleDefaultCharacters = defaultCharacters.filter(c => !hiddenDefaultIds.includes(c.id))
   const allCharacters = [...visibleDefaultCharacters, ...customCharacters]
@@ -440,10 +445,30 @@ export function CharacterGrid({
             )}>
               generation takes 3-4 minutes. we{"'"}ll email you when complete.
             </p>
+            {generateError && (
+              <p className="font-mono text-[11px] text-amber-400">
+                {generateError}
+              </p>
+            )}
             <button
-              onClick={onGenerate}
-              disabled={!canGenerate}
-              className="flex h-10 w-full items-center justify-center rounded-lg bg-white font-mono text-[13px] font-medium text-black transition-all hover:bg-neutral-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => {
+                if (canGenerate) {
+                  setGenerateError(null)
+                  onGenerate()
+                } else if (!hasVideo && !hasCharacter) {
+                  setGenerateError("record a video and select a character first")
+                } else if (!hasVideo) {
+                  setGenerateError("record a video first")
+                } else if (!hasCharacter) {
+                  setGenerateError("select a character first")
+                }
+              }}
+              className={cn(
+                "flex h-10 w-full items-center justify-center rounded-lg font-mono text-[13px] font-medium transition-all active:scale-[0.98]",
+                canGenerate 
+                  ? "bg-white text-black hover:bg-neutral-200" 
+                  : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+              )}
             >
               Generate video
             </button>
