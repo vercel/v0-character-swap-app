@@ -140,12 +140,14 @@ export function CameraPreview({
     }
 
     mediaRecorder.onstop = () => {
+      console.log("[v0] mediaRecorder.onstop fired, chunks count:", chunksRef.current.length)
       // Stop canvas drawing
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
         animationFrameRef.current = null
       }
       const blob = new Blob(chunksRef.current, { type: mimeType })
+      console.log("[v0] Created blob, size:", blob.size, "type:", blob.type)
       onVideoRecorded(blob)
     }
 
@@ -213,7 +215,9 @@ export function CameraPreview({
   }, [beginRecording])
 
   const stopRecording = useCallback(() => {
+    console.log("[v0] stopRecording called, mediaRecorder state:", mediaRecorderRef.current?.state)
     if (mediaRecorderRef.current?.state === "recording") {
+      console.log("[v0] Stopping mediaRecorder...")
       mediaRecorderRef.current.stop()
     }
     if (animationFrameRef.current) {
