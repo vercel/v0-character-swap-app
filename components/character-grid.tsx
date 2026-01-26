@@ -14,31 +14,46 @@ export type { Character }
 interface CharacterGridProps {
   selectedId: number | null
   onSelect: (id: number) => void
-  disabled: boolean
+  disabled?: boolean
   customCharacters: Character[]
   onAddCustom: (character: Character) => void
   onDeleteCustom?: (id: number) => void
   hiddenDefaultIds?: number[]
   onHideDefault?: (id: number) => void
   children?: React.ReactNode
+  // Generate video CTA props
+  canGenerate?: boolean
+  hasVideo?: boolean
+  hasCharacter?: boolean
+  onGenerate?: () => void
+  sendViaEmail?: boolean
+  onSendViaEmailChange?: (value: boolean) => void
 }
 
 export function CharacterGrid({ 
   selectedId, 
   onSelect, 
-  disabled, 
+  disabled = false, 
   customCharacters, 
   onAddCustom,
   onDeleteCustom,
   hiddenDefaultIds = [],
   onHideDefault,
-  children
+  children,
+  canGenerate = false,
+  hasVideo = false,
+  hasCharacter = false,
+  onGenerate,
+  sendViaEmail = true,
+  onSendViaEmailChange,
 }: CharacterGridProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [prompt, setPrompt] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
+  const [showAiPrompt, setShowAiPrompt] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
   
   const visibleDefaultCharacters = defaultCharacters.filter(c => !hiddenDefaultIds.includes(c.id))
   const allCharacters = [...visibleDefaultCharacters, ...customCharacters]
@@ -251,7 +266,8 @@ export function CharacterGrid({
             )
           })}
           
-<div className="relative">
+{/* Upload card */}
+          <div className="relative">
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || isUploading}
@@ -300,6 +316,37 @@ export function CharacterGrid({
             </div>
           </div>
           
+          {/* AI Generate card */}
+          <div className="relative">
+            <button
+              onClick={() => setShowAiPrompt(!showAiPrompt)}
+              disabled={disabled || isGenerating}
+              className={cn(
+                "aspect-[3/4] w-full rounded-lg border border-dashed transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                showAiPrompt ? "border-white" : "border-neutral-700 hover:border-neutral-500"
+              )}
+            >
+              <div className="flex h-full flex-col items-center justify-center gap-1 text-neutral-500">
+                {isGenerating ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span className="font-mono text-[9px] lowercase">creating...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
+                    </svg>
+                    <span className="font-mono text-[9px] lowercase">ai create</span>
+                  </>
+                )}
+              </div>
+            </button>
+          </div>
+          
           <input
             ref={fileInputRef}
             type="file"
@@ -308,6 +355,51 @@ export function CharacterGrid({
             className="hidden"
           />
         </div>
+        
+        {/* AI Prompt Bar - shows inline below the grid */}
+        {showAiPrompt && (
+          <div className="mt-3 rounded-lg bg-neutral-900 p-3">
+            {isGenerating ? (
+              <div className="space-y-2">
+                <p className="font-mono text-[11px] text-neutral-400">
+                  Generating with <span className="text-white">Nano Banana Pro</span>...
+                </p>
+                <div className="h-px w-full overflow-hidden bg-neutral-800">
+                  <div 
+                    className="h-full bg-white transition-all duration-100 ease-linear"
+                    style={{ width: `${generationProgress}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  id="ai-prompt-input"
+                  type="text"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      handleGenerate()
+                    }
+                  }}
+                  placeholder="describe a character..."
+                  disabled={disabled}
+                  autoFocus
+                  className="h-8 flex-1 rounded-md border-0 bg-neutral-800 px-3 font-mono text-[12px] text-white placeholder-neutral-500 outline-none transition-colors focus:ring-1 focus:ring-neutral-600 disabled:opacity-50"
+                />
+                <button
+                  onClick={handleGenerate}
+                  disabled={disabled || !prompt.trim()}
+                  className="flex h-8 items-center justify-center rounded-md bg-white px-3 font-mono text-[11px] text-black transition-opacity hover:opacity-80 disabled:opacity-30"
+                >
+                  go
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Upload error message */}
         {uploadError && (
@@ -326,50 +418,63 @@ export function CharacterGrid({
         {children}
       </div>
       
-      <div className="shrink-0 border-t border-neutral-800 pt-4">
-        {isGenerating ? (
-          <div className="space-y-3">
-            <p className="font-mono text-[11px] text-neutral-400">
-              Generating with <span className="text-white">Nano Banana Pro</span>...
+      {/* Generate Video CTA - Always visible */}
+      {onGenerate && (
+        <div className="shrink-0 border-t border-neutral-800 pt-4">
+          <div className="flex flex-col gap-4">
+            {onSendViaEmailChange && (
+              <label className={cn(
+                "flex cursor-pointer items-center gap-2",
+                !canGenerate && "opacity-50 pointer-events-none"
+              )}>
+                <input
+                  type="checkbox"
+                  checked={sendViaEmail}
+                  onChange={(e) => onSendViaEmailChange(e.target.checked)}
+                  disabled={!canGenerate}
+                  className="h-3 w-3 rounded-sm border-neutral-700 bg-transparent accent-white"
+                />
+                <span className="font-mono text-[11px] text-neutral-500">
+                  send video via email when ready
+                </span>
+              </label>
+            )}
+            <p className={cn(
+              "font-mono text-[10px] text-neutral-600",
+              !canGenerate && "opacity-50"
+            )}>
+              generation takes 3-4 minutes. we{"'"}ll email you when complete.
             </p>
-            <div className="h-px w-full overflow-hidden bg-neutral-800">
-              <div 
-                className="h-full bg-white transition-all duration-100 ease-linear"
-                style={{ width: `${generationProgress}%` }}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <input
-              type="text"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault()
-                  handleGenerate()
+            {generateError && (
+              <p className="font-mono text-[11px] text-amber-400">
+                {generateError}
+              </p>
+            )}
+            <button
+              onClick={() => {
+                if (canGenerate) {
+                  setGenerateError(null)
+                  onGenerate()
+                } else if (!hasVideo && !hasCharacter) {
+                  setGenerateError("record a video and select a character first")
+                } else if (!hasVideo) {
+                  setGenerateError("record a video first")
+                } else if (!hasCharacter) {
+                  setGenerateError("select a character first")
                 }
               }}
-              placeholder="describe a character..."
-              disabled={disabled}
-              className="h-9 w-full rounded-none border-0 border-b border-neutral-700 bg-transparent px-0 font-mono text-[13px] text-white placeholder-neutral-600 outline-none transition-colors focus:border-neutral-500 disabled:opacity-50"
-            />
-            <div className="flex items-center justify-between">
-              <p className="font-mono text-[10px] text-neutral-600">
-                create with <span className="text-neutral-500">nano banana pro</span> via <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="text-neutral-500 underline decoration-neutral-700 underline-offset-2 transition-colors hover:text-neutral-400">ai gateway</a>
-              </p>
-              <button
-                onClick={handleGenerate}
-                disabled={disabled || !prompt.trim()}
-                className="font-mono text-[11px] text-white transition-opacity hover:opacity-70 disabled:opacity-30"
-              >
-                go
-              </button>
-            </div>
+              className={cn(
+                "flex h-10 w-full items-center justify-center rounded-lg font-mono text-[13px] font-medium transition-all active:scale-[0.98]",
+                canGenerate 
+                  ? "bg-white text-black hover:bg-neutral-200" 
+                  : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+              )}
+            >
+              Generate video
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
