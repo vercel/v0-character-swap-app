@@ -413,16 +413,20 @@ export function CharacterGrid({
         {children}
       </div>
       
-      {/* Generate Video CTA */}
-      {canGenerate && onGenerate && (
+      {/* Generate Video CTA - Always visible */}
+      {onGenerate && (
         <div className="shrink-0 border-t border-neutral-800 pt-4">
           <div className="flex flex-col gap-4">
             {onSendViaEmailChange && (
-              <label className="flex cursor-pointer items-center gap-2">
+              <label className={cn(
+                "flex cursor-pointer items-center gap-2",
+                !canGenerate && "opacity-50 pointer-events-none"
+              )}>
                 <input
                   type="checkbox"
                   checked={sendViaEmail}
                   onChange={(e) => onSendViaEmailChange(e.target.checked)}
+                  disabled={!canGenerate}
                   className="h-3 w-3 rounded-sm border-neutral-700 bg-transparent accent-white"
                 />
                 <span className="font-mono text-[11px] text-neutral-500">
@@ -430,12 +434,16 @@ export function CharacterGrid({
                 </span>
               </label>
             )}
-            <p className="font-mono text-[10px] text-neutral-600">
+            <p className={cn(
+              "font-mono text-[10px] text-neutral-600",
+              !canGenerate && "opacity-50"
+            )}>
               generation takes 3-4 minutes. we{"'"}ll email you when complete.
             </p>
             <button
               onClick={onGenerate}
-              className="flex h-10 w-full items-center justify-center rounded-lg bg-white font-mono text-[13px] font-medium text-black transition-all hover:bg-neutral-200 active:scale-[0.98]"
+              disabled={!canGenerate}
+              className="flex h-10 w-full items-center justify-center rounded-lg bg-white font-mono text-[13px] font-medium text-black transition-all hover:bg-neutral-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >
               Generate video
             </button>
