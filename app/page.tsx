@@ -177,34 +177,7 @@ export default function Home() {
     )
   }
 
-  const renderGenerateSection = (size: "desktop" | "mobile") => {
-    if (!recordedVideo || !selectedCharacter || resultUrl) return null
-    
-    return (
-      <div className={`${size === "desktop" ? "mt-4" : "mt-6"} flex flex-col gap-4 border-t border-neutral-800 pt-4`}>
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={sendViaEmail}
-            onChange={(e) => setSendViaEmail(e.target.checked)}
-            className="h-3 w-3 rounded-sm border-neutral-700 bg-transparent accent-white"
-          />
-          <span className="font-mono text-[11px] text-neutral-500">
-            send video via email when ready
-          </span>
-        </label>
-        <p className="font-mono text-[10px] text-neutral-600">
-          generation takes 3-4 minutes. we{"'"}ll email you when complete.
-        </p>
-        <button
-          onClick={handleProcess}
-          className="font-mono text-[11px] text-white transition-opacity hover:opacity-70"
-        >
-          generate →
-        </button>
-      </div>
-    )
-  }
+  
 
   return (
     <main className="relative flex h-[100dvh] flex-row overflow-hidden bg-black">
@@ -309,6 +282,10 @@ export default function Home() {
                 onDeleteCustom={deleteCustomCharacter}
                 hiddenDefaultIds={hiddenDefaultIds}
                 onHideDefault={hideDefaultCharacter}
+                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
+                onGenerate={handleProcess}
+                sendViaEmail={sendViaEmail}
+                onSendViaEmailChange={setSendViaEmail}
               >
                 <GenerationsPanel
                 onSelectVideo={(url) => {
@@ -319,7 +296,6 @@ export default function Home() {
               />
             </CharacterGrid>
           </div>
-          {renderGenerateSection("desktop")}
         </div>
       )}
 
@@ -373,6 +349,10 @@ export default function Home() {
                 onDeleteCustom={deleteCustomCharacter}
                 hiddenDefaultIds={hiddenDefaultIds}
                 onHideDefault={hideDefaultCharacter}
+                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
+                onGenerate={handleProcess}
+                sendViaEmail={sendViaEmail}
+                onSendViaEmailChange={setSendViaEmail}
               >
                 <GenerationsPanel
                   onSelectVideo={(url) => {
@@ -383,7 +363,6 @@ export default function Home() {
                   className="mt-4 border-t border-neutral-800 pt-4"
                 />
               </CharacterGrid>
-              {renderGenerateSection("mobile")}
             </>
           )}
         </BottomSheet>
