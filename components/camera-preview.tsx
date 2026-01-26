@@ -1,8 +1,6 @@
 "use client"
 
 import { useRef, useState, useCallback, useEffect } from "react"
-import Image from "next/image"
-import type { Character } from "@/lib/types"
 
 interface CameraPreviewProps {
   onVideoRecorded: (videoBlob: Blob) => void
@@ -10,41 +8,11 @@ interface CameraPreviewProps {
   progress?: number
   progressMessage?: string
   isError?: boolean
-  // New props for character selection flow
-  recordedVideoUrl?: string | null
-  showCharacterSelection?: boolean
-  characters?: Character[]
-  selectedCharacter?: number | null
-  onSelectCharacter?: (id: number) => void
-  onGenerate?: () => void
-  onReRecord?: () => void
-  isUploading?: boolean
-  customCharacters?: Character[]
-  onAddCustomCharacter?: (file: File) => void
-  isUploadingCharacter?: boolean
 }
 
-export function CameraPreview({ 
-  onVideoRecorded, 
-  isProcessing, 
-  progress, 
-  progressMessage, 
-  isError,
-  recordedVideoUrl,
-  showCharacterSelection,
-  characters = [],
-  selectedCharacter,
-  onSelectCharacter,
-  onGenerate,
-  onReRecord,
-  isUploading,
-  customCharacters = [],
-  onAddCustomCharacter,
-  isUploadingCharacter,
-}: CameraPreviewProps) {
+export function CameraPreview({ onVideoRecorded, isProcessing, progress, progressMessage, isError }: CameraPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const animationFrameRef = useRef<number | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -227,141 +195,10 @@ export function CameraPreview({
     }
   }, [])
 
-  const allCharacters = [...characters, ...customCharacters]
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file && onAddCustomCharacter) {
-      onAddCustomCharacter(file)
-      e.target.value = ""
-    }
-  }
-
   if (hasPermission === false) {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-neutral-500">Camera access denied</p>
-      </div>
-    )
-  }
-
-  // Show character selection overlay when video is recorded
-  if (showCharacterSelection && recordedVideoUrl) {
-    return (
-      <div className="relative flex h-full w-full items-start justify-center md:items-center">
-        <div className="relative aspect-[9/16] w-full max-w-none overflow-hidden rounded-none bg-neutral-900 md:h-full md:max-h-[80vh] md:max-w-sm md:rounded-2xl">
-          {/* Background video playing in loop */}
-          <video
-            src={recordedVideoUrl}
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="h-full w-full object-cover"
-          />
-          
-          {/* Dark overlay */}
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" />
-          
-          {/* Character selection UI */}
-          <div className="absolute inset-0 flex flex-col">
-            {/* Upload status indicator */}
-            {isUploading && (
-              <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/40 px-3 py-1.5 backdrop-blur-sm md:left-4 md:top-4">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
-                <span className="font-mono text-[11px] text-white">uploading...</span>
-              </div>
-            )}
-            
-            {/* Re-record button */}
-            <button
-              onClick={onReRecord}
-              className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 font-mono text-[11px] text-white backdrop-blur-sm transition-colors hover:bg-black/60 md:right-4 md:top-4"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              re-record
-            </button>
-            
-            {/* Main content */}
-            <div className="flex flex-1 flex-col justify-end p-4 pb-6 md:p-6">
-              <div className="flex flex-col gap-4">
-                <p className="font-mono text-[11px] lowercase text-neutral-400">
-                  select character
-                </p>
-                
-                {/* Character grid - horizontal scrollable on mobile, grid on desktop */}
-                <div className="flex gap-2 overflow-x-auto pb-2 md:grid md:grid-cols-5 md:gap-2 md:overflow-visible md:pb-0">
-                  {allCharacters.map((char) => (
-                    <button
-                      key={char.id}
-                      onClick={() => onSelectCharacter?.(char.id)}
-                      className={`relative aspect-[3/4] w-14 shrink-0 overflow-hidden rounded-lg transition-all md:w-auto ${
-                        selectedCharacter === char.id 
-                          ? "ring-2 ring-white" 
-                          : "ring-1 ring-white/20 hover:ring-white/40"
-                      }`}
-                    >
-                      <Image
-                        src={char.src || "/placeholder.svg"}
-                        alt={char.name}
-                        fill
-                        className="object-cover"
-                        sizes="56px"
-                      />
-                    </button>
-                  ))}
-                  
-                  {/* Upload button */}
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploadingCharacter}
-                    className="flex aspect-[3/4] w-14 shrink-0 items-center justify-center rounded-lg border border-dashed border-white/30 transition-colors hover:border-white/50 md:w-auto"
-                  >
-                    {isUploadingCharacter ? (
-                      <svg className="h-4 w-4 animate-spin text-white/50" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                    ) : (
-                      <svg className="h-4 w-4 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-                
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                
-                {/* Generate button */}
-                <button
-                  onClick={onGenerate}
-                  disabled={!selectedCharacter || isUploading}
-                  className="flex h-12 w-full items-center justify-center rounded-full bg-white font-sans text-[14px] font-semibold text-black transition-all hover:bg-neutral-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isUploading ? (
-                    <>
-                      <svg className="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Uploading video...
-                    </>
-                  ) : (
-                    "Generate"
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     )
   }

@@ -3,8 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import Image from "next/image"
 import { CameraPreview } from "@/components/camera-preview"
-import { CharacterGrid } from "@/components/character-grid"
-import { upload } from "@vercel/blob/client"
+import { CharacterGrid, defaultCharacters } from "@/components/character-grid"
 import { useAuth } from "@/components/auth-provider"
 import { BottomSheet } from "@/components/bottom-sheet"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -23,7 +22,7 @@ export default function Home() {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [sendViaEmail, setSendViaEmail] = useState(true)
   const [resultUrl, setResultUrl] = useState<string | null>(null)
-  const [, setSelectedGeneratedVideo] = useState<string | null>(null)
+  const [selectedGeneratedVideo, setSelectedGeneratedVideo] = useState<string | null>(null)
   const [bottomSheetExpanded, setBottomSheetExpanded] = useState(false)
   const [pendingAutoSubmit, setPendingAutoSubmit] = useState(false)
   const [emailSent] = useState(false)
@@ -46,6 +45,8 @@ export default function Home() {
     recordedVideoUrl,
     uploadedVideoUrl,
     isUploading,
+    showPreview,
+    setShowPreview,
     handleVideoRecorded,
     clearRecording,
     restoreFromSession,
@@ -53,7 +54,6 @@ export default function Home() {
   } = useVideoRecording()
 
   const [errorToast, setErrorToast] = useState<string | null>(null)
-  const [isUploadingCharacter, setIsUploadingCharacter] = useState(false)
   
   const {
     processVideo,
@@ -101,7 +101,12 @@ export default function Home() {
     }
   }, [pendingAutoSubmit, user, recordedVideo, selectedCharacter, allCharacters, processVideo, sendViaEmail, uploadedVideoUrl])
 
-  
+  // Auto-expand bottom sheet when video is recorded
+  useEffect(() => {
+    if (isMobile && recordedVideo && !resultUrl) {
+      setBottomSheetExpanded(true)
+    }
+  }, [isMobile, recordedVideo, resultUrl])
 
   // Handlers
   const handleProcess = useCallback(() => {
@@ -119,48 +124,6 @@ export default function Home() {
     setSelectedGeneratedVideo(null)
   }, [clearRecording, setSelectedCharacter])
 
-  // Handle character image upload from CameraPreview
-  const handleAddCustomCharacterFromFile = useCallback(async (file: File) => {
-    setIsUploadingCharacter(true)
-    try {
-      // Validate dimensions first
-      const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-        const img = new window.Image()
-        img.onload = () => {
-          URL.revokeObjectURL(img.src)
-          resolve({ width: img.naturalWidth, height: img.naturalHeight })
-        }
-        img.onerror = () => {
-          URL.revokeObjectURL(img.src)
-          reject(new Error("Failed to load image"))
-        }
-        img.src = URL.createObjectURL(file)
-      })
-      
-      if (dimensions.width < 340 || dimensions.height < 340) {
-        setErrorToast(`Image too small (${dimensions.width}x${dimensions.height}). Min 340x340px.`)
-        setTimeout(() => setErrorToast(null), 5000)
-        return
-      }
-
-      // Upload to Vercel Blob
-      const blob = await upload(`reference-images/${Date.now()}-${file.name}`, file, {
-        access: "public",
-        handleUploadUrl: "/api/upload",
-      })
-      
-      const newId = Math.max(...allCharacters.map(c => c.id), 0) + 1
-      addCustomCharacter({ id: newId, src: blob.url, name: `Custom ${customCharacters.length + 1}` })
-      setSelectedCharacter(newId)
-    } catch (error) {
-      console.error("Failed to upload image:", error)
-      setErrorToast("Failed to upload image")
-      setTimeout(() => setErrorToast(null), 5000)
-    } finally {
-      setIsUploadingCharacter(false)
-    }
-  }, [allCharacters, customCharacters, addCustomCharacter, setSelectedCharacter])
-
   const handleLoginAndContinue = useCallback(async () => {
     if (recordedVideo) {
       await saveToSession(recordedVideo, selectedCharacter)
@@ -170,8 +133,11 @@ export default function Home() {
   }, [recordedVideo, selectedCharacter, saveToSession, login])
 
   // Render helpers
-  const renderAuthSection = (_size: "desktop" | "mobile") => {
+  const renderAuthSection = (size: "desktop" | "mobile") => {
     if (!mounted) return null
+    
+    const avatarSize = size === "desktop" ? "h-5 w-5" : "h-6 w-6"
+    const textSize = size === "desktop" ? "text-[12px]" : "text-[13px]"
     
     if (user) {
       return (
@@ -294,28 +260,44 @@ export default function Home() {
               </button>
             </div>
           </div>
+        ) : recordedVideoUrl ? (
+          <div className="relative flex h-full w-full items-center justify-center">
+            <div className="relative aspect-[9/16] h-full max-h-[80vh] w-full max-w-sm overflow-hidden rounded-2xl bg-neutral-900">
+              <video 
+                src={recordedVideoUrl} 
+                controls 
+                autoPlay 
+                muted
+                loop 
+                playsInline
+                className="h-full w-full object-cover" 
+                onLoadedData={(e) => {
+                  // Unmute after autoplay starts
+                  const video = e.currentTarget
+                  video.muted = false
+                }}
+              />
+              <button
+                onClick={() => {
+                  setShowPreview(false)
+                  clearRecording()
+                }}
+                className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-5 py-2.5 font-sans text-[13px] font-medium text-white backdrop-blur-md transition-all hover:bg-black/60 active:scale-95"
+              >
+                Re-record
+              </button>
+            </div>
+          </div>
         ) : (
           <CameraPreview
             onVideoRecorded={handleVideoRecorded}
             isProcessing={false}
-            // Character selection props
-            recordedVideoUrl={recordedVideoUrl}
-            showCharacterSelection={!!recordedVideoUrl}
-            characters={visibleDefaultCharacters}
-            customCharacters={customCharacters}
-            selectedCharacter={selectedCharacter}
-            onSelectCharacter={setSelectedCharacter}
-            onGenerate={handleProcess}
-            onReRecord={clearRecording}
-            isUploading={isUploading}
-            onAddCustomCharacter={handleAddCustomCharacterFromFile}
-            isUploadingCharacter={isUploadingCharacter}
           />
         )}
       </div>
 
-      {/* Desktop Sidebar - hide when video is recorded (selection happens in camera view) */}
-      {!isMobile && !recordedVideoUrl && (
+      {/* Desktop Sidebar */}
+      {!isMobile && (
         <div className="flex h-full w-96 flex-col border-l border-neutral-800 bg-neutral-950 p-5">
           {renderAuthSection("desktop")}
           <div className="min-h-0 flex-1">
@@ -341,8 +323,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* Mobile Bottom Sheet - only show when no video recorded */}
-      {isMobile && !recordedVideoUrl && (
+      {/* Mobile Bottom Sheet */}
+      {isMobile && (
         <BottomSheet
           isExpanded={bottomSheetExpanded}
           onExpandedChange={setBottomSheetExpanded}

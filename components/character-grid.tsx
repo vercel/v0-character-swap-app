@@ -14,7 +14,7 @@ export type { Character }
 interface CharacterGridProps {
   selectedId: number | null
   onSelect: (id: number) => void
-  disabled?: boolean
+  disabled: boolean
   customCharacters: Character[]
   onAddCustom: (character: Character) => void
   onDeleteCustom?: (id: number) => void
@@ -26,7 +26,7 @@ interface CharacterGridProps {
 export function CharacterGrid({ 
   selectedId, 
   onSelect, 
-  disabled = false, 
+  disabled, 
   customCharacters, 
   onAddCustom,
   onDeleteCustom,
