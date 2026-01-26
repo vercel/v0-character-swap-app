@@ -382,8 +382,8 @@ export default function Home() {
         )}
       </div>
 
-      {/* Desktop Sidebar - hide when video is recorded (selection is on camera overlay) */}
-      {!isMobile && !recordedVideoUrl && (
+      {/* Desktop Sidebar */}
+      {!isMobile && (
         <div className="flex h-full w-96 flex-col border-l border-neutral-800 bg-neutral-950 p-5">
           {renderAuthSection("desktop")}
           <div className="min-h-0 flex-1">
@@ -410,8 +410,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* Mobile Bottom Sheet - hide when video is recorded (selection is on camera overlay) */}
-      {isMobile && !recordedVideoUrl && (
+      {/* Mobile Bottom Sheet */}
+      {isMobile && (
         <BottomSheet
           isExpanded={bottomSheetExpanded}
           onExpandedChange={setBottomSheetExpanded}
