@@ -8,9 +8,10 @@ interface CameraPreviewProps {
   progress?: number
   progressMessage?: string
   isError?: boolean
+  onAspectRatioChange?: (aspectRatio: "9:16" | "16:9" | "fill") => void
 }
 
-export function CameraPreview({ onVideoRecorded, isProcessing, progress, progressMessage, isError }: CameraPreviewProps) {
+export function CameraPreview({ onVideoRecorded, isProcessing, progress, progressMessage, isError, onAspectRatioChange }: CameraPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animationFrameRef = useRef<number | null>(null)
@@ -23,7 +24,12 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
   const [countdown, setCountdown] = useState<number | null>(null)
   const [showFlash, setShowFlash] = useState(false)
   const [showTips, setShowTips] = useState(true)
-  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9" | "fill">("9:16")
+  const [aspectRatio, setAspectRatioState] = useState<"9:16" | "16:9" | "fill">("9:16")
+  
+  const setAspectRatio = useCallback((newRatio: "9:16" | "16:9" | "fill") => {
+    setAspectRatioState(newRatio)
+    onAspectRatioChange?.(newRatio)
+  }, [onAspectRatioChange])
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const countdownRef = useRef<NodeJS.Timeout | null>(null)
   const isStartingRef = useRef(false)

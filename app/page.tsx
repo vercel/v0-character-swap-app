@@ -26,6 +26,7 @@ export default function Home() {
   const [bottomSheetExpanded, setBottomSheetExpanded] = useState(false)
   const [pendingAutoSubmit, setPendingAutoSubmit] = useState(false)
   const [emailSent] = useState(false)
+  const [currentAspectRatio, setCurrentAspectRatio] = useState<"9:16" | "16:9" | "fill">("9:16")
 
   // Custom hooks
   const {
@@ -183,7 +184,7 @@ export default function Home() {
   return (
     <main className="relative flex h-[100dvh] flex-row overflow-hidden bg-black">
       {/* Camera/Video Section */}
-      <div className={`flex flex-1 items-center justify-center ${isMobile ? "p-0" : "p-6"}`}>
+      <div className={`flex flex-1 items-center justify-center ${isMobile ? "p-0" : currentAspectRatio === "fill" ? "p-0" : "p-6"}`}>
         {resultUrl ? (
           <div className="relative flex h-full w-full flex-col items-center justify-center gap-4">
             <div className={`relative overflow-hidden bg-neutral-900 rounded-2xl ${
@@ -274,6 +275,7 @@ export default function Home() {
           <CameraPreview
             onVideoRecorded={handleVideoRecorded}
             isProcessing={false}
+            onAspectRatioChange={setCurrentAspectRatio}
           />
         )}
       </div>
