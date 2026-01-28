@@ -23,7 +23,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
   const [countdown, setCountdown] = useState<number | null>(null)
   const [showFlash, setShowFlash] = useState(false)
   const [showTips, setShowTips] = useState(true)
-  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9">("16:9")
+  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const countdownRef = useRef<NodeJS.Timeout | null>(null)
   const isStartingRef = useRef(false)
@@ -39,9 +39,10 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: "user", 
+          // For "fill" mode, request 16:9 as base (most webcams are 16:9)
           width: isVertical ? 720 : 1280, 
           height: isVertical ? 1280 : 720, 
-          aspectRatio: isVertical ? 9/16 : 16/9 
+          ...(aspectRatio !== "fill" && { aspectRatio: isVertical ? 9/16 : 16/9 })
         },
         audio: true,
       })
@@ -126,7 +127,8 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         animationFrameRef.current = null
       }
       const blob = new Blob(chunksRef.current, { type: mimeType })
-      onVideoRecorded(blob, aspectRatio)
+      // For "fill" mode, report as 16:9 since that's what most webcams capture
+      onVideoRecorded(blob, aspectRatio === "9:16" ? "9:16" : "16:9")
     }
 
     mediaRecorderRef.current = mediaRecorder
@@ -220,7 +222,9 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
       <div className={`relative overflow-hidden bg-neutral-900 md:rounded-2xl ${
         aspectRatio === "9:16" 
           ? "aspect-[9/16] h-full max-h-full w-auto rounded-none md:max-h-[80vh] md:max-w-sm" 
-          : "aspect-[16/9] h-auto w-full max-w-full rounded-2xl md:max-h-[80vh] md:max-w-4xl"
+          : aspectRatio === "16:9"
+            ? "aspect-[16/9] h-auto w-full max-w-full rounded-2xl md:max-h-[80vh] md:max-w-4xl"
+            : "h-full w-full rounded-none md:rounded-2xl"
       }`}>
         <video
           ref={videoRef}
@@ -292,6 +296,21 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         {!isRecording && !isProcessing && countdown === null && hasPermission && (
           <div className="absolute right-3 top-3 z-40 hidden md:flex md:right-4 md:top-4">
             <div className="flex rounded-lg bg-black/60 p-1 backdrop-blur-sm">
+              <button
+                onClick={() => setAspectRatio("fill")}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition-colors ${
+                  aspectRatio === "fill" 
+                    ? "bg-white text-black" 
+                    : "text-neutral-400 hover:text-white"
+                }`}
+                title="Fill available space"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="1" y="1" width="12" height="12" rx="1" />
+                  <path d="M1 5h12M1 9h12" strokeOpacity="0.4" />
+                </svg>
+                Fill
+              </button>
               <button
                 onClick={() => setAspectRatio("9:16")}
                 className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition-colors ${
