@@ -8,9 +8,10 @@ interface CameraPreviewProps {
   progress?: number
   progressMessage?: string
   isError?: boolean
+  onAspectRatioChange?: (aspectRatio: "9:16" | "16:9" | "fill") => void
 }
 
-export function CameraPreview({ onVideoRecorded, isProcessing, progress, progressMessage, isError }: CameraPreviewProps) {
+export function CameraPreview({ onVideoRecorded, isProcessing, progress, progressMessage, isError, onAspectRatioChange }: CameraPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animationFrameRef = useRef<number | null>(null)
@@ -23,7 +24,12 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
   const [countdown, setCountdown] = useState<number | null>(null)
   const [showFlash, setShowFlash] = useState(false)
   const [showTips, setShowTips] = useState(true)
-  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9" | "fill">("9:16")
+  const [aspectRatio, setAspectRatioState] = useState<"9:16" | "16:9" | "fill">("9:16")
+  
+  const setAspectRatio = useCallback((newRatio: "9:16" | "16:9" | "fill") => {
+    setAspectRatioState(newRatio)
+    onAspectRatioChange?.(newRatio)
+  }, [onAspectRatioChange])
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const countdownRef = useRef<NodeJS.Timeout | null>(null)
   const isStartingRef = useRef(false)
@@ -218,13 +224,73 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
   }
 
   return (
-    <div className="relative flex h-full w-full items-start justify-center md:items-center">
-      <div className={`relative overflow-hidden bg-neutral-900 md:rounded-2xl ${
+    <div className={`relative flex h-full w-full ${
+      aspectRatio === "fill" 
+        ? "" 
+        : "items-start justify-center md:items-center"
+    }`}>
+      {/* Aspect ratio selector - positioned in preview zone corner, not video corner */}
+      {!isRecording && !isProcessing && countdown === null && hasPermission && (
+        <div className="absolute right-4 top-4 z-50 hidden flex-col items-end gap-2 md:flex">
+          <div className="flex rounded-lg bg-black/60 p-1 backdrop-blur-sm">
+            <button
+              onClick={() => setAspectRatio("fill")}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition-colors ${
+                aspectRatio === "fill" 
+                  ? "bg-white text-black" 
+                  : "text-neutral-400 hover:text-white"
+              }`}
+              title="Fill available space"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="1" y="1" width="12" height="12" rx="1" />
+              </svg>
+              Fill
+            </button>
+            <button
+              onClick={() => setAspectRatio("9:16")}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition-colors ${
+                aspectRatio === "9:16" 
+                  ? "bg-white text-black" 
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="4" y="1" width="6" height="12" rx="1" />
+              </svg>
+              9:16
+            </button>
+            <button
+              onClick={() => setAspectRatio("16:9")}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition-colors ${
+                aspectRatio === "16:9" 
+                  ? "bg-white text-black" 
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="1" y="4" width="12" height="6" rx="1" />
+              </svg>
+              16:9
+            </button>
+          </div>
+          {/* Warning for non-portrait modes */}
+          {(aspectRatio === "16:9" || aspectRatio === "fill") && (
+            <div className="rounded-md bg-amber-500/20 px-2.5 py-1.5 backdrop-blur-sm">
+              <p className="font-mono text-[10px] text-amber-400">
+                Ensure head + upper body are clearly visible
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className={`relative overflow-hidden bg-neutral-900 ${
         aspectRatio === "9:16" 
-          ? "aspect-[9/16] h-full max-h-full w-auto rounded-none md:max-h-[80vh] md:max-w-sm" 
+          ? "aspect-[9/16] h-full max-h-full w-auto rounded-none md:max-h-[80vh] md:max-w-sm md:rounded-2xl" 
           : aspectRatio === "16:9"
             ? "aspect-[16/9] h-auto w-full max-w-full rounded-2xl md:max-h-[80vh] md:max-w-4xl"
-            : "h-full w-full rounded-none md:rounded-2xl"
+            : "h-full w-full rounded-none"
       }`}>
         <video
           ref={videoRef}
@@ -289,62 +355,6 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
             <span className="font-mono text-8xl font-bold text-white animate-in zoom-in duration-200">
               {countdown}
             </span>
-          </div>
-        )}
-
-        {/* Aspect ratio selector - desktop only, always visible when not recording */}
-        {!isRecording && !isProcessing && countdown === null && hasPermission && (
-          <div className="absolute right-3 top-3 z-40 hidden flex-col items-end gap-2 md:flex md:right-4 md:top-4">
-            <div className="flex rounded-lg bg-black/60 p-1 backdrop-blur-sm">
-              <button
-                onClick={() => setAspectRatio("fill")}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition-colors ${
-                  aspectRatio === "fill" 
-                    ? "bg-white text-black" 
-                    : "text-neutral-400 hover:text-white"
-                }`}
-                title="Fill available space"
-              >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="1" y="1" width="12" height="12" rx="1" />
-                </svg>
-                Fill
-              </button>
-              <button
-                onClick={() => setAspectRatio("9:16")}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition-colors ${
-                  aspectRatio === "9:16" 
-                    ? "bg-white text-black" 
-                    : "text-neutral-400 hover:text-white"
-                }`}
-              >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="4" y="1" width="6" height="12" rx="1" />
-                </svg>
-                9:16
-              </button>
-              <button
-                onClick={() => setAspectRatio("16:9")}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition-colors ${
-                  aspectRatio === "16:9" 
-                    ? "bg-white text-black" 
-                    : "text-neutral-400 hover:text-white"
-                }`}
-              >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="1" y="4" width="12" height="6" rx="1" />
-                </svg>
-                16:9
-              </button>
-            </div>
-            {/* Warning for non-portrait modes */}
-            {(aspectRatio === "16:9" || aspectRatio === "fill") && (
-              <div className="rounded-md bg-amber-500/20 px-2.5 py-1.5 backdrop-blur-sm">
-                <p className="font-mono text-[10px] text-amber-400">
-                  Ensure head + upper body are clearly visible
-                </p>
-              </div>
-            )}
           </div>
         )}
 
