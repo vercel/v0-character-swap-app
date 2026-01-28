@@ -205,13 +205,13 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
 
   return (
     <div className="relative flex h-full w-full items-start justify-center md:items-center">
-      <div className="relative aspect-[9/16] w-full max-w-none overflow-hidden rounded-none bg-neutral-900 md:h-full md:max-h-[80vh] md:max-w-sm md:rounded-2xl">
+      <div className="relative aspect-[9/16] h-full max-h-full w-auto overflow-hidden rounded-none bg-neutral-900 md:max-h-[80vh] md:w-full md:max-w-sm md:rounded-2xl">
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain md:object-cover"
           style={{ transform: "scaleX(-1)" }}
         />
         {/* Hidden canvas for mirrored recording */}
@@ -225,19 +225,40 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         {/* Tips overlay */}
         {showTips && hasPermission && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 px-6 backdrop-blur-sm">
-            <div className="flex max-w-[280px] flex-col gap-3">
-              <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
-                <span className="text-white">1.</span> Keep your head centered, avoid sudden movements
-              </p>
-              <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
-                <span className="text-white">2.</span> Good lighting on your face works best
-              </p>
-              <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
-                <span className="text-white">3.</span> Speak clearly - your audio will be preserved
-              </p>
-              <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
-                <span className="text-white">4.</span> Videos must be <span className="font-semibold text-white">3-30 seconds</span> long
-              </p>
+            <div className="flex max-w-[280px] flex-col gap-4">
+              <div>
+                <p className="font-mono text-[12px] text-neutral-400">
+                  Using{" "}
+                  <span className="text-white">Kling AI Motion Control</span>
+                  {" "}via{" "}
+                  <a 
+                    href="https://vercel.com/ai-gateway" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-white underline underline-offset-2 hover:text-neutral-300"
+                  >
+                    AI Gateway
+                  </a>
+                </p>
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                <p className="font-mono text-[11px] uppercase tracking-wide text-neutral-500">
+                  For best results
+                </p>
+                <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
+                  <span className="text-white">1.</span> <span className="font-semibold text-white">Keep moving</span> — the AI needs continuous motion
+                </p>
+                <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
+                  <span className="text-white">2.</span> Talk, gesture, turn your head
+                </p>
+                <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
+                  <span className="text-white">3.</span> Good lighting on your face
+                </p>
+                <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
+                  <span className="text-white">4.</span> Record <span className="font-semibold text-white">3-30 seconds</span>
+                </p>
+              </div>
             </div>
           </div>
         )}
