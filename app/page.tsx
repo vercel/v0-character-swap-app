@@ -201,7 +201,7 @@ export default function Home() {
                 muted
                 loop 
                 playsInline
-                className={`h-full w-full ${recordedAspectRatio === "fill" ? "object-cover" : "object-contain"}`}
+                className="h-full w-full object-cover"
                 onLoadedData={(e) => {
                   const video = e.currentTarget
                   video.muted = false
@@ -266,7 +266,7 @@ export default function Home() {
                 muted
                 loop 
                 playsInline
-                className={`h-full w-full ${recordedAspectRatio === "fill" ? "object-cover" : "object-contain"}`} 
+                className="h-full w-full object-cover" 
                 onLoadedData={(e) => {
                   // Unmute after autoplay starts
                   const video = e.currentTarget
