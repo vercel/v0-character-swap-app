@@ -218,13 +218,17 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
   }
 
   return (
-    <div className="relative flex h-full w-full items-start justify-center md:items-center">
-      <div className={`relative overflow-hidden bg-neutral-900 md:rounded-2xl ${
+    <div className={`relative flex h-full w-full ${
+      aspectRatio === "fill" 
+        ? "" 
+        : "items-start justify-center md:items-center"
+    }`}>
+      <div className={`relative overflow-hidden bg-neutral-900 ${
         aspectRatio === "9:16" 
-          ? "aspect-[9/16] h-full max-h-full w-auto rounded-none md:max-h-[80vh] md:max-w-sm" 
+          ? "aspect-[9/16] h-full max-h-full w-auto rounded-none md:max-h-[80vh] md:max-w-sm md:rounded-2xl" 
           : aspectRatio === "16:9"
             ? "aspect-[16/9] h-auto w-full max-w-full rounded-2xl md:max-h-[80vh] md:max-w-4xl"
-            : "h-full w-full rounded-none md:rounded-2xl"
+            : "h-full w-full rounded-none"
       }`}>
         <video
           ref={videoRef}
