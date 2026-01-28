@@ -225,25 +225,38 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         {/* Tips overlay */}
         {showTips && hasPermission && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 px-6 backdrop-blur-sm">
-            <div className="flex max-w-[240px] flex-col gap-4">
-              <p className="font-mono text-[11px] text-neutral-500">
-                Kling AI via{" "}
-                <a 
-                  href="https://vercel.com/ai-gateway" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-neutral-400 underline underline-offset-2 hover:text-white"
-                >
-                  AI Gateway
-                </a>
-              </p>
-              
-              <div className="flex flex-col gap-1.5">
-                <p className="font-mono text-[13px] text-neutral-300">
-                  <span className="font-semibold text-white">Move continuously</span> — the AI needs motion
+            <div className="flex max-w-[280px] flex-col gap-4">
+              <div>
+                <p className="font-mono text-[12px] text-neutral-400">
+                  Using{" "}
+                  <span className="text-white">Kling AI Motion Control</span>
+                  {" "}via{" "}
+                  <a 
+                    href="https://vercel.com/ai-gateway" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-white underline underline-offset-2 hover:text-neutral-300"
+                  >
+                    AI Gateway
+                  </a>
                 </p>
-                <p className="font-mono text-[12px] text-neutral-500">
-                  Talk, gesture, turn your head. 3-30s.
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                <p className="font-mono text-[11px] uppercase tracking-wide text-neutral-500">
+                  For best results
+                </p>
+                <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
+                  <span className="text-white">1.</span> <span className="font-semibold text-white">Keep moving</span> — the AI needs continuous motion
+                </p>
+                <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
+                  <span className="text-white">2.</span> Talk, gesture, turn your head
+                </p>
+                <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
+                  <span className="text-white">3.</span> Good lighting on your face
+                </p>
+                <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
+                  <span className="text-white">4.</span> Record <span className="font-semibold text-white">3-30 seconds</span>
                 </p>
               </div>
             </div>
