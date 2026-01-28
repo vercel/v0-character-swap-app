@@ -186,10 +186,10 @@ export default function Home() {
       <div className={`flex flex-1 items-center justify-center ${isMobile ? "p-0" : "p-6"}`}>
         {resultUrl ? (
           <div className="relative flex h-full w-full flex-col items-center justify-center gap-4">
-            <div className={`relative overflow-hidden bg-neutral-900 ${
+            <div className={`relative overflow-hidden bg-neutral-900 rounded-2xl ${
               recordedAspectRatio === "9:16"
-                ? "aspect-[9/16] h-full max-h-[70vh] w-auto max-w-sm rounded-2xl"
-                : "h-full w-full max-h-[80vh] rounded-2xl"
+                ? "aspect-[9/16] h-full max-h-[70vh] w-auto max-w-sm"
+                : "aspect-video w-full max-w-4xl"
             }`}>
               <video 
                 src={resultUrl} 
@@ -198,7 +198,7 @@ export default function Home() {
                 muted
                 loop 
                 playsInline
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
                 onLoadedData={(e) => {
                   const video = e.currentTarget
                   video.muted = false
@@ -240,10 +240,10 @@ export default function Home() {
           </div>
         ) : recordedVideoUrl ? (
           <div className="relative flex h-full w-full items-center justify-center">
-            <div className={`relative overflow-hidden bg-neutral-900 ${
+            <div className={`relative overflow-hidden bg-neutral-900 rounded-2xl ${
               recordedAspectRatio === "9:16"
-                ? "aspect-[9/16] h-full max-h-[80vh] w-auto max-w-sm rounded-2xl"
-                : "h-full w-full rounded-none md:rounded-2xl"
+                ? "aspect-[9/16] h-full max-h-[80vh] w-auto max-w-sm"
+                : "aspect-video w-full max-w-4xl"
             }`}>
               <video 
                 src={recordedVideoUrl} 
@@ -252,7 +252,7 @@ export default function Home() {
                 muted
                 loop 
                 playsInline
-                className="h-full w-full object-cover" 
+                className="h-full w-full object-contain" 
                 onLoadedData={(e) => {
                   // Unmute after autoplay starts
                   const video = e.currentTarget
