@@ -186,13 +186,13 @@ export default function Home() {
       {/* Camera/Video Section */}
       <div className={`flex flex-1 items-center justify-center ${isMobile ? "p-0" : currentAspectRatio === "fill" ? "p-0" : "p-6"}`}>
         {resultUrl ? (
-          <div className={`relative flex h-full w-full flex-col gap-4 ${recordedAspectRatio === "fill" ? "" : "items-center justify-center"}`}>
+          <div className={`relative flex h-full w-full ${recordedAspectRatio === "fill" ? "" : "items-center justify-center"}`}>
             <div className={`relative overflow-hidden bg-neutral-900 ${
               recordedAspectRatio === "9:16"
-                ? "aspect-[9/16] h-full max-h-[70vh] w-auto max-w-sm rounded-2xl"
+                ? "aspect-[9/16] h-full max-h-[85vh] w-auto rounded-2xl"
                 : recordedAspectRatio === "16:9"
                   ? "aspect-video w-full max-w-4xl rounded-2xl"
-                  : "h-full w-full flex-1"
+                  : "h-full w-full"
             }`}>
               <video 
                 src={resultUrl} 
@@ -201,44 +201,45 @@ export default function Home() {
                 muted
                 loop 
                 playsInline
-                className={`h-full w-full ${recordedAspectRatio === "fill" ? "object-cover" : "object-contain"}`}
+                className="h-full w-full object-cover"
                 onLoadedData={(e) => {
                   const video = e.currentTarget
                   video.muted = false
                 }}
               />
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={async () => {
-                  try {
-                    const response = await fetch(resultUrl)
-                    const blob = await response.blob()
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement("a")
-                    a.href = url
-                    a.download = "generated-video.mp4"
-                    document.body.appendChild(a)
-                    a.click()
-                    document.body.removeChild(a)
-                    URL.revokeObjectURL(url)
-                  } catch (error) {
-                    console.error("Download failed:", error)
-                  }
-                }}
-                className="flex items-center gap-2 rounded-full bg-white px-5 py-2.5 font-sans text-[13px] font-medium text-black transition-all hover:bg-neutral-200 active:scale-95"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Download
-              </button>
-              <button
-                onClick={handleReset}
-                className="rounded-full bg-neutral-900 px-5 py-2.5 font-sans text-[13px] font-medium text-white transition-all hover:bg-neutral-800 active:scale-95"
-              >
-                New Video
-              </button>
+              {/* Action buttons overlayed on video */}
+              <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-3">
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(resultUrl)
+                      const blob = await response.blob()
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement("a")
+                      a.href = url
+                      a.download = "generated-video.mp4"
+                      document.body.appendChild(a)
+                      a.click()
+                      document.body.removeChild(a)
+                      URL.revokeObjectURL(url)
+                    } catch (error) {
+                      console.error("Download failed:", error)
+                    }
+                  }}
+                  className="flex items-center gap-2 rounded-full bg-white px-5 py-2.5 font-sans text-[13px] font-medium text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-95"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="rounded-full bg-black/50 px-5 py-2.5 font-sans text-[13px] font-medium text-white shadow-lg backdrop-blur-md transition-all hover:bg-black/60 active:scale-95"
+                >
+                  New Video
+                </button>
+              </div>
             </div>
           </div>
         ) : recordedVideoUrl ? (
@@ -254,7 +255,7 @@ export default function Home() {
           >
             <div className={`relative overflow-hidden bg-neutral-900 ${
               recordedAspectRatio === "9:16"
-                ? "aspect-[9/16] h-full max-h-[80vh] w-auto max-w-sm rounded-2xl"
+                ? "aspect-[9/16] h-full max-h-[95vh] w-auto rounded-2xl"
                 : recordedAspectRatio === "16:9"
                   ? "aspect-video w-full max-w-4xl rounded-2xl"
                   : "h-full w-full"
@@ -266,7 +267,7 @@ export default function Home() {
                 muted
                 loop 
                 playsInline
-                className={`h-full w-full ${recordedAspectRatio === "fill" ? "object-cover" : "object-contain"}`} 
+                className="h-full w-full object-cover" 
                 onLoadedData={(e) => {
                   // Unmute after autoplay starts
                   const video = e.currentTarget

@@ -291,7 +291,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
 
       <div className={`relative overflow-hidden bg-neutral-900 ${
         aspectRatio === "9:16" 
-          ? "aspect-[9/16] h-full max-h-full w-auto rounded-none md:max-h-[80vh] md:max-w-sm md:rounded-2xl" 
+          ? "aspect-[9/16] h-full max-h-full w-auto rounded-none md:max-h-[95vh] md:rounded-2xl" 
           : aspectRatio === "16:9"
             ? "aspect-[16/9] h-auto w-full max-w-full rounded-2xl md:max-h-[80vh] md:max-w-4xl"
             : "h-full w-full rounded-none"
@@ -316,11 +316,13 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         {showTips && hasPermission && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 px-6 backdrop-blur-sm">
             <div className="flex max-w-[280px] flex-col gap-4">
-              <div>
+              <div className="flex flex-col gap-0.5">
                 <p className="font-mono text-[12px] text-neutral-400">
                   Using{" "}
                   <span className="text-white">Kling AI Motion Control</span>
-                  {" "}via{" "}
+                </p>
+                <p className="font-mono text-[12px] text-neutral-400">
+                  via{" "}
                   <a 
                     href="https://vercel.com/ai-gateway" 
                     target="_blank" 
