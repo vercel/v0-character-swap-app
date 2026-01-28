@@ -239,6 +239,16 @@ export default function Home() {
                     pipVideoRef.current.currentTime = mainVideoRef.current.currentTime
                   }
                 }}
+                }}
+                onTimeUpdate={() => {
+                  // Sync PiP video time with main video (handles loop restart)
+                  if (pipVideoRef.current && mainVideoRef.current) {
+                    const timeDiff = Math.abs(pipVideoRef.current.currentTime - mainVideoRef.current.currentTime)
+                    if (timeDiff > 0.5) {
+                      pipVideoRef.current.currentTime = mainVideoRef.current.currentTime
+                    }
+                  }
+                }}
               />
               {/* PiP overlay - show original video in bottom right */}
               {(sourceVideoUrl || recordedVideoUrl) && (
@@ -254,7 +264,6 @@ export default function Home() {
                     src={sourceVideoUrl || recordedVideoUrl || ""}
                     autoPlay
                     muted
-                    loop
                     playsInline
                     className="h-full w-full object-cover"
                   />
