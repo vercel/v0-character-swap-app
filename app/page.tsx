@@ -242,8 +242,16 @@ export default function Home() {
             </div>
           </div>
         ) : recordedVideoUrl ? (
-          <div className={`relative flex h-full w-full ${recordedAspectRatio === "fill" ? "" : "items-center justify-center"}`}>
-            {console.log("[v0] recordedAspectRatio:", recordedAspectRatio)}
+          <div 
+            className={`relative flex h-full w-full ${recordedAspectRatio === "fill" ? "" : "items-center justify-center"}`}
+            onClick={(e) => {
+              // If clicked outside the video container, go back to recording
+              if (e.target === e.currentTarget) {
+                setShowPreview(false)
+                clearRecording()
+              }
+            }}
+          >
             <div className={`relative overflow-hidden bg-neutral-900 ${
               recordedAspectRatio === "9:16"
                 ? "aspect-[9/16] h-full max-h-[80vh] w-auto max-w-sm rounded-2xl"
@@ -270,7 +278,7 @@ export default function Home() {
                   setShowPreview(false)
                   clearRecording()
                 }}
-                className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-5 py-2.5 font-sans text-[13px] font-medium text-white backdrop-blur-md transition-all hover:bg-black/60 active:scale-95"
+                className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-white px-5 py-2.5 font-sans text-[13px] font-medium text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-95"
               >
                 Re-record
               </button>
