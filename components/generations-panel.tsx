@@ -200,8 +200,8 @@ export function GenerationsPanel({ onSelectVideo, className = "" }: GenerationsP
 
   return (
     <div className={className}>
-      <p className="mb-1.5 font-sans text-[10px] font-medium uppercase tracking-wider text-neutral-500 md:mb-2 md:text-[11px]">
-        My Videos
+      <p className="mb-1.5 font-mono text-[10px] lowercase text-neutral-500 md:mb-2 md:text-[11px]">
+        my videos
       </p>
       
       <div className="flex gap-1.5 overflow-x-auto pb-1">
