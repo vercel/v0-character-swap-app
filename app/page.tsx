@@ -239,7 +239,6 @@ export default function Home() {
                     pipVideoRef.current.currentTime = mainVideoRef.current.currentTime
                   }
                 }}
-                }}
                 onTimeUpdate={() => {
                   // Sync PiP video time with main video (handles loop restart)
                   if (pipVideoRef.current && mainVideoRef.current) {
