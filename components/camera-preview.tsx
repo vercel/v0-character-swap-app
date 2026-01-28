@@ -23,7 +23,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
   const [countdown, setCountdown] = useState<number | null>(null)
   const [showFlash, setShowFlash] = useState(false)
   const [showTips, setShowTips] = useState(true)
-  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9">("9:16")
+  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9">("16:9")
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const countdownRef = useRef<NodeJS.Timeout | null>(null)
   const isStartingRef = useRef(false)
@@ -217,10 +217,10 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
 
   return (
     <div className="relative flex h-full w-full items-start justify-center md:items-center">
-      <div className={`relative h-full max-h-full w-auto overflow-hidden rounded-none bg-neutral-900 md:max-h-[80vh] md:rounded-2xl ${
+      <div className={`relative overflow-hidden bg-neutral-900 md:rounded-2xl ${
         aspectRatio === "9:16" 
-          ? "aspect-[9/16] md:max-w-sm" 
-          : "aspect-[16/9] md:max-w-2xl"
+          ? "aspect-[9/16] h-full max-h-full w-auto rounded-none md:max-h-[80vh] md:max-w-sm" 
+          : "aspect-[16/9] h-auto w-full max-w-full rounded-2xl md:max-h-[80vh] md:max-w-4xl"
       }`}>
         <video
           ref={videoRef}
@@ -288,10 +288,10 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
           </div>
         )}
 
-        {/* Aspect ratio selector - desktop only */}
+        {/* Aspect ratio selector - desktop only, always visible when not recording */}
         {!isRecording && !isProcessing && countdown === null && hasPermission && (
-          <div className="absolute right-3 top-3 hidden md:flex md:right-4 md:top-4">
-            <div className="flex rounded-lg bg-black/40 p-1 backdrop-blur-sm">
+          <div className="absolute right-3 top-3 z-40 hidden md:flex md:right-4 md:top-4">
+            <div className="flex rounded-lg bg-black/60 p-1 backdrop-blur-sm">
               <button
                 onClick={() => setAspectRatio("9:16")}
                 className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-[11px] transition-colors ${
