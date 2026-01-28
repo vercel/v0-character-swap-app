@@ -94,18 +94,24 @@ export async function generateVideoWorkflow(input: GenerateVideoInput) {
     console.log(`[Workflow] [TIMING SUMMARY] Total: ${totalTime}ms (${(totalTime / 1000).toFixed(1)}s), Hook wait: ${hookWaitTime}ms (${(hookWaitTime / 1000).toFixed(1)}s)`)
     return { success: true, videoUrl: blobUrl }
   } else {
-    // Handle failure
+    // Handle failure - log full response for debugging
+    console.error(`[Workflow] [${new Date().toISOString()}] Generation ${generationId} FAILED`)
+    console.error(`[Workflow] Full fal result:`, JSON.stringify(falResult, null, 2))
+    console.error(`[Workflow] Input videoUrl: ${videoUrl}`)
+    console.error(`[Workflow] Input characterImageUrl: ${characterImageUrl}`)
+    
     let errorMessage = "Unknown error"
 
     if (falResult.payload?.detail?.length) {
       const detail = falResult.payload.detail[0]
       errorMessage = detail.msg || detail.message || falResult.error || "Validation error"
-    } else {
-      errorMessage = falResult.error || "Processing failed"
+      console.error(`[Workflow] Error detail:`, JSON.stringify(detail, null, 2))
+    } else if (falResult.error) {
+      errorMessage = falResult.error
     }
 
     await markGenerationFailed(generationId, errorMessage)
-    console.error(`[Workflow] Generation ${generationId} failed: ${errorMessage}`)
+    console.error(`[Workflow] Final error message: ${errorMessage}`)
     return { success: false, error: errorMessage }
   }
 }
