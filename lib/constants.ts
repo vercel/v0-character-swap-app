@@ -19,15 +19,11 @@ export const MIN_IMAGE_DIMENSION = 340 // pixels - fal.ai minimum
 // ===========================================
 
 export const DEFAULT_CHARACTERS: Character[] = [
-  { id: 1, src: "/characters/rauch.png", name: "Rauchg" },
-  { id: 2, src: "/characters/leo.png", name: "Django" },
-  { id: 3, src: "/characters/bernie.png", name: "Bernie" },
-  { id: 4, src: "/characters/think.png", name: "Think" },
-  { id: 5, src: "/characters/aliens.png", name: "Aliens" },
-  { id: 6, src: "/characters/jdvance.png", name: "JD Vance" },
-  { id: 7, src: "/characters/dolly.png", name: "Dolly Parton" },
-  { id: 8, src: "/characters/aubrey.png", name: "Aubrey Plaza" },
-  { id: 9, src: "/characters/character-new.avif", name: "Character" },
+  { id: 1, src: "/characters/leodc.png", name: "Django" },
+  { id: 2, src: "/characters/aliens.png", name: "Aliens" },
+  { id: 3, src: "/characters/dolly.png", name: "Dolly Parton" },
+  { id: 4, src: "/characters/aubrey.png", name: "Aubrey Plaza" },
+  { id: 5, src: "/characters/donald.png", name: "Donald Trump" },
 ]
 
 // Alias for backwards compatibility
