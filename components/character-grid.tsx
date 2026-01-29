@@ -255,21 +255,13 @@ export function CharacterGrid({
           select character
         </p>
         
-        {/* Grid container - flex wrap with same height, variable width based on aspect ratio */}
-        <div className="-mr-1 -mt-1 pr-1 pt-1">
-          <div className="flex flex-wrap gap-2 md:gap-3">
+        {/* Grid container - uniform grid that fills width */}
+        <div>
+          <div className="grid grid-cols-4 gap-2 md:grid-cols-6 md:gap-3">
           {allCharacters.map((char) => {
             const isCustom = customCharacters.some(c => c.id === char.id)
             const isDefault = visibleDefaultCharacters.some(c => c.id === char.id)
             const canDelete = (isCustom && onDeleteCustom) || (isDefault && onHideDefault)
-            const ar = aspectRatios[char.id]
-            // Calculate width based on aspect ratio - all same height (90px mobile, 110px desktop)
-            // 9:16 = 0.5625, 3:4 = 0.75, 1:1 = 1, 4:3 = 1.33, 16:9 = 1.77
-            let widthClass = "w-[68px] md:w-[82px]" // default 3:4
-            if (ar === "9:16") widthClass = "w-[51px] md:w-[62px]"
-            else if (ar === "1:1") widthClass = "w-[90px] md:w-[110px]"
-            else if (ar === "4:3") widthClass = "w-[120px] md:w-[147px]"
-            else if (ar === "16:9") widthClass = "w-[160px] md:w-[196px]"
             
             return (
               <div key={char.id} className="group relative">
@@ -277,14 +269,14 @@ export function CharacterGrid({
                   onClick={() => onSelect(char.id)}
                   disabled={disabled}
                   data-selected={selectedId === char.id}
-                  className={`relative h-[90px] overflow-hidden rounded-lg transition-all ring-1 ring-neutral-800 hover:ring-neutral-600 data-[selected=true]:ring-2 data-[selected=true]:ring-white disabled:cursor-not-allowed disabled:opacity-50 md:h-[110px] ${widthClass}`}
+                  className="relative aspect-square w-full overflow-hidden rounded-lg transition-all ring-1 ring-neutral-800 hover:ring-neutral-600 data-[selected=true]:ring-2 data-[selected=true]:ring-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Image
                     src={char.src || "/placeholder.svg"}
                     alt={char.name}
                     fill
-                    className="object-cover object-center"
-                    sizes="200px"
+                    className="object-cover object-top"
+                    sizes="(max-width: 768px) 25vw, 16vw"
                   />
                 </button>
                 {canDelete && !disabled && (
@@ -314,7 +306,7 @@ export function CharacterGrid({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || isUploading}
-              className="h-[90px] w-[68px] rounded-lg border border-dashed border-neutral-700 transition-colors hover:border-neutral-500 disabled:cursor-not-allowed disabled:opacity-50 md:h-[110px] md:w-[82px]"
+              className="aspect-square w-full rounded-lg border border-dashed border-neutral-700 transition-colors hover:border-neutral-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <div className="flex h-full flex-col items-center justify-center gap-1 text-neutral-500">
                 {isUploading ? (
@@ -365,7 +357,7 @@ export function CharacterGrid({
               onClick={() => setShowAiPrompt(!showAiPrompt)}
               disabled={disabled || isGenerating}
               className={cn(
-                "h-[90px] w-[68px] rounded-lg border border-dashed transition-colors disabled:cursor-not-allowed disabled:opacity-50 md:h-[110px] md:w-[82px]",
+                "aspect-square w-full rounded-lg border border-dashed transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                 showAiPrompt ? "border-white" : "border-neutral-700 hover:border-neutral-500"
               )}
             >
