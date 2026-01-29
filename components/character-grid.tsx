@@ -199,7 +199,7 @@ export function CharacterGrid({
   return (
     <div 
       className={cn(
-        "relative flex h-full flex-col",
+        "relative flex max-h-full flex-col",
         isDragOver && "ring-2 ring-white/30"
       )}
       onDragOver={handleDragOver}
@@ -217,14 +217,14 @@ export function CharacterGrid({
         </div>
       )}
       
-      <div className="-ml-1 min-h-0 flex-1 overflow-y-auto pl-1">
+      <div className="-ml-1 shrink overflow-y-auto pl-1 md:min-h-0 md:flex-1">
         <p className="mb-2 font-mono text-[10px] lowercase text-neutral-500 md:mb-3 md:text-[11px]">
           select character
         </p>
         
         {/* Grid container */}
         <div className="-mr-1 -mt-1 pr-1 pt-1">
-          <div className="grid grid-cols-5 gap-2 md:grid-cols-4 md:gap-3">
+          <div className="grid grid-cols-5 gap-1.5 md:grid-cols-4 md:gap-3">
           {allCharacters.map((char) => {
             const isCustom = customCharacters.some(c => c.id === char.id)
             const isDefault = visibleDefaultCharacters.some(c => c.id === char.id)
@@ -423,8 +423,8 @@ export function CharacterGrid({
       
       {/* Generate Video CTA - Always visible at bottom */}
       {onGenerate && (
-        <div className="shrink-0 border-t border-neutral-800 pt-3 md:pt-4">
-          <div className="flex flex-col gap-2 md:gap-4">
+        <div className="shrink-0 border-t border-neutral-800 pt-2 md:pt-4">
+          <div className="flex flex-col gap-1.5 md:gap-4">
             {onSendViaEmailChange && (
               <label className={cn(
                 "flex cursor-pointer items-center gap-2",
