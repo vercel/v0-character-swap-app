@@ -1,11 +1,31 @@
 "use client"
 
-import React, { useRef, useState } from "react"
+import React, { useRef, useState, useEffect } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { upload } from "@vercel/blob/client"
 import type { Character } from "@/lib/types"
 import { defaultCharacters } from "@/lib/constants"
+
+// Helper to detect aspect ratio from image URL
+function detectImageAspectRatio(src: string): Promise<"9:16" | "16:9" | "square"> {
+  return new Promise((resolve) => {
+    const img = new window.Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      const ratio = img.width / img.height
+      if (ratio < 0.7) {
+        resolve("9:16")
+      } else if (ratio > 1.4) {
+        resolve("16:9")
+      } else {
+        resolve("square")
+      }
+    }
+    img.onerror = () => resolve("square")
+    img.src = src
+  })
+}
 
 // Re-export for backwards compatibility
 export { defaultCharacters }
@@ -57,6 +77,19 @@ export function CharacterGrid({
   
   const visibleDefaultCharacters = defaultCharacters.filter(c => !hiddenDefaultIds.includes(c.id))
   const allCharacters = [...visibleDefaultCharacters, ...customCharacters]
+  
+  // Track detected aspect ratios for each character image
+  const [aspectRatios, setAspectRatios] = useState<Record<number, "9:16" | "16:9" | "square">>({})
+  
+  // Detect aspect ratios for all character images
+  useEffect(() => {
+    allCharacters.forEach(async (char) => {
+      if (!aspectRatios[char.id] && char.src) {
+        const ar = await detectImageAspectRatio(char.src)
+        setAspectRatios(prev => ({ ...prev, [char.id]: ar }))
+      }
+    })
+  }, [allCharacters, aspectRatios])
 
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -245,6 +278,12 @@ export function CharacterGrid({
                     className="object-cover object-top"
                     sizes="80px"
                   />
+                  {/* Aspect ratio badge */}
+                  {aspectRatios[char.id] && aspectRatios[char.id] !== "square" && (
+                    <div className="absolute right-1 top-1 rounded bg-black/70 px-1 py-0.5 font-mono text-[8px] text-white/80 backdrop-blur-sm">
+                      {aspectRatios[char.id]}
+                    </div>
+                  )}
                 </button>
                 {canDelete && !disabled && (
                   <button
