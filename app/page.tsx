@@ -392,7 +392,7 @@ export default function Home() {
           </div>
         ) : recordedVideoUrl ? (
           <div 
-            className={`relative flex h-full w-full ${recordedAspectRatio === "fill" ? "" : "items-center justify-center"}`}
+            className="relative flex h-full w-full"
             onClick={(e) => {
               // If clicked outside the video container, go back to recording
               if (e.target === e.currentTarget) {
@@ -401,13 +401,7 @@ export default function Home() {
               }
             }}
           >
-            <div className={`relative overflow-hidden bg-neutral-900 ${
-              recordedAspectRatio === "9:16"
-                ? "aspect-[9/16] h-full max-h-[95vh] w-auto rounded-2xl"
-                : recordedAspectRatio === "16:9"
-                  ? "aspect-video w-full max-w-4xl rounded-2xl"
-                  : "h-full w-full"
-            }`}>
+            <div className="relative h-full w-full overflow-hidden bg-neutral-900">
               <video 
                 src={recordedVideoUrl} 
                 controls 
