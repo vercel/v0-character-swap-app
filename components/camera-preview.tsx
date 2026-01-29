@@ -120,9 +120,6 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
 
     chunksRef.current = []
     
-    // Detect if mobile for adaptive settings
-    const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-    
     let mediaRecorder: MediaRecorder
     let mimeType: string
     
