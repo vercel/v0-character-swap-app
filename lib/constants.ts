@@ -38,6 +38,7 @@ export const STORAGE_KEYS = {
   PENDING_VIDEO_URL: "pendingVideoUrl",
   PENDING_UPLOADED: "pendingUploaded",
   PENDING_AUTO_SUBMIT: "pendingAutoSubmit",
+  PENDING_ASPECT_RATIO: "pendingAspectRatio",
 } as const
 
 // ===========================================
