@@ -404,14 +404,15 @@ export default function Home() {
                   video.muted = false
                 }}
               />
+              {/* New video button - positioned above mobile bottom sheet */}
               <button
                 onClick={() => {
                   setShowPreview(false)
                   clearRecording()
                 }}
-                className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-white px-5 py-2.5 font-sans text-[13px] font-medium text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-95"
+                className="absolute bottom-28 left-1/2 -translate-x-1/2 rounded-full bg-white px-5 py-2.5 font-sans text-[13px] font-medium text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-95 md:bottom-6"
               >
-                Re-record
+                New Video
               </button>
             </div>
           </div>
