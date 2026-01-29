@@ -272,8 +272,8 @@ export function CharacterGrid({
                   onClick={() => onSelect(char.id)}
                   disabled={disabled}
                   data-selected={selectedId === char.id}
-                  className={`relative h-[72px] overflow-hidden rounded-lg transition-all ring-1 ring-neutral-800 hover:ring-neutral-600 data-[selected=true]:ring-2 data-[selected=true]:ring-white disabled:cursor-not-allowed disabled:opacity-50 md:h-[80px] ${
-                    isLandscape ? "w-[96px] md:w-[107px]" : "w-[54px] md:w-[60px]"
+                  className={`relative h-[56px] overflow-hidden rounded-lg transition-all ring-1 ring-neutral-800 hover:ring-neutral-600 data-[selected=true]:ring-2 data-[selected=true]:ring-white disabled:cursor-not-allowed disabled:opacity-50 md:h-[64px] ${
+                    isLandscape ? "w-[100px] md:w-[114px]" : "w-[42px] md:w-[48px]"
                   }`}
                 >
                   <Image
@@ -317,7 +317,7 @@ export function CharacterGrid({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || isUploading}
-              className="h-[72px] w-[54px] rounded-lg border border-dashed border-neutral-700 transition-colors hover:border-neutral-500 disabled:cursor-not-allowed disabled:opacity-50 md:h-[80px] md:w-[60px]"
+              className="h-[56px] w-[42px] rounded-lg border border-dashed border-neutral-700 transition-colors hover:border-neutral-500 disabled:cursor-not-allowed disabled:opacity-50 md:h-[64px] md:w-[48px]"
             >
               <div className="flex h-full flex-col items-center justify-center gap-1 text-neutral-500">
                 {isUploading ? (
@@ -368,7 +368,7 @@ export function CharacterGrid({
               onClick={() => setShowAiPrompt(!showAiPrompt)}
               disabled={disabled || isGenerating}
               className={cn(
-                "h-[72px] w-[54px] rounded-lg border border-dashed transition-colors disabled:cursor-not-allowed disabled:opacity-50 md:h-[80px] md:w-[60px]",
+                "h-[56px] w-[42px] rounded-lg border border-dashed transition-colors disabled:cursor-not-allowed disabled:opacity-50 md:h-[64px] md:w-[48px]",
                 showAiPrompt ? "border-white" : "border-neutral-700 hover:border-neutral-500"
               )}
             >
