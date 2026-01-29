@@ -136,11 +136,6 @@ export default function Home() {
     setSelectedGeneratedVideo(null)
   }, [clearRecording, setSelectedCharacter])
 
-  // Debug: log aspect ratio changes
-  useEffect(() => {
-    console.log("[v0] recordedAspectRatio changed:", recordedAspectRatio)
-  }, [recordedAspectRatio])
-
   // Handle Escape key to close video and go back to camera
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -371,7 +366,6 @@ export default function Home() {
         ) : recordedVideoUrl ? (
           <div 
             className={`relative flex h-full w-full ${recordedAspectRatio === "fill" ? "" : "items-center justify-center"}`}
-            data-aspect-ratio={recordedAspectRatio}
             onClick={(e) => {
               // If clicked outside the video container, go back to recording
               if (e.target === e.currentTarget) {

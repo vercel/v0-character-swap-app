@@ -114,6 +114,8 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     if (characterId) {
       sessionStorage.setItem(STORAGE_KEYS.PENDING_CHARACTER, String(characterId))
     }
+    // Save aspect ratio
+    sessionStorage.setItem(STORAGE_KEYS.PENDING_ASPECT_RATIO, recordedAspectRatio)
     // Save uploaded URL if available, otherwise save blob as data URL
     if (uploadedVideoUrl) {
       sessionStorage.setItem(STORAGE_KEYS.PENDING_VIDEO_URL, uploadedVideoUrl)
@@ -128,12 +130,13 @@ export function useVideoRecording(): UseVideoRecordingReturn {
       }
     }
     sessionStorage.setItem(STORAGE_KEYS.PENDING_AUTO_SUBMIT, "true")
-  }, [uploadedVideoUrl])
+  }, [uploadedVideoUrl, recordedAspectRatio])
 
   const restoreFromSession = useCallback(async (): Promise<{ shouldAutoSubmit: boolean }> => {
     const savedVideoUrl = sessionStorage.getItem(STORAGE_KEYS.PENDING_VIDEO_URL)
     const wasUploaded = sessionStorage.getItem(STORAGE_KEYS.PENDING_UPLOADED) === "true"
     const shouldAutoSubmit = sessionStorage.getItem(STORAGE_KEYS.PENDING_AUTO_SUBMIT) === "true"
+    const savedAspectRatio = sessionStorage.getItem(STORAGE_KEYS.PENDING_ASPECT_RATIO) as "9:16" | "16:9" | "fill" | null
     
     if (savedVideoUrl) {
       try {
@@ -152,15 +155,21 @@ export function useVideoRecording(): UseVideoRecordingReturn {
           // Re-upload in background
           uploadVideo(blob)
         }
+        // Restore aspect ratio
+        if (savedAspectRatio) {
+          setRecordedAspectRatio(savedAspectRatio)
+        }
         setShowPreview(true)
         sessionStorage.removeItem(STORAGE_KEYS.PENDING_VIDEO_URL)
         sessionStorage.removeItem(STORAGE_KEYS.PENDING_UPLOADED)
         sessionStorage.removeItem(STORAGE_KEYS.PENDING_AUTO_SUBMIT)
+        sessionStorage.removeItem(STORAGE_KEYS.PENDING_ASPECT_RATIO)
         return { shouldAutoSubmit }
       } catch {
         sessionStorage.removeItem(STORAGE_KEYS.PENDING_VIDEO_URL)
         sessionStorage.removeItem(STORAGE_KEYS.PENDING_UPLOADED)
         sessionStorage.removeItem(STORAGE_KEYS.PENDING_AUTO_SUBMIT)
+        sessionStorage.removeItem(STORAGE_KEYS.PENDING_ASPECT_RATIO)
       }
     }
     return { shouldAutoSubmit: false }
