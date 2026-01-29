@@ -227,7 +227,7 @@ export function GenerationsPanel({ onSelectVideo, className = "" }: GenerationsP
         my videos
       </p>
       
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 pt-1">
         {generations.filter(g => g.status !== "cancelled").map((gen) => {
           // Determine thumbnail width based on aspect ratio
           const isLandscape = gen.aspect_ratio === "16:9"
