@@ -150,8 +150,14 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     }
 
     mediaRecorderRef.current = mediaRecorder
-    // Start recording without interval - chunks with timeslice can cause timestamp issues
-    mediaRecorder.start()
+    // Mobile needs timeslice for fal.ai to properly read the video metadata
+    // Using longer timeslice (10s) to reduce timestamp issues while still helping metadata
+    // Desktop works better without it
+    if (isMobileDevice) {
+      mediaRecorder.start(10000) // Request data every 10 seconds - fewer chunks = better timestamps
+    } else {
+      mediaRecorder.start()
+    }
     setIsRecording(true)
     setRecordingTime(0)
 
