@@ -8,21 +8,25 @@ import type { Character } from "@/lib/types"
 import { defaultCharacters } from "@/lib/constants"
 
 // Helper to detect aspect ratio from image URL
-function detectImageAspectRatio(src: string): Promise<"9:16" | "16:9" | "square"> {
+function detectImageAspectRatio(src: string): Promise<string> {
   return new Promise((resolve) => {
     const img = new window.Image()
     img.crossOrigin = "anonymous"
     img.onload = () => {
       const ratio = img.width / img.height
-      if (ratio < 0.7) {
+      if (ratio < 0.65) {
         resolve("9:16")
-      } else if (ratio > 1.4) {
-        resolve("16:9")
+      } else if (ratio >= 0.65 && ratio < 0.85) {
+        resolve("3:4")
+      } else if (ratio >= 0.85 && ratio < 1.15) {
+        resolve("1:1")
+      } else if (ratio >= 1.15 && ratio < 1.5) {
+        resolve("4:3")
       } else {
-        resolve("square")
+        resolve("16:9")
       }
     }
-    img.onerror = () => resolve("square")
+    img.onerror = () => resolve("1:1")
     img.src = src
   })
 }
@@ -79,7 +83,7 @@ export function CharacterGrid({
   const allCharacters = [...visibleDefaultCharacters, ...customCharacters]
   
   // Track detected aspect ratios for each character image
-  const [aspectRatios, setAspectRatios] = useState<Record<number, "9:16" | "16:9" | "square">>({})
+  const [aspectRatios, setAspectRatios] = useState<Record<number, string>>({})
   
   // Detect aspect ratios for all character images
   useEffect(() => {
@@ -279,7 +283,7 @@ export function CharacterGrid({
                     sizes="80px"
                   />
                   {/* Aspect ratio badge */}
-                  {aspectRatios[char.id] && aspectRatios[char.id] !== "square" && (
+                  {aspectRatios[char.id] && (
                     <div className="absolute right-1 top-1 rounded bg-black/70 px-1 py-0.5 font-mono text-[8px] text-white/80 backdrop-blur-sm">
                       {aspectRatios[char.id]}
                     </div>
