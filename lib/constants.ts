@@ -26,6 +26,7 @@ export const DEFAULT_CHARACTERS: Character[] = [
   { id: 5, src: "/characters/aubrey.png", name: "Aubrey Plaza" },
   { id: 6, src: "/characters/donald.png", name: "Donald Trump" },
   { id: 7, src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/think-gpwwAFDFK6EWZ8V7ckfg6Gze8YEV5W.png", name: "Think" },
+  { id: 8, src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/nano-banana-pro-image-editing-result%20%2850%29-MKnUP5YDwDFujPEfusSQ5edL6x815s.png", name: "Einstein" },
 ]
 
 // Alias for backwards compatibility
