@@ -115,14 +115,13 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     let mimeType: string
     
     if (isMobileDevice) {
-      // Mobile: Use same config as desktop but with higher bitrate
-      // Safari iOS has limited MediaRecorder support, webm works better
+      // Mobile: Use lower bitrate - too high can cause issues with fal.ai processing
       mimeType = MediaRecorder.isTypeSupported("video/mp4") 
         ? "video/mp4" 
         : "video/webm"
       mediaRecorder = new MediaRecorder(canvasStream, { 
         mimeType,
-        videoBitsPerSecond: 8000000, // 8 Mbps for mobile - helps fal.ai detect motion
+        videoBitsPerSecond: 2500000, // 2.5 Mbps for mobile - balance between quality and file size
       })
     } else {
       // Desktop: Original working config - mp4 if supported, else webm with vp8
