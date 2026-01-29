@@ -108,15 +108,26 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
 
     chunksRef.current = []
     
-    // Try to use mp4 if supported, otherwise fall back to webm
-    const mimeType = MediaRecorder.isTypeSupported("video/mp4") 
-      ? "video/mp4" 
-      : "video/webm;codecs=vp8,opus"
+    // Try different formats in order of preference for best compatibility with fal.ai
+    // MP4 (H.264) is best supported, then WebM with VP9, then VP8
+    let mimeType = "video/webm"
+    if (MediaRecorder.isTypeSupported("video/mp4;codecs=avc1")) {
+      mimeType = "video/mp4;codecs=avc1"
+    } else if (MediaRecorder.isTypeSupported("video/mp4")) {
+      mimeType = "video/mp4"
+    } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")) {
+      mimeType = "video/webm;codecs=vp9,opus"
+    } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")) {
+      mimeType = "video/webm;codecs=vp8,opus"
+    }
+    
+    console.log("[v0] MediaRecorder using mimeType:", mimeType)
     
     // Use higher bitrate to preserve motion quality (especially important for mobile)
+    // Also request more frequent keyframes for better seeking/processing
     const mediaRecorder = new MediaRecorder(canvasStream, { 
       mimeType,
-      videoBitsPerSecond: 5000000, // 5 Mbps for better motion preservation
+      videoBitsPerSecond: 8000000, // 8 Mbps for better quality
     })
 
     mediaRecorder.ondataavailable = (e) => {
@@ -134,7 +145,8 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     }
 
     mediaRecorderRef.current = mediaRecorder
-    mediaRecorder.start()
+    // Request data every 1 second instead of at the end - helps with metadata
+    mediaRecorder.start(1000)
     setIsRecording(true)
     setRecordingTime(0)
 

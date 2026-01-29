@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
           addRandomSuffix: true,
         }
       },
-      onUploadCompleted: async () => {
-        // Upload completed - nothing to do here
+      onUploadCompleted: async ({ blob }) => {
+        console.log(`[v0] Video uploaded: ${blob.pathname}, size: ${blob.size} bytes, contentType: ${blob.contentType}`)
       },
     })
 
