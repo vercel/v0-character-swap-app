@@ -132,8 +132,9 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     
     let mediaRecorder: MediaRecorder
     let mimeType: string
-    
     let videoBitrate: number
+    
+    // isMobileDevice is defined above when setting canvas dimensions
     if (isMobileDevice) {
       // Mobile: Use lower bitrate - too high can cause issues with fal.ai processing
       mimeType = MediaRecorder.isTypeSupported("video/mp4") 
