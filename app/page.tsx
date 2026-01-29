@@ -14,6 +14,26 @@ import { useVideoRecording } from "@/hooks/use-video-recording"
 import { STORAGE_KEYS } from "@/lib/constants"
 import { createPipVideoClient, downloadBlob } from "@/lib/video-pip-client"
 
+// Helper to detect aspect ratio from character image
+function getCharacterAspectRatio(src: string): Promise<"9:16" | "16:9" | "fill"> {
+  return new Promise((resolve) => {
+    const img = new window.Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      const ratio = img.width / img.height
+      if (ratio < 0.75) {
+        resolve("9:16")
+      } else if (ratio > 1.33) {
+        resolve("16:9")
+      } else {
+        resolve("fill")
+      }
+    }
+    img.onerror = () => resolve("fill")
+    img.src = src
+  })
+}
+
 export default function Home() {
   const { user, login, logout } = useAuth()
   const isMobile = useIsMobile()
@@ -105,12 +125,15 @@ export default function Home() {
       setPendingAutoSubmit(false)
       const character = allCharacters.find(c => c.id === selectedCharacter)
       if (character) {
-        setTimeout(() => {
-          processVideo(recordedVideo, character, false, uploadedVideoUrl, recordedAspectRatio)
-        }, 100)
+        // Use character image aspect ratio, not recorded video aspect ratio
+        getCharacterAspectRatio(character.src).then(characterAspectRatio => {
+          setTimeout(() => {
+            processVideo(recordedVideo, character, false, uploadedVideoUrl, characterAspectRatio)
+          }, 100)
+        })
       }
     }
-  }, [pendingAutoSubmit, user, recordedVideo, selectedCharacter, allCharacters, processVideo, uploadedVideoUrl, recordedAspectRatio])
+  }, [pendingAutoSubmit, user, recordedVideo, selectedCharacter, allCharacters, processVideo, uploadedVideoUrl])
 
   // Auto-expand bottom sheet when video is recorded
   useEffect(() => {
@@ -120,13 +143,15 @@ export default function Home() {
   }, [isMobile, recordedVideo, resultUrl])
 
   // Handlers
-  const handleProcess = useCallback(() => {
+  const handleProcess = useCallback(async () => {
     if (!recordedVideo || !selectedCharacter) return
     const character = allCharacters.find(c => c.id === selectedCharacter)
     if (character) {
-      processVideo(recordedVideo, character, false, uploadedVideoUrl, recordedAspectRatio)
+      // Use character image aspect ratio, not recorded video aspect ratio
+      const characterAspectRatio = await getCharacterAspectRatio(character.src)
+      processVideo(recordedVideo, character, false, uploadedVideoUrl, characterAspectRatio)
     }
-  }, [recordedVideo, selectedCharacter, allCharacters, processVideo, uploadedVideoUrl, recordedAspectRatio])
+  }, [recordedVideo, selectedCharacter, allCharacters, processVideo, uploadedVideoUrl])
 
   const handleReset = useCallback(() => {
     clearRecording()
