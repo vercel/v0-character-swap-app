@@ -6,6 +6,7 @@ import type { Character } from "./types"
 
 export const MAX_VIDEO_SIZE = 50 * 1024 * 1024 // 50MB
 export const MAX_VIDEO_DURATION = 30 // seconds - fal.ai limit
+export const MIN_VIDEO_DURATION = 3 // seconds - fal.ai requirement
 
 // ===========================================
 // Image Constraints
