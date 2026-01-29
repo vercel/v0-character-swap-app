@@ -169,18 +169,7 @@ export default function Home() {
     if (user) {
       return (
         <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {user.avatar ? (
-              <Image src={user.avatar || "/placeholder.svg"} alt={user.name || ""} width={20} height={20} className="h-5 w-5 rounded-full" />
-            ) : (
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-neutral-800">
-                <span className="font-mono text-[10px] text-white">
-                  {user.name?.charAt(0).toLowerCase()}
-                </span>
-              </div>
-            )}
-            <span className="font-mono text-[11px] text-neutral-500">{user.name?.toLowerCase()}</span>
-          </div>
+          <span className="font-mono text-[11px] text-neutral-500">{user.name?.toLowerCase()}</span>
           <button
             onClick={logout}
             className="font-mono text-[11px] text-neutral-600 transition-colors hover:text-white"
