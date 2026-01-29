@@ -158,8 +158,13 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     }
 
     mediaRecorderRef.current = mediaRecorder
-    // Start without timeslice - let browser handle data buffering
-    mediaRecorder.start()
+    // Mobile Safari needs timeslice to write proper metadata, but use long interval to avoid timestamp issues
+    // Desktop works better without timeslice
+    if (isMobileDevice) {
+      mediaRecorder.start(30000) // 30 second timeslice - essentially one chunk for short recordings
+    } else {
+      mediaRecorder.start()
+    }
     setIsRecording(true)
     setRecordingTime(0)
 
