@@ -446,7 +446,7 @@ export function CharacterGrid({
               "hidden font-mono text-[10px] text-neutral-600 md:block",
               !canGenerate && "opacity-50"
             )}>
-              generation takes 3-4 minutes. we{"'"}ll email you when complete.
+              generation takes 5-6 minutes. we{"'"}ll email you when complete.
             </p>
             {generateError && (
               <p className="font-mono text-[10px] text-amber-400 md:text-[11px]">
