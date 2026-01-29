@@ -108,26 +108,36 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
 
     chunksRef.current = []
     
-    // Try different formats in order of preference for best compatibility with fal.ai
-    // MP4 (H.264) is best supported, then WebM with VP9, then VP8
-    let mimeType = "video/webm"
-    if (MediaRecorder.isTypeSupported("video/mp4;codecs=avc1")) {
-      mimeType = "video/mp4;codecs=avc1"
-    } else if (MediaRecorder.isTypeSupported("video/mp4")) {
-      mimeType = "video/mp4"
-    } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")) {
-      mimeType = "video/webm;codecs=vp9,opus"
-    } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")) {
-      mimeType = "video/webm;codecs=vp8,opus"
+    // Detect if mobile for adaptive settings
+    const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    
+    let mimeType: string
+    let videoBitrate: number
+    
+    if (isMobileDevice) {
+      // Mobile (iPhone/Android): Use MP4 if available with high bitrate
+      // This fixes fal.ai "continuous motion" detection issues on mobile
+      if (MediaRecorder.isTypeSupported("video/mp4;codecs=avc1")) {
+        mimeType = "video/mp4;codecs=avc1"
+      } else if (MediaRecorder.isTypeSupported("video/mp4")) {
+        mimeType = "video/mp4"
+      } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")) {
+        mimeType = "video/webm;codecs=vp9,opus"
+      } else {
+        mimeType = "video/webm;codecs=vp8,opus"
+      }
+      videoBitrate = 8000000 // 8 Mbps for mobile
+    } else {
+      // Desktop: Use original config that worked well (WebM VP8, 5 Mbps)
+      mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+        ? "video/webm;codecs=vp8,opus"
+        : "video/webm"
+      videoBitrate = 5000000 // 5 Mbps for desktop
     }
     
-    console.log("[v0] MediaRecorder using mimeType:", mimeType)
-    
-    // Use higher bitrate to preserve motion quality (especially important for mobile)
-    // Also request more frequent keyframes for better seeking/processing
     const mediaRecorder = new MediaRecorder(canvasStream, { 
       mimeType,
-      videoBitsPerSecond: 8000000, // 8 Mbps for better quality
+      videoBitsPerSecond: videoBitrate,
     })
 
     mediaRecorder.ondataavailable = (e) => {
@@ -145,8 +155,9 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     }
 
     mediaRecorderRef.current = mediaRecorder
-    // Request data every 1 second instead of at the end - helps with metadata
-    mediaRecorder.start(1000)
+    // Mobile: request data every 1 second for better metadata handling
+    // Desktop: start without interval for smoother playback
+    mediaRecorder.start(isMobileDevice ? 1000 : undefined)
     setIsRecording(true)
     setRecordingTime(0)
 

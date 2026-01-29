@@ -221,16 +221,16 @@ export default function Home() {
   
 
   return (
-    <main className={`relative flex h-[100dvh] flex-row overflow-hidden bg-black ${isMobile ? 'extend-to-top' : ''}`}>
+    <main className="relative flex h-[100dvh] flex-row overflow-hidden bg-black">
       {/* Camera/Video Section */}
       <div className={`flex flex-1 items-center justify-center ${isMobile ? "p-0" : (resultUrl || recordedVideoUrl) ? (generatedVideoAspectRatio === "fill" ? "p-0" : "p-1") : "p-0"}`}>
         {resultUrl ? (
-          <div className={`relative flex h-full w-full ${generatedVideoAspectRatio === "fill" ? "" : "items-center justify-center"}`}>
+          <div className="relative flex h-full w-full items-center justify-center">
             <div className={`relative overflow-hidden bg-neutral-900 ${
               generatedVideoAspectRatio === "9:16"
-                ? "aspect-[9/16] h-full max-h-[95vh] w-auto rounded-lg"
+                ? "aspect-[9/16] h-full max-h-[85vh] w-auto rounded-lg"
                 : generatedVideoAspectRatio === "16:9"
-                  ? "aspect-video w-full max-w-[90%] rounded-lg"
+                  ? "aspect-video w-full max-w-[95%] rounded-lg md:max-w-[90%]"
                   : "h-full w-full"
             }`}>
               <video 
