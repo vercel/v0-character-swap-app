@@ -127,14 +127,7 @@
   }
 }
 
-/* iOS: Make content extend under status bar */
-@supports (padding-top: env(safe-area-inset-top)) {
-  .extend-to-top {
-    padding-top: env(safe-area-inset-top);
-    margin-top: calc(-1 * env(safe-area-inset-top));
-    height: calc(100% + env(safe-area-inset-top));
-  }
-}
+
 
 /* Hide scrollbar */
 .scrollbar-none {
