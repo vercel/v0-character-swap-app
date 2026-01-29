@@ -111,22 +111,29 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     // Detect if mobile for adaptive settings
     const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
     
-    // Try different formats in order of preference for best compatibility with fal.ai
-    // MP4 (H.264) is best supported, then WebM with VP9, then VP8
-    let mimeType = "video/webm"
-    if (MediaRecorder.isTypeSupported("video/mp4;codecs=avc1")) {
-      mimeType = "video/mp4;codecs=avc1"
-    } else if (MediaRecorder.isTypeSupported("video/mp4")) {
-      mimeType = "video/mp4"
-    } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")) {
-      mimeType = "video/webm;codecs=vp9,opus"
-    } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")) {
-      mimeType = "video/webm;codecs=vp8,opus"
-    }
+    let mimeType: string
+    let videoBitrate: number
     
-    // Mobile needs higher bitrate for fal.ai to detect motion properly
-    // Desktop works fine with lower bitrate
-    const videoBitrate = isMobileDevice ? 8000000 : 5000000 // 8 Mbps mobile, 5 Mbps desktop
+    if (isMobileDevice) {
+      // Mobile (iPhone/Android): Use MP4 if available with high bitrate
+      // This fixes fal.ai "continuous motion" detection issues on mobile
+      if (MediaRecorder.isTypeSupported("video/mp4;codecs=avc1")) {
+        mimeType = "video/mp4;codecs=avc1"
+      } else if (MediaRecorder.isTypeSupported("video/mp4")) {
+        mimeType = "video/mp4"
+      } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")) {
+        mimeType = "video/webm;codecs=vp9,opus"
+      } else {
+        mimeType = "video/webm;codecs=vp8,opus"
+      }
+      videoBitrate = 8000000 // 8 Mbps for mobile
+    } else {
+      // Desktop: Use original config that worked well (WebM VP8, 5 Mbps)
+      mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+        ? "video/webm;codecs=vp8,opus"
+        : "video/webm"
+      videoBitrate = 5000000 // 5 Mbps for desktop
+    }
     
     const mediaRecorder = new MediaRecorder(canvasStream, { 
       mimeType,
