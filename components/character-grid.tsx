@@ -496,6 +496,19 @@ export function CharacterGrid({
               Generate video
             </button>
           </div>
+          
+          {/* Credits */}
+          <p className="mt-3 text-center font-mono text-[10px] text-neutral-600">
+            created by{" "}
+            <a 
+              href="https://x.com/estebansuarez" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-neutral-500 transition-colors hover:text-white"
+            >
+              @estebansuarez
+            </a>
+          </p>
         </div>
       )}
     </div>
