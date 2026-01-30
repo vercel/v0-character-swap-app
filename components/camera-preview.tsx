@@ -108,23 +108,33 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
 
     chunksRef.current = []
     
-    // Detect if mobile for adaptive settings
-    const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    // Detect browser type
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
     
     let mediaRecorder: MediaRecorder
     let mimeType: string
     
-    if (isMobileDevice) {
-      // Mobile: Use same config as desktop but with higher bitrate
+    if (isSafari) {
+      // Safari (desktop & mobile): Use MP4 with high bitrate
+      // Safari has issues with canvas-recorded video metadata
+      mimeType = "video/mp4"
+      mediaRecorder = new MediaRecorder(canvasStream, { 
+        mimeType,
+        videoBitsPerSecond: 8000000, // 8 Mbps
+      })
+      console.log("[v0] Safari detected - using MP4 with 60s timeslice")
+    } else if (isMobile) {
+      // Android mobile: Use MP4 if supported, else WebM
       mimeType = MediaRecorder.isTypeSupported("video/mp4") 
         ? "video/mp4" 
         : "video/webm"
       mediaRecorder = new MediaRecorder(canvasStream, { 
         mimeType,
-        videoBitsPerSecond: 8000000, // 8 Mbps for mobile
+        videoBitsPerSecond: 8000000, // 8 Mbps
       })
     } else {
-      // Desktop: Original working config
+      // Chrome/Firefox Desktop: Original working config
       mimeType = MediaRecorder.isTypeSupported("video/mp4") 
         ? "video/mp4" 
         : "video/webm;codecs=vp8,opus"
@@ -149,11 +159,16 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     }
 
     mediaRecorderRef.current = mediaRecorder
-    // Mobile needs timeslice for fal.ai to properly read the video metadata
-    if (isMobileDevice) {
-      mediaRecorder.start(10000) // Request data every 10 seconds
+    
+    // Safari needs a long timeslice to force proper metadata writing
+    // but not too short to avoid timestamp issues (which cause fast-forward)
+    // 60 seconds = single chunk for videos up to 30s
+    if (isSafari) {
+      mediaRecorder.start(60000) // 60 second timeslice - single chunk
+    } else if (isMobile) {
+      mediaRecorder.start(10000) // 10 seconds for Android
     } else {
-      mediaRecorder.start()
+      mediaRecorder.start() // No timeslice for Chrome/Firefox desktop
     }
     setIsRecording(true)
     setRecordingTime(0)
