@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect } from "react"
 import { upload } from "@vercel/blob/client"
 import { MAX_VIDEO_SIZE, MAX_VIDEO_DURATION, STORAGE_KEYS } from "@/lib/constants"
-import { processVideoForUpload, needsVideoProcessing } from "@/lib/process-video"
 
 interface UseVideoRecordingReturn {
   recordedVideo: Blob | null
@@ -42,40 +41,17 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     }
   }, [recordedVideo])
 
-  // Process and upload video when recorded
+  // Upload video when recorded
   const uploadVideo = useCallback(async (blob: Blob) => {
-    let videoToUpload = blob
-    let extension = "webm"
-    
-    // For Safari, re-encode video to fix metadata issues
-    if (needsVideoProcessing()) {
-      setIsProcessing(true)
-      setProcessingProgress(0)
-      try {
-        console.log("[v0] Safari detected - re-encoding video")
-        videoToUpload = await processVideoForUpload(blob, setProcessingProgress)
-        extension = "mp4"
-        console.log("[v0] Video re-encoded successfully, size:", videoToUpload.size)
-      } catch (error) {
-        console.error("[v0] Failed to re-encode video:", error)
-        // Continue with original video as fallback
-      } finally {
-        setIsProcessing(false)
-        setProcessingProgress(0)
-      }
-    }
-    
-    // Upload video
     setIsUploading(true)
     try {
-      const videoBlob = await upload(`videos/${Date.now()}-recording.${extension}`, videoToUpload, {
+      const videoBlob = await upload(`videos/${Date.now()}-recording.webm`, blob, {
         access: "public",
         handleUploadUrl: "/api/upload",
       })
       setUploadedVideoUrl(videoBlob.url)
     } catch (error) {
       console.error("Failed to upload video:", error)
-      // Don't fail - user can still generate, it will upload then
     } finally {
       setIsUploading(false)
     }
