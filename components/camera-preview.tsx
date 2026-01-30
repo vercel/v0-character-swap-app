@@ -108,35 +108,71 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
 
     chunksRef.current = []
     
-    // Detect if mobile for adaptive settings
+    // Detect browser and device
     const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+    const isChrome = /chrome/i.test(navigator.userAgent) && !/edge/i.test(navigator.userAgent)
+    
+    // Check supported mimeTypes
+    const mp4Supported = MediaRecorder.isTypeSupported("video/mp4")
+    const webmSupported = MediaRecorder.isTypeSupported("video/webm")
+    const webmVp8Supported = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+    
+    console.log("[v0] Recording Debug - Browser Detection:", {
+      isMobileDevice,
+      isSafari,
+      isChrome,
+      userAgent: navigator.userAgent.substring(0, 100)
+    })
+    
+    console.log("[v0] Recording Debug - MimeType Support:", {
+      mp4Supported,
+      webmSupported,
+      webmVp8Supported
+    })
     
     let mediaRecorder: MediaRecorder
     let mimeType: string
+    let bitrate: number
+    let timeslice: number | undefined
     
     if (isMobileDevice) {
       // Mobile: Use same config as desktop but with higher bitrate
-      // Safari iOS has limited MediaRecorder support, webm works better
-      mimeType = MediaRecorder.isTypeSupported("video/mp4") 
-        ? "video/mp4" 
-        : "video/webm"
+      mimeType = mp4Supported ? "video/mp4" : "video/webm"
+      bitrate = 8000000 // 8 Mbps
+      timeslice = 10000 // 10 seconds
       mediaRecorder = new MediaRecorder(canvasStream, { 
         mimeType,
-        videoBitsPerSecond: 8000000, // 8 Mbps for mobile - helps fal.ai detect motion
+        videoBitsPerSecond: bitrate,
       })
     } else {
-      // Desktop: Original working config - mp4 if supported, else webm with vp8
-      mimeType = MediaRecorder.isTypeSupported("video/mp4") 
-        ? "video/mp4" 
-        : "video/webm;codecs=vp8,opus"
+      // Desktop: Original working config
+      mimeType = mp4Supported ? "video/mp4" : "video/webm;codecs=vp8,opus"
+      bitrate = 5000000 // 5 Mbps
+      timeslice = undefined // No timeslice for desktop
       mediaRecorder = new MediaRecorder(canvasStream, { 
         mimeType,
-        videoBitsPerSecond: 5000000, // 5 Mbps
+        videoBitsPerSecond: bitrate,
       })
     }
+    
+    console.log("[v0] Recording Debug - MediaRecorder Config:", {
+      mimeType,
+      bitrate: bitrate / 1000000 + " Mbps",
+      timeslice: timeslice ? timeslice / 1000 + "s" : "none",
+      canvasWidth: width,
+      canvasHeight: height
+    })
 
     mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data)
+      if (e.data.size > 0) {
+        chunksRef.current.push(e.data)
+        console.log("[v0] Recording Debug - Chunk received:", {
+          chunkNumber: chunksRef.current.length,
+          chunkSize: (e.data.size / 1024).toFixed(2) + " KB",
+          chunkType: e.data.type
+        })
+      }
     }
 
     mediaRecorder.onstop = () => {
@@ -145,18 +181,32 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         cancelAnimationFrame(animationFrameRef.current)
         animationFrameRef.current = null
       }
+      
+      const totalSize = chunksRef.current.reduce((acc, chunk) => acc + chunk.size, 0)
+      console.log("[v0] Recording Debug - Recording Stopped:", {
+        totalChunks: chunksRef.current.length,
+        totalSize: (totalSize / 1024 / 1024).toFixed(2) + " MB",
+        mimeType
+      })
+      
       const blob = new Blob(chunksRef.current, { type: mimeType })
+      console.log("[v0] Recording Debug - Blob Created:", {
+        blobSize: (blob.size / 1024 / 1024).toFixed(2) + " MB",
+        blobType: blob.type
+      })
+      
       onVideoRecorded(blob, aspectRatio)
     }
 
     mediaRecorderRef.current = mediaRecorder
-    // Mobile needs timeslice for fal.ai to properly read the video metadata
-    // Using longer timeslice (10s) to reduce timestamp issues while still helping metadata
-    // Desktop works better without it
-    if (isMobileDevice) {
-      mediaRecorder.start(10000) // Request data every 10 seconds - fewer chunks = better timestamps
+    
+    // Start recording with or without timeslice
+    if (timeslice) {
+      mediaRecorder.start(timeslice)
+      console.log("[v0] Recording Debug - Started with timeslice:", timeslice / 1000 + "s")
     } else {
       mediaRecorder.start()
+      console.log("[v0] Recording Debug - Started without timeslice")
     }
     setIsRecording(true)
     setRecordingTime(0)
