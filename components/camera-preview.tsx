@@ -90,60 +90,110 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     canvas.width = width
     canvas.height = height
 
-    // Draw mirrored video to canvas
-    const drawFrame = () => {
-      ctx.save()
-      ctx.translate(width, 0)
-      ctx.scale(-1, 1)
-      ctx.drawImage(video, 0, 0, width, height)
-      ctx.restore()
-      animationFrameRef.current = requestAnimationFrame(drawFrame)
-    }
-    drawFrame()
-
-    // Get canvas stream and add audio from original stream
-    const canvasStream = canvas.captureStream(30)
-    const audioTracks = originalStreamRef.current.getAudioTracks()
-    audioTracks.forEach(track => canvasStream.addTrack(track))
-
-    chunksRef.current = []
-    
     // Detect browser type
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    
+    // For Safari/iOS: Use direct camera stream (canvas.captureStream produces black video)
+    // For Chrome/Firefox: Use canvas stream for mirrored recording
+    const useCameraDirectly = isSafari || isIOS
+    
+    let recordingStream: MediaStream
+    
+    if (useCameraDirectly) {
+      // Safari/iOS: Record directly from camera (no mirroring in recording)
+      // The video will appear non-mirrored in the final output
+      recordingStream = originalStreamRef.current
+      console.log("[v0] Safari/iOS detected - recording directly from camera stream")
+    } else {
+      // Chrome/Firefox: Draw mirrored video to canvas
+      const drawFrame = () => {
+        ctx.save()
+        ctx.translate(width, 0)
+        ctx.scale(-1, 1)
+        ctx.drawImage(video, 0, 0, width, height)
+        ctx.restore()
+        animationFrameRef.current = requestAnimationFrame(drawFrame)
+      }
+      drawFrame()
+
+      // Get canvas stream and add audio from original stream
+      const canvasStream = canvas.captureStream(30)
+      const audioTracks = originalStreamRef.current.getAudioTracks()
+      audioTracks.forEach(track => canvasStream.addTrack(track))
+      recordingStream = canvasStream
+      console.log("[v0] Chrome/Firefox detected - using canvas stream for mirrored recording")
+    }
+
+    chunksRef.current = []
     
     let mediaRecorder: MediaRecorder
     let mimeType: string
     
-    if (isSafari) {
-      // Safari (desktop & mobile): Use MP4 with high bitrate
-      // Safari has issues with canvas-recorded video metadata
+    // Determine best codec based on browser support
+    const supportedTypes = [
+      "video/mp4;codecs=avc1",
+      "video/mp4",
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm",
+    ]
+    
+    const findSupportedType = () => {
+      for (const type of supportedTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          return type
+        }
+      }
+      return ""
+    }
+    
+    if (isSafari || isIOS) {
+      // Safari/iOS: Use MP4 (only format Safari supports)
       mimeType = "video/mp4"
-      mediaRecorder = new MediaRecorder(canvasStream, { 
-        mimeType,
-        videoBitsPerSecond: 8000000, // 8 Mbps
-      })
-      console.log("[v0] Safari detected - using MP4 with 60s timeslice")
+      try {
+        mediaRecorder = new MediaRecorder(recordingStream, { 
+          mimeType,
+          videoBitsPerSecond: 8000000, // 8 Mbps
+        })
+      } catch {
+        // Fallback without options
+        console.log("[v0] Safari MediaRecorder fallback - no options")
+        mediaRecorder = new MediaRecorder(recordingStream)
+        mimeType = mediaRecorder.mimeType || "video/mp4"
+      }
+      console.log("[v0] Safari/iOS - using mimeType:", mimeType)
     } else if (isMobile) {
       // Android mobile: Use MP4 if supported, else WebM
-      mimeType = MediaRecorder.isTypeSupported("video/mp4") 
-        ? "video/mp4" 
-        : "video/webm"
-      mediaRecorder = new MediaRecorder(canvasStream, { 
-        mimeType,
+      mimeType = findSupportedType() || "video/webm"
+      mediaRecorder = new MediaRecorder(recordingStream, { 
+        mimeType: mimeType.split(";")[0], // Use base type
         videoBitsPerSecond: 8000000, // 8 Mbps
       })
+      console.log("[v0] Android mobile - using mimeType:", mimeType)
     } else {
       // Chrome/Firefox Desktop: Use WebM (works reliably with fal.ai)
       mimeType = "video/webm;codecs=vp8,opus"
-      mediaRecorder = new MediaRecorder(canvasStream, { 
-        mimeType,
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = findSupportedType() || "video/webm"
+      }
+      mediaRecorder = new MediaRecorder(recordingStream, { 
+        mimeType: mimeType.split(";")[0],
         videoBitsPerSecond: 5000000, // 5 Mbps
       })
+      console.log("[v0] Chrome/Firefox desktop - using mimeType:", mimeType)
     }
 
     mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data)
+      if (e.data.size > 0) {
+        chunksRef.current.push(e.data)
+        console.log("[v0] Chunk received, size:", e.data.size)
+      }
+    }
+
+    mediaRecorder.onerror = (e) => {
+      console.error("[v0] MediaRecorder error:", e)
     }
 
     mediaRecorder.onstop = () => {
@@ -154,22 +204,26 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
       }
       // Use base mimeType without codecs for the blob
       const blobType = mimeType.split(";")[0]
+      const totalSize = chunksRef.current.reduce((acc, chunk) => acc + chunk.size, 0)
+      console.log("[v0] Recording stopped. Total chunks:", chunksRef.current.length, "Total size:", totalSize)
       const blob = new Blob(chunksRef.current, { type: blobType })
+      console.log("[v0] Final blob size:", blob.size, "type:", blob.type)
       onVideoRecorded(blob, aspectRatio)
     }
 
     mediaRecorderRef.current = mediaRecorder
     
-    // Safari needs a long timeslice to force proper metadata writing
-    // but not too short to avoid timestamp issues (which cause fast-forward)
-    // 60 seconds = single chunk for videos up to 30s
-    if (isSafari) {
-      mediaRecorder.start(60000) // 60 second timeslice - single chunk
+    // Start recording with appropriate timeslice
+    // Safari needs longer timeslice or single chunk for proper metadata
+    if (isSafari || isIOS) {
+      mediaRecorder.start(60000) // 60 second timeslice - single chunk for videos up to 30s
     } else if (isMobile) {
       mediaRecorder.start(10000) // 10 seconds for Android
     } else {
-      mediaRecorder.start() // No timeslice for Chrome/Firefox desktop
+      mediaRecorder.start(1000) // 1 second chunks for desktop (helps with debugging)
     }
+    
+    console.log("[v0] Recording started, state:", mediaRecorder.state)
     setIsRecording(true)
     setRecordingTime(0)
 
