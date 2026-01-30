@@ -71,7 +71,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     }
   }, [startCamera])
 
-  const beginRecording = useCallback(() => {
+  const beginRecording = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || !originalStreamRef.current) return
     
     // Clear any existing timer first
@@ -96,7 +96,6 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     // Detect Safari and check if WebCodecs is available
     const isSafari = isSafariBrowser()
     const useWebCodecs = isSafari && hasWebCodecs()
-    useSafariEncoderRef.current = useWebCodecs
     
     console.log("[v0] Recording setup:", { isSafari, useWebCodecs, width, height })
 
@@ -126,7 +125,6 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
       
       animationFrameRef.current = requestAnimationFrame(drawFrame)
     }
-    drawFrame(0)
 
     if (useWebCodecs) {
       // Safari with WebCodecs: Use mp4-muxer for proper metadata
@@ -138,18 +136,32 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         bitrate: 5_000_000,
       })
       
-      encoder.start().then(() => {
+      try {
+        // Wait for encoder to start before beginning to draw frames
+        await encoder.start()
         safariEncoderRef.current = encoder
-        console.log("[v0] Safari WebCodecs encoder started")
-      }).catch(err => {
-        console.error("[v0] Failed to start Safari encoder:", err)
-        // Fall back to regular MediaRecorder
+        useSafariEncoderRef.current = true
+        console.log("[v0] Safari WebCodecs encoder started successfully")
+        // Now start drawing frames
+        drawFrame(0)
+      } catch (err) {
+        console.error("[v0] Failed to start Safari encoder, falling back to MediaRecorder:", err)
         useSafariEncoderRef.current = false
-      })
+        safariEncoderRef.current = null
+        // Fall through to MediaRecorder below
+        drawFrame(0)
+        setupMediaRecorder()
+      }
     } else {
-      // Chrome/Firefox or Safari without WebCodecs: Use MediaRecorder
+      // Chrome/Firefox or Safari fallback: Use MediaRecorder
+      drawFrame(0)
+      setupMediaRecorder()
+    }
+    
+    // Helper function to setup MediaRecorder (used for Chrome/Firefox and Safari fallback)
+    function setupMediaRecorder() {
       const canvasStream = canvas.captureStream(30)
-      const audioTracks = originalStreamRef.current.getAudioTracks()
+      const audioTracks = originalStreamRef.current!.getAudioTracks()
       audioTracks.forEach(track => canvasStream.addTrack(track))
 
       chunksRef.current = []
@@ -157,21 +169,12 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
       let mediaRecorder: MediaRecorder
       let mimeType: string
       
-      if (isSafari) {
-        // Safari without WebCodecs: Use MP4 with timeslice
-        mimeType = "video/mp4"
-        mediaRecorder = new MediaRecorder(canvasStream, { 
-          mimeType,
-          videoBitsPerSecond: 5000000,
-        })
-      } else {
-        // Chrome/Firefox: Use WebM with VP8
-        mimeType = "video/webm;codecs=vp8,opus"
-        mediaRecorder = new MediaRecorder(canvasStream, { 
-          mimeType,
-          videoBitsPerSecond: 5000000,
-        })
-      }
+      // Chrome/Firefox: Use WebM with VP8
+      mimeType = "video/webm;codecs=vp8,opus"
+      mediaRecorder = new MediaRecorder(canvasStream, { 
+        mimeType,
+        videoBitsPerSecond: 5000000,
+      })
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
@@ -191,12 +194,8 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
       }
 
       mediaRecorderRef.current = mediaRecorder
-      
-      if (isSafari) {
-        mediaRecorder.start(10000) // Safari needs timeslice
-      } else {
-        mediaRecorder.start()
-      }
+      mediaRecorder.start()
+      console.log("[v0] MediaRecorder started with mimeType:", mimeType)
     }
     setIsRecording(true)
     setRecordingTime(0)
