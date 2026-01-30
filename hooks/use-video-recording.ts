@@ -44,30 +44,30 @@ export function useVideoRecording(): UseVideoRecordingReturn {
 
   // Process and upload video when recorded
   const uploadVideo = useCallback(async (blob: Blob) => {
-    let videoToUpload = blob
-    let extension = "webm"
-    
-    // For Safari, process video with ffmpeg to fix metadata
+    // For Safari, process video on server to fix metadata issues
     if (needsVideoProcessing()) {
       setIsProcessing(true)
       setProcessingProgress(0)
       try {
-        console.log("[v0] Safari detected - processing video with ffmpeg")
-        videoToUpload = await processVideoForUpload(blob, setProcessingProgress)
-        extension = "mp4"
-        console.log("[v0] Video processed successfully")
+        console.log("[v0] Safari detected - processing video on server")
+        // processVideoForUpload handles both processing and uploading, returns URL
+        const processedUrl = await processVideoForUpload(blob, setProcessingProgress)
+        setUploadedVideoUrl(processedUrl)
+        console.log("[v0] Video processed and uploaded:", processedUrl)
+        return
       } catch (error) {
         console.error("[v0] Failed to process video:", error)
-        // Continue with original video as fallback
+        // Fall through to normal upload as fallback
       } finally {
         setIsProcessing(false)
         setProcessingProgress(0)
       }
     }
     
+    // Normal upload for Chrome/Firefox or as fallback
     setIsUploading(true)
     try {
-      const videoBlob = await upload(`videos/${Date.now()}-recording.${extension}`, videoToUpload, {
+      const videoBlob = await upload(`videos/${Date.now()}-recording.webm`, blob, {
         access: "public",
         handleUploadUrl: "/api/upload",
       })
