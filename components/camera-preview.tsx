@@ -12,6 +12,8 @@ interface CameraPreviewProps {
 
 export function CameraPreview({ onVideoRecorded, isProcessing, progress, progressMessage, isError }: CameraPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const animationFrameRef = useRef<number | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const originalStreamRef = useRef<MediaStream | null>(null)
@@ -62,11 +64,12 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
       }
       if (timerRef.current) clearInterval(timerRef.current)
       if (countdownRef.current) clearInterval(countdownRef.current)
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
     }
   }, [startCamera])
 
   const beginRecording = useCallback(() => {
-    if (!videoRef.current || !originalStreamRef.current) return
+    if (!videoRef.current || !canvasRef.current || !originalStreamRef.current) return
     
     // Clear any existing timer first
     if (timerRef.current) {
@@ -80,48 +83,61 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
       return
     }
 
-    // Detect browser type - more robust detection
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })
+    if (!ctx) return
+
+    // Get video dimensions
+    const width = video.videoWidth || 1280
+    const height = video.videoHeight || 720
+    canvas.width = width
+    canvas.height = height
+
+    // Detect browser type
     const ua = navigator.userAgent
     const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
     const isSafari = /^((?!chrome|android).)*safari/i.test(ua) || isIOS
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(ua) || isIOS
     
-    console.log("[v0] Browser detection - Safari:", isSafari, "iOS:", isIOS, "Mobile:", isMobile)
-    console.log("[v0] User Agent:", ua)
+    console.log("[v0] Browser detection - Safari:", isSafari, "iOS:", isIOS)
     
-    // Record directly from camera stream for all browsers
-    const recordingStream = originalStreamRef.current
-    console.log("[v0] Recording directly from camera stream")
+    let recordingStream: MediaStream
+    
+    if (isSafari || isIOS) {
+      // Safari/iOS: Record directly from camera (canvas.captureStream produces black video)
+      // Video will NOT be mirrored in the final output
+      recordingStream = originalStreamRef.current
+      console.log("[v0] Safari/iOS - recording directly from camera (no mirror)")
+    } else {
+      // Chrome/Firefox: Use canvas to mirror the video
+      const drawFrame = () => {
+        ctx.save()
+        ctx.translate(width, 0)
+        ctx.scale(-1, 1)
+        ctx.drawImage(video, 0, 0, width, height)
+        ctx.restore()
+        animationFrameRef.current = requestAnimationFrame(drawFrame)
+      }
+      drawFrame()
+
+      // Get canvas stream and add audio from original stream
+      const canvasStream = canvas.captureStream(30)
+      const audioTracks = originalStreamRef.current.getAudioTracks()
+      audioTracks.forEach(track => canvasStream.addTrack(track))
+      recordingStream = canvasStream
+      console.log("[v0] Chrome/Firefox - using canvas for mirrored recording")
+    }
 
     chunksRef.current = []
     
     let mediaRecorder: MediaRecorder
     let mimeType: string
     
-    // Check which types are supported
-    const checkTypes = [
-      "video/mp4",
-      "video/mp4;codecs=avc1",
-      "video/mp4;codecs=h264",
-      "video/webm",
-      "video/webm;codecs=vp9",
-      "video/webm;codecs=vp8",
-      "video/webm;codecs=vp9,opus",
-      "video/webm;codecs=vp8,opus",
-    ]
-    
-    console.log("[v0] Checking supported MIME types:")
-    for (const type of checkTypes) {
-      const supported = MediaRecorder.isTypeSupported(type)
-      console.log(`[v0]   ${type}: ${supported ? "YES" : "no"}`)
-    }
-    
     // Find best supported type
     const findSupportedType = () => {
-      // Prefer MP4 for Safari, WebM for others
       const preferredOrder = isSafari 
-        ? ["video/mp4", "video/mp4;codecs=avc1", "video/webm", "video/webm;codecs=vp8"]
-        : ["video/webm", "video/webm;codecs=vp8", "video/webm;codecs=vp9", "video/mp4"]
+        ? ["video/mp4", "video/mp4;codecs=avc1"]
+        : ["video/webm", "video/webm;codecs=vp8", "video/webm;codecs=vp9"]
       
       for (const type of preferredOrder) {
         if (MediaRecorder.isTypeSupported(type)) {
@@ -132,31 +148,27 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     }
     
     const selectedType = findSupportedType()
-    console.log("[v0] Selected MIME type:", selectedType || "(none - using default)")
+    console.log("[v0] Selected MIME type:", selectedType || "(browser default)")
     
     try {
       if (selectedType) {
-        mimeType = selectedType.split(";")[0] // Use base type without codecs
+        mimeType = selectedType.split(";")[0]
         mediaRecorder = new MediaRecorder(recordingStream, { 
           mimeType,
-          videoBitsPerSecond: isSafari ? 8000000 : 5000000,
+          videoBitsPerSecond: 5000000,
         })
       } else {
-        // Let browser choose default
-        console.log("[v0] No specific type supported, using browser default")
         mediaRecorder = new MediaRecorder(recordingStream)
-        mimeType = mediaRecorder.mimeType || "video/mp4"
+        mimeType = mediaRecorder.mimeType || "video/webm"
       }
       console.log("[v0] MediaRecorder created with mimeType:", mediaRecorder.mimeType)
     } catch (err) {
       console.error("[v0] MediaRecorder creation failed:", err)
-      // Try without any options
       try {
         mediaRecorder = new MediaRecorder(recordingStream)
-        mimeType = mediaRecorder.mimeType || "video/mp4"
-        console.log("[v0] MediaRecorder fallback created with mimeType:", mimeType)
+        mimeType = mediaRecorder.mimeType || "video/webm"
       } catch (err2) {
-        console.error("[v0] MediaRecorder fallback also failed:", err2)
+        console.error("[v0] MediaRecorder fallback failed:", err2)
         alert("Unable to start recording. Please try a different browser.")
         return
       }
@@ -174,9 +186,15 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     }
 
     mediaRecorder.onstop = () => {
+      // Stop canvas drawing
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
+      
       const blobType = mimeType.split(";")[0]
       const totalSize = chunksRef.current.reduce((acc, chunk) => acc + chunk.size, 0)
-      console.log("[v0] Recording stopped. Total chunks:", chunksRef.current.length, "Total size:", totalSize)
+      console.log("[v0] Recording stopped. Chunks:", chunksRef.current.length, "Size:", totalSize)
       
       if (chunksRef.current.length === 0 || totalSize === 0) {
         console.error("[v0] No data recorded!")
@@ -192,23 +210,19 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     mediaRecorderRef.current = mediaRecorder
     
     // Start recording
-    // Safari/iOS: use longer timeslice or none for proper metadata
-    // Chrome/Firefox: use shorter timeslice for chunked data
     try {
       if (isSafari || isIOS) {
-        mediaRecorder.start() // No timeslice for Safari - let it handle naturally
-        console.log("[v0] Recording started (Safari mode - no timeslice)")
+        mediaRecorder.start() // No timeslice for Safari
       } else {
-        mediaRecorder.start(1000) // 1 second chunks
-        console.log("[v0] Recording started (1s timeslice)")
+        mediaRecorder.start(1000) // 1 second chunks for Chrome
       }
+      console.log("[v0] Recording started, state:", mediaRecorder.state)
     } catch (err) {
       console.error("[v0] MediaRecorder.start() failed:", err)
       alert("Failed to start recording. Please try again.")
       return
     }
     
-    console.log("[v0] Recording state:", mediaRecorder.state)
     setIsRecording(true)
     setRecordingTime(0)
 
@@ -280,6 +294,11 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     if (mediaRecorderRef.current?.state === "recording") {
       mediaRecorderRef.current.stop()
     }
+    // Stop canvas drawing
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
     setIsRecording(false)
     if (timerRef.current) {
       clearInterval(timerRef.current)
@@ -308,6 +327,8 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
           className="h-full w-full object-contain md:object-cover"
           style={{ transform: "scaleX(-1)" }}
         />
+        {/* Hidden canvas for mirrored recording (Chrome/Firefox) */}
+        <canvas ref={canvasRef} className="hidden" />
         
         {/* Flash effect */}
         {showFlash && (
