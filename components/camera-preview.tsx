@@ -83,7 +83,9 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     if (!ctx) return
 
     // Wait for video to have dimensions
-    const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    // Detect Safari (both macOS and iOS) - has different MediaRecorder behavior
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
     
     const originalWidth = video.videoWidth || 720
     const originalHeight = video.videoHeight || 1280
@@ -91,7 +93,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     let height = originalHeight
     
     // Mobile: Reduce resolution to avoid issues with fal.ai processing large files
-    if (isMobileDevice) {
+    if (isMobile) {
       const maxDimension = 720 // Cap at 720p for mobile
       if (width > maxDimension || height > maxDimension) {
         const scale = maxDimension / Math.max(width, height)
@@ -101,7 +103,8 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     }
     
     console.log("[v0] Recording config:", { 
-      isMobileDevice, 
+      isSafari,
+      isMobile, 
       originalWidth, 
       originalHeight, 
       canvasWidth: width, 
@@ -134,22 +137,17 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     let mimeType: string
     let videoBitrate: number
     
-    // isMobileDevice is defined above when setting canvas dimensions
-    if (isMobileDevice) {
-      // Mobile: Use lower bitrate - too high can cause issues with fal.ai processing
-      mimeType = MediaRecorder.isTypeSupported("video/mp4") 
-        ? "video/mp4" 
-        : "video/webm"
-      videoBitrate = 2500000 // 2.5 Mbps
+    if (isSafari) {
+      // Safari (macOS and iOS): Use MP4, needs specific handling
+      mimeType = "video/mp4"
+      videoBitrate = isMobile ? 2500000 : 5000000 // Lower bitrate for mobile
       mediaRecorder = new MediaRecorder(canvasStream, { 
         mimeType,
         videoBitsPerSecond: videoBitrate,
       })
     } else {
-      // Desktop: Original working config - mp4 if supported, else webm with vp8
-      mimeType = MediaRecorder.isTypeSupported("video/mp4") 
-        ? "video/mp4" 
-        : "video/webm;codecs=vp8,opus"
+      // Chrome/Firefox: Use WebM with VP8
+      mimeType = "video/webm;codecs=vp8,opus"
       videoBitrate = 5000000 // 5 Mbps
       mediaRecorder = new MediaRecorder(canvasStream, { 
         mimeType,
@@ -188,10 +186,10 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     }
 
     mediaRecorderRef.current = mediaRecorder
-    // Mobile Safari needs timeslice to write proper metadata, but use long interval to avoid timestamp issues
-    // Desktop works better without timeslice
-    const timeslice = isMobileDevice ? 30000 : undefined
-    console.log("[v0] Starting MediaRecorder with timeslice:", timeslice)
+    // Safari needs timeslice to write proper metadata, but use long interval to avoid timestamp issues
+    // Chrome/Firefox work better without timeslice
+    const timeslice = isSafari ? 30000 : undefined
+    console.log("[v0] Starting MediaRecorder with timeslice:", timeslice, { isSafari })
     if (timeslice) {
       mediaRecorder.start(timeslice)
     } else {
