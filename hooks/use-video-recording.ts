@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import { upload } from "@vercel/blob/client"
 import { MAX_VIDEO_SIZE, MAX_VIDEO_DURATION, STORAGE_KEYS } from "@/lib/constants"
+import { convertWebMToMP4, isFFmpegSupported } from "@/lib/video-converter"
 
 interface UseVideoRecordingReturn {
   recordedVideo: Blob | null
@@ -10,6 +11,7 @@ interface UseVideoRecordingReturn {
   uploadedVideoUrl: string | null
   recordedAspectRatio: "9:16" | "16:9" | "fill"
   isUploading: boolean
+  isConverting: boolean
   showPreview: boolean
   setShowPreview: (show: boolean) => void
   handleVideoRecorded: (blob: Blob, aspectRatio: "9:16" | "16:9" | "fill") => void
@@ -24,6 +26,7 @@ export function useVideoRecording(): UseVideoRecordingReturn {
   const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null)
   const [recordedAspectRatio, setRecordedAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
   const [isUploading, setIsUploading] = useState(false)
+  const [isConverting, setIsConverting] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
 
   // Create object URL when video changes
@@ -37,20 +40,40 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     }
   }, [recordedVideo])
 
-  // Auto-upload video when recorded
+  // Convert and upload video
   const uploadVideo = useCallback(async (blob: Blob) => {
+    let videoToUpload = blob
+    
+    // Convert WebM to MP4 if needed (for Kling AI compatibility)
+    // Kling AI requires H.264 codec which is in MP4, not WebM (VP8/VP9)
+    if (blob.type.includes("webm") && isFFmpegSupported()) {
+      setIsConverting(true)
+      console.log("[v0] WebM detected, converting to MP4 for Kling AI compatibility...")
+      try {
+        videoToUpload = await convertWebMToMP4(blob)
+        console.log("[v0] Conversion successful, new type:", videoToUpload.type)
+      } catch (error) {
+        console.error("[v0] Failed to convert video, uploading original:", error)
+        // Continue with original WebM if conversion fails
+      } finally {
+        setIsConverting(false)
+      }
+    } else if (blob.type.includes("webm")) {
+      console.log("[v0] WebM detected but FFmpeg not supported (no SharedArrayBuffer), uploading as-is")
+    }
+    
     setIsUploading(true)
     try {
       // Determine file extension based on blob type
       let extension = "webm"
-      if (blob.type.includes("mp4")) {
+      if (videoToUpload.type.includes("mp4")) {
         extension = "mp4"
-      } else if (blob.type.includes("quicktime")) {
+      } else if (videoToUpload.type.includes("quicktime")) {
         extension = "mov"
       }
-      console.log("[v0] Uploading video - type:", blob.type, "extension:", extension, "size:", blob.size)
+      console.log("[v0] Uploading video - type:", videoToUpload.type, "extension:", extension, "size:", videoToUpload.size)
       
-      const videoBlob = await upload(`videos/${Date.now()}-recording.${extension}`, blob, {
+      const videoBlob = await upload(\`videos/\${Date.now()}-recording.\${extension}\`, videoToUpload, {
         access: "public",
         handleUploadUrl: "/api/upload",
       })
@@ -85,7 +108,7 @@ export function useVideoRecording(): UseVideoRecordingReturn {
       
       if (hasValidDuration && duration > MAX_VIDEO_DURATION + 1) {
         const durationSeconds = Math.round(duration)
-        alert(`Video is too long (${durationSeconds}s). Please record up to ${MAX_VIDEO_DURATION} seconds.`)
+        alert(\`Video is too long (\${durationSeconds}s). Please record up to \${MAX_VIDEO_DURATION} seconds.\`)
         return
       }
       
@@ -110,7 +133,7 @@ export function useVideoRecording(): UseVideoRecordingReturn {
       setRecordedVideo(blob)
       setRecordedAspectRatio(detectedAspectRatio)
       setShowPreview(true)
-      // Start uploading immediately in background
+      // Start converting and uploading immediately in background
       uploadVideo(blob)
     }
     
@@ -206,6 +229,7 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     uploadedVideoUrl,
     recordedAspectRatio,
     isUploading,
+    isConverting,
     showPreview,
     setShowPreview,
     handleVideoRecorded,

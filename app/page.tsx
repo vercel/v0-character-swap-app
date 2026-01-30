@@ -76,6 +76,7 @@ export default function Home() {
     uploadedVideoUrl,
     recordedAspectRatio,
     isUploading,
+    isConverting,
     showPreview,
     setShowPreview,
     handleVideoRecorded,
