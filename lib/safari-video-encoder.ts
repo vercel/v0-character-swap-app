@@ -1,6 +1,7 @@
 "use client"
 
-import * as Mp4Muxer from "mp4-muxer"
+// Dynamic import to avoid SSR issues
+let Mp4Muxer: typeof import("mp4-muxer") | null = null
 
 /**
  * Check if browser is Safari (needs special video encoding)
@@ -41,6 +42,11 @@ export class SafariVideoEncoder {
 
   async start(): Promise<void> {
     console.log("[v0] SafariVideoEncoder: Starting with config:", this.config)
+
+    // Dynamic import mp4-muxer (avoid SSR issues)
+    if (!Mp4Muxer) {
+      Mp4Muxer = await import("mp4-muxer")
+    }
 
     // Create mp4-muxer
     this.muxer = new Mp4Muxer.Muxer({
