@@ -27,25 +27,6 @@ const nextConfig = {
     deviceSizes: [640, 750, 828, 1080, 1200],
     imageSizes: [16, 32, 48, 64, 96, 128, 160, 256],
   },
-  // Enable SharedArrayBuffer for ffmpeg.wasm (WebM to MP4 conversion)
-  // Using 'credentialless' instead of 'require-corp' for better compatibility
-  async headers() {
-    return [
-      {
-        source: "/:path*",
-        headers: [
-          {
-            key: "Cross-Origin-Opener-Policy",
-            value: "same-origin",
-          },
-          {
-            key: "Cross-Origin-Embedder-Policy",
-            value: "credentialless",
-          },
-        ],
-      },
-    ]
-  },
 }
 
 export default withWorkflow(nextConfig)
