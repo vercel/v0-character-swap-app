@@ -99,33 +99,26 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     let mediaRecorder: MediaRecorder
     let mimeType: string
     
-    // Find best supported type
-    // WebM works with fal.ai Kling for Chrome/Firefox
-    // Safari only supports MP4 - use specific codec for compatibility
+    // Find best supported type - Try MP4 first for ALL browsers (Kling AI requires H.264)
+    // Chrome 120+ supports MP4 recording in some configurations
     const findSupportedType = () => {
-      // For Chrome/Firefox, use WebM (proven to work with Kling)
-      if (!isSafari) {
-        const webmTypes = ["video/webm;codecs=vp8", "video/webm;codecs=vp9", "video/webm"]
-        for (const type of webmTypes) {
-          if (MediaRecorder.isTypeSupported(type)) {
-            console.log("[v0] Chrome/Firefox - using WebM:", type)
-            return type
-          }
+      // Try MP4 first for all browsers - this is what Kling AI needs
+      const mp4Types = ["video/mp4", "video/mp4;codecs=avc1", "video/mp4;codecs=h264"]
+      for (const type of mp4Types) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          console.log("[v0] MP4 supported:", type)
+          return type
         }
       }
       
-      // For Safari, use MP4 with H.264 baseline profile for best compatibility
-      // avc1.42E01E = H.264 Baseline Profile Level 3.0 (most compatible)
-      const safariTypes = [
-        "video/mp4;codecs=avc1.42E01E", // Baseline profile (most compatible)
-        "video/mp4;codecs=avc1.4D401E", // Main profile
-        "video/mp4;codecs=avc1",
-        "video/mp4"
-      ]
-      for (const type of safariTypes) {
-        if (MediaRecorder.isTypeSupported(type)) {
-          console.log("[v0] Safari - using:", type)
-          return type
+      // Fall back to WebM only if MP4 is not supported
+      if (!isSafari) {
+        const webmTypes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]
+        for (const type of webmTypes) {
+          if (MediaRecorder.isTypeSupported(type)) {
+            console.log("[v0] Falling back to WebM:", type)
+            return type
+          }
         }
       }
       

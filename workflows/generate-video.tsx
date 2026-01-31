@@ -133,10 +133,29 @@ async function submitToFal(
 
   fal.config({ credentials: process.env.FAL_KEY })
 
-  // Use Vercel Blob URL directly - Kling AI can access public URLs
-  // This worked before and is simpler than re-uploading to fal.ai storage
-  const finalVideoUrl = videoUrl
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Using video URL directly: ${videoUrl}`)
+  let finalVideoUrl = videoUrl
+  
+  // Kling AI requires MP4 with H.264 codec
+  // Safari records in MP4 natively, Chrome records in WebM
+  // For WebM, we upload to fal.ai storage which may handle the format better
+  if (videoUrl.includes('.webm')) {
+    console.log(`[Workflow Step] [${new Date().toISOString()}] WebM detected - uploading to fal.ai storage...`)
+    
+    // Download from Vercel Blob and upload to fal.ai storage
+    const videoFetchStart = Date.now()
+    const videoResponse = await fetch(videoUrl)
+    if (!videoResponse.ok) {
+      throw new Error(`Failed to download video: ${videoResponse.status}`)
+    }
+    const videoBlob = await videoResponse.blob()
+    console.log(`[Workflow Step] [${new Date().toISOString()}] Video downloaded in ${Date.now() - videoFetchStart}ms, size: ${videoBlob.size} bytes`)
+
+    const falUploadStart = Date.now()
+    finalVideoUrl = await fal.storage.upload(videoBlob)
+    console.log(`[Workflow Step] [${new Date().toISOString()}] fal.storage.upload took ${Date.now() - falUploadStart}ms, url: ${finalVideoUrl}`)
+  } else {
+    console.log(`[Workflow Step] [${new Date().toISOString()}] Video is MP4, using directly: ${videoUrl}`)
+  }
 
   // Build our webhook URL with both generationId and hookToken
   const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
