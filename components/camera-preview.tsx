@@ -90,19 +90,29 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     let mediaRecorder: MediaRecorder
     let mimeType: string
     
-    // Find best supported type - prioritize VP8 for better compatibility with fal.ai
-    // VP9 can cause issues with some video processing pipelines
+    // Find best supported type - MUST produce MP4 for fal.ai Kling Motion Control
+    // Kling only accepts MP4, not WebM - this is documented in their API
     const findSupportedType = () => {
       const preferredOrder = [
-        "video/webm;codecs=vp8,opus",   // VP8 is more compatible with processing pipelines
-        "video/webm;codecs=vp8",        // VP8 without audio codec spec
-        "video/webm;codecs=vp9,opus",   // VP9 as fallback
-        "video/webm",                    // Generic WebM
-        "video/mp4",                     // MP4 fallback (Safari)
+        // MP4 with H.264 - Chrome 125+ supports this natively
+        "video/mp4;codecs=avc1.64003E,mp4a.40.2", // H.264 High + AAC
+        "video/mp4;codecs=avc1.64003E,opus",       // H.264 High + Opus
+        "video/mp4;codecs=avc1.42E01E,mp4a.40.2", // H.264 Baseline + AAC
+        "video/mp4;codecs=avc1.42E01E",            // H.264 Baseline only
+        "video/mp4;codecs=avc1",                   // H.264 generic
+        "video/mp4",                                // MP4 generic (Safari uses this)
+        // WebM with H.264 codec - can be remuxed to MP4 on server
+        "video/webm;codecs=h264",                  // H.264 in WebM container
+        // Fallback to VP8/VP9 - will need server-side conversion
+        "video/webm;codecs=vp8,opus",
+        "video/webm;codecs=vp9,opus",
+        "video/webm",
       ]
       
       for (const type of preferredOrder) {
-        if (MediaRecorder.isTypeSupported(type)) {
+        const supported = MediaRecorder.isTypeSupported(type)
+        console.log(`[v0] isTypeSupported("${type}"): ${supported}`)
+        if (supported) {
           return type
         }
       }
