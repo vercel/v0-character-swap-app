@@ -38,7 +38,7 @@ export function useVideoRecording(): UseVideoRecordingReturn {
   }, [recordedVideo])
 
   // Upload video to Vercel Blob
-  // The video is then sent directly to fal.ai from the workflow
+  // Server-side workflow will handle conversion to MP4 if needed via fal.ai storage
   const uploadVideo = useCallback(async (blob: Blob) => {
     setIsUploading(true)
     try {
