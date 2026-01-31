@@ -99,11 +99,16 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     let mediaRecorder: MediaRecorder
     let mimeType: string
     
-    // Find best supported type
+    // Find best supported type - ALWAYS prefer MP4 for fal.ai compatibility
     const findSupportedType = () => {
-      const preferredOrder = isSafari 
-        ? ["video/mp4", "video/mp4;codecs=avc1"]
-        : ["video/webm", "video/webm;codecs=vp8", "video/webm;codecs=vp9"]
+      // MP4 first (works directly with fal.ai), then WebM as fallback
+      const preferredOrder = [
+        "video/mp4",
+        "video/mp4;codecs=avc1",
+        "video/webm;codecs=vp8",
+        "video/webm;codecs=vp9",
+        "video/webm",
+      ]
       
       for (const type of preferredOrder) {
         if (MediaRecorder.isTypeSupported(type)) {

@@ -134,11 +134,12 @@ async function submitToFal(
   fal.config({ credentials: process.env.FAL_KEY })
 
   let finalVideoUrl = videoUrl
+  const isWebM = videoUrl.includes('.webm')
   
-  // Safari records MP4 → use Vercel Blob URL directly (works with Kling)
-  // Chrome records WebM → upload to fal.storage (Kling can process it from there)
-  if (videoUrl.includes('.webm')) {
-    console.log(`[Workflow Step] [${new Date().toISOString()}] WebM detected - uploading to fal.ai storage...`)
+  // WebM (Chrome) needs fal.storage upload for format conversion
+  // MP4 (Safari) can use Vercel Blob URL directly
+  if (isWebM) {
+    console.log(`[Workflow Step] [${new Date().toISOString()}] WebM detected - uploading to fal.storage for conversion...`)
     
     const videoFetchStart = Date.now()
     const videoResponse = await fetch(videoUrl)
