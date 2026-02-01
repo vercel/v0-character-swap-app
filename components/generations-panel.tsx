@@ -249,7 +249,7 @@ export function GenerationsPanel({ onSelectVideo, className = "", variant = "def
             {/* Thumbnail or status indicator */}
             {gen.status === "completed" && gen.video_url ? (
               <button
-                onClick={() => onSelectVideo?.(gen.video_url!, gen.source_video_url, gen.aspect_ratio || "fill")}
+                onClick={() => onSelectVideo?.(gen.video_url!, gen.source_video_url, gen.source_video_aspect_ratio || "fill")}
                 className="relative h-full w-full overflow-hidden rounded-lg"
               >
                 <video
