@@ -46,8 +46,10 @@ export async function generateVideoWorkflow(input: GenerateVideoInput) {
   console.log(`[Workflow] [${new Date().toISOString()}] Starting generation ${generationId}`)
 
   // Create a hook with deterministic token so fal-webhook can resume it
+  // Timeout after 8 minutes - if fal.ai doesn't respond by then, something is wrong
   const hook = createHook<FalWebhookResult>({
     token: `fal-generation-${generationId}`,
+    timeout: 8 * 60 * 1000, // 8 minutes in milliseconds
   })
 
   console.log(`[Workflow] [${new Date().toISOString()}] Created hook with token: fal-generation-${generationId} (+${Date.now() - workflowStartTime}ms)`)
@@ -59,9 +61,22 @@ export async function generateVideoWorkflow(input: GenerateVideoInput) {
   console.log(`[Workflow] [${new Date().toISOString()}] Submitted to fal.ai (request_id: ${requestId}), submitToFal took ${Date.now() - submitStartTime}ms, waiting for webhook...`)
 
   // SUSPEND HERE - workflow sleeps with ZERO resource consumption
-  // until /api/fal-webhook calls resumeHook()
+  // until /api/fal-webhook calls resumeHook() or timeout is reached
   const hookWaitStartTime = Date.now()
-  const falResult = await hook
+  let falResult: FalWebhookResult
+  
+  try {
+    falResult = await hook
+  } catch (hookError) {
+    // Hook timed out or failed
+    console.error(`[Workflow] [${new Date().toISOString()}] Hook failed or timed out:`, hookError)
+    const errorMessage = hookError instanceof Error && hookError.message.includes("timeout")
+      ? "Generation timed out after 8 minutes. The video may have processing issues."
+      : `Workflow hook error: ${hookError instanceof Error ? hookError.message : String(hookError)}`
+    await markGenerationFailed(generationId, errorMessage)
+    return { success: false, error: errorMessage }
+  }
+  
   const hookWaitTime = Date.now() - hookWaitStartTime
 
   console.log(`[Workflow] [${new Date().toISOString()}] Received fal result: ${falResult.status}, hook waited ${hookWaitTime}ms (${(hookWaitTime / 1000).toFixed(1)}s)`)
@@ -133,25 +148,48 @@ async function submitToFal(
 
   fal.config({ credentials: process.env.FAL_KEY })
 
-  // Always upload to fal.storage for format normalization
-  // This fixes Safari MP4 metadata issues and handles Chrome WebM conversion
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Uploading video to fal.storage for normalization: ${videoUrl}`)
+  // Transcode video using our ffmpeg endpoint to fix Safari MP4 metadata issues
+  // This ensures proper moov atom placement and compatible codecs for fal.ai
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Transcoding video: ${videoUrl}`)
   
   let finalVideoUrl: string
   
   try {
+    // Build base URL for our transcode endpoint
+    const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000"
+    
+    const transcodeStart = Date.now()
+    const transcodeResponse = await fetch(`${baseUrl}/api/transcode`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ videoUrl }),
+    })
+    
+    if (!transcodeResponse.ok) {
+      const errorText = await transcodeResponse.text()
+      throw new Error(`Transcode failed: ${transcodeResponse.status} - ${errorText}`)
+    }
+    
+    const { transcodedUrl, error: transcodeError } = await transcodeResponse.json()
+    
+    if (transcodeError || !transcodedUrl) {
+      throw new Error(transcodeError || "Transcode returned no URL")
+    }
+    
+    console.log(`[Workflow Step] [${new Date().toISOString()}] Transcoded in ${Date.now() - transcodeStart}ms: ${transcodedUrl}`)
+    
+    // Now upload the transcoded video to fal.storage
     const videoFetchStart = Date.now()
-    const videoResponse = await fetch(videoUrl)
+    const videoResponse = await fetch(transcodedUrl)
     if (!videoResponse.ok) {
-      throw new Error(`Failed to download video: ${videoResponse.status} ${videoResponse.statusText}`)
+      throw new Error(`Failed to download transcoded video: ${videoResponse.status}`)
     }
     const videoBlob = await videoResponse.blob()
-    console.log(`[Workflow Step] [${new Date().toISOString()}] Video downloaded in ${Date.now() - videoFetchStart}ms, size: ${videoBlob.size} bytes, type: ${videoBlob.type}`)
-    
-    // Validate blob has content
-    if (videoBlob.size === 0) {
-      throw new Error("Downloaded video blob is empty (0 bytes)")
-    }
+    console.log(`[Workflow Step] [${new Date().toISOString()}] Transcoded video downloaded in ${Date.now() - videoFetchStart}ms, size: ${videoBlob.size} bytes`)
 
     const falUploadStart = Date.now()
     finalVideoUrl = await fal.storage.upload(videoBlob)
@@ -161,9 +199,8 @@ async function submitToFal(
       throw new Error("fal.storage.upload returned empty URL")
     }
   } catch (uploadError) {
-    console.error(`[Workflow Step] [${new Date().toISOString()}] Video upload failed:`, uploadError)
-    // Mark generation as failed immediately
-    await updateGenerationFailed(generationId, `Video upload failed: ${uploadError instanceof Error ? uploadError.message : String(uploadError)}`)
+    console.error(`[Workflow Step] [${new Date().toISOString()}] Video processing failed:`, uploadError)
+    await updateGenerationFailed(generationId, `Video processing failed: ${uploadError instanceof Error ? uploadError.message : String(uploadError)}`)
     throw uploadError
   }
 
