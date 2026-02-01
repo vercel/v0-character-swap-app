@@ -305,6 +305,7 @@ export default function Home() {
                           ? "aspect-video w-32 md:w-48"
                           : "aspect-video w-32 md:w-48"
                     }`}>
+                      {console.log("[v0] PiP rendering with aspectRatio:", recordedAspectRatio)}
                       <video
                         ref={pipVideoRef}
                         src={sourceVideoUrl || recordedVideoUrl || ""}
