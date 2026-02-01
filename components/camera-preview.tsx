@@ -359,13 +359,10 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
                   <span className="text-white">1.</span> <span className="font-semibold text-white">Show head + upper body</span> clearly
                 </p>
                 <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
-                  <span className="text-white">2.</span> <span className="font-semibold text-white">Keep moving</span> — talk, gesture, turn head
+                  <span className="text-white">2.</span> Good lighting on your face
                 </p>
                 <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
-                  <span className="text-white">3.</span> Good lighting on your face
-                </p>
-                <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
-                  <span className="text-white">4.</span> Record <span className="font-semibold text-white">3-30 seconds</span>
+                  <span className="text-white">3.</span> Record <span className="font-semibold text-white">3-30 seconds</span>
                 </p>
               </div>
             </div>
