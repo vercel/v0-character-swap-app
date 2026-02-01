@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { upload } from "@vercel/blob/client"
 import { MAX_VIDEO_SIZE, MAX_VIDEO_DURATION, STORAGE_KEYS } from "@/lib/constants"
+import { useVideoProcessor } from "./use-video-processor"
 
 interface UseVideoRecordingReturn {
   recordedVideo: Blob | null
@@ -10,6 +11,8 @@ interface UseVideoRecordingReturn {
   uploadedVideoUrl: string | null
   recordedAspectRatio: "9:16" | "16:9" | "fill"
   isUploading: boolean
+  isProcessing: boolean
+  processingProgress: { stage: string; percent: number; message: string } | null
   showPreview: boolean
   setShowPreview: (show: boolean) => void
   handleVideoRecorded: (blob: Blob, aspectRatio: "9:16" | "16:9" | "fill") => void
@@ -25,6 +28,10 @@ export function useVideoRecording(): UseVideoRecordingReturn {
   const [recordedAspectRatio, setRecordedAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
   const [isUploading, setIsUploading] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  
+  // Video processor for client-side transcoding
+  const { processVideo, progress: processingProgress, isProcessing } = useVideoProcessor()
+  const processingRef = useRef(false)
 
   // Create object URL when video changes
   useEffect(() => {
@@ -38,32 +45,39 @@ export function useVideoRecording(): UseVideoRecordingReturn {
   }, [recordedVideo])
 
   // Upload video to Vercel Blob
-  // Server-side workflow will handle conversion to MP4 if needed via fal.ai storage
+  // Now we process the video client-side with ffmpeg.wasm before uploading
   const uploadVideo = useCallback(async (blob: Blob) => {
+    // Prevent duplicate processing
+    if (processingRef.current) {
+      console.log("[v0] Already processing, skipping duplicate call")
+      return
+    }
+    processingRef.current = true
+    
     setIsUploading(true)
     try {
-      // Determine file extension based on blob type
-      let extension = "webm"
-      if (blob.type.includes("mp4")) {
-        extension = "mp4"
-      } else if (blob.type.includes("quicktime")) {
-        extension = "mov"
-      }
-      console.log("[v0] Uploading video - type:", blob.type, "extension:", extension, "size:", blob.size)
+      // Process video with ffmpeg.wasm to fix metadata and ensure compatibility
+      console.log("[v0] Processing video with ffmpeg.wasm - input type:", blob.type, "size:", blob.size)
+      const processedBlob = await processVideo(blob)
+      console.log("[v0] Video processed - output type:", processedBlob.type, "size:", processedBlob.size)
       
-      const videoBlob = await upload(`videos/${Date.now()}-recording.${extension}`, blob, {
+      // Upload the processed MP4 to Vercel Blob
+      console.log("[v0] Uploading processed video to Vercel Blob")
+      
+      const videoBlob = await upload(`videos/${Date.now()}-recording.mp4`, processedBlob, {
         access: "public",
         handleUploadUrl: "/api/upload",
       })
       console.log("[v0] Video uploaded successfully:", videoBlob.url)
       setUploadedVideoUrl(videoBlob.url)
     } catch (error) {
-      console.error("[v0] Failed to upload video:", error)
+      console.error("[v0] Failed to process/upload video:", error)
       // Don't fail - user can still generate, it will upload then
     } finally {
       setIsUploading(false)
+      processingRef.current = false
     }
-  }, [])
+  }, [processVideo])
 
   const handleVideoRecorded = useCallback((blob: Blob, _aspectRatio: "9:16" | "16:9" | "fill") => {
     // Validate file size
@@ -207,6 +221,8 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     uploadedVideoUrl,
     recordedAspectRatio,
     isUploading,
+    isProcessing,
+    processingProgress,
     showPreview,
     setShowPreview,
     handleVideoRecorded,
