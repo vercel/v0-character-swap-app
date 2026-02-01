@@ -443,15 +443,20 @@ export default function Home() {
               {/* Processing overlay */}
               {(isProcessingVideo || isUploading) && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
-                  <div className="flex w-full max-w-[280px] flex-col items-center gap-6 px-6">
+                  <div className="flex w-full max-w-[280px] flex-col items-center gap-4 px-6">
                     <p className="font-sans text-[15px] font-medium tracking-wide text-white">
                       {isUploading ? "Uploading" : "Processing video"}
                     </p>
-                    <div className="h-[2px] w-full overflow-hidden rounded-full bg-white/20">
-                      <div
-                        className="h-full rounded-full bg-white transition-all duration-300 ease-out"
-                        style={{ width: `${processingProgress?.percent || 0}%` }}
-                      />
+                    <div className="flex w-full flex-col items-center gap-2">
+                      <div className="h-[2px] w-full overflow-hidden rounded-full bg-white/20">
+                        <div
+                          className="h-full rounded-full bg-white transition-all duration-300 ease-out"
+                          style={{ width: `${processingProgress?.percent || 0}%` }}
+                        />
+                      </div>
+                      <p className="font-mono text-[13px] tabular-nums text-white/60">
+                        {processingProgress?.percent || 0}%
+                      </p>
                     </div>
                   </div>
                 </div>
