@@ -76,6 +76,8 @@ export default function Home() {
     uploadedVideoUrl,
     recordedAspectRatio,
     isUploading,
+    isProcessing: isProcessingVideo,
+    processingProgress,
     showPreview,
     setShowPreview,
     handleVideoRecorded,
@@ -438,6 +440,33 @@ export default function Home() {
               >
                 New Video
               </button>
+              {/* Processing overlay */}
+              {(isProcessingVideo || isUploading) && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
+                  <div className="flex w-full max-w-[240px] flex-col items-center gap-4 px-6">
+                    <svg className="h-8 w-8 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p className="text-center font-sans text-[15px] font-medium text-white">
+                      {processingProgress?.message || (isUploading ? "Uploading..." : "Processing video...")}
+                    </p>
+                    {processingProgress && (
+                      <>
+                        <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-800">
+                          <div
+                            className="h-full rounded-full bg-white transition-all duration-300 ease-out"
+                            style={{ width: `${processingProgress.percent}%` }}
+                          />
+                        </div>
+                        <p className="font-mono text-[13px] tabular-nums text-neutral-400">
+                          {processingProgress.percent}%
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -461,7 +490,7 @@ export default function Home() {
                 onDeleteCustom={deleteCustomCharacter}
                 hiddenDefaultIds={hiddenDefaultIds}
                 onHideDefault={hideDefaultCharacter}
-                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
+                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl && !isProcessingVideo && !isUploading}
                 hasVideo={!!recordedVideo}
                 hasCharacter={!!selectedCharacter}
                 onGenerate={handleProcess}
@@ -531,7 +560,7 @@ export default function Home() {
                 onDeleteCustom={deleteCustomCharacter}
                 hiddenDefaultIds={hiddenDefaultIds}
                 onHideDefault={hideDefaultCharacter}
-                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
+                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl && !isProcessingVideo && !isUploading}
                 hasVideo={!!recordedVideo}
                 hasCharacter={!!selectedCharacter}
                 onGenerate={handleProcess}

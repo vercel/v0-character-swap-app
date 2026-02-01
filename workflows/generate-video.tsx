@@ -148,9 +148,9 @@ async function submitToFal(
 
   fal.config({ credentials: process.env.FAL_KEY })
 
-  // Upload video to fal.storage for processing
-  // fal.storage handles format normalization internally
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Uploading video to fal.storage: ${videoUrl}`)
+  // Video is already processed client-side with ffmpeg.wasm
+  // Just upload to fal.storage for processing
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Uploading pre-processed video to fal.storage: ${videoUrl}`)
   
   let finalVideoUrl: string
   
@@ -163,7 +163,6 @@ async function submitToFal(
     const videoBlob = await videoResponse.blob()
     console.log(`[Workflow Step] [${new Date().toISOString()}] Video downloaded in ${Date.now() - videoFetchStart}ms, size: ${videoBlob.size} bytes, type: ${videoBlob.type}`)
     
-    // Validate blob has content
     if (videoBlob.size === 0) {
       throw new Error("Downloaded video blob is empty (0 bytes)")
     }
