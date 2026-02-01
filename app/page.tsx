@@ -278,42 +278,22 @@ export default function Home() {
                   }
                 }}
               />
-              {/* PiP container - positioned to avoid video controls */}
-              {(sourceVideoUrl || recordedVideoUrl) && (
-                <div className="absolute bottom-20 right-4 flex flex-col items-end gap-2 md:bottom-20">
-                  {/* PiP toggle button */}
-                  <button
-                    onClick={() => setShowPip(!showPip)}
-                    className={`flex items-center gap-2 rounded-lg px-3 py-1.5 font-mono text-[11px] backdrop-blur-md transition-all ${
-                      showPip 
-                        ? "bg-white text-black" 
-                        : "bg-black/50 text-white hover:bg-black/60"
-                    }`}
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <rect x="2" y="3" width="20" height="14" rx="2" />
-                      <rect x="12" y="10" width="8" height="5" rx="1" />
-                    </svg>
-                    {showPip ? "PiP on" : "PiP off"}
-                  </button>
-                  {/* PiP overlay - show original video with its actual aspect ratio */}
-                  {showPip && (
-                    <div className={`overflow-hidden rounded-lg border-2 border-white/20 shadow-lg ${
-                      recordedAspectRatio === "9:16" 
-                        ? "aspect-[9/16] h-32 md:h-40" 
-                        : recordedAspectRatio === "16:9"
-                          ? "aspect-video w-32 md:w-48"
-                          : "aspect-video w-32 md:w-48"
-                    }`}>
-                      <video
-                        ref={pipVideoRef}
-                        src={sourceVideoUrl || recordedVideoUrl || ""}
-                        muted
-                        playsInline
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  )}
+              {/* PiP video overlay - positioned at bottom right */}
+              {(sourceVideoUrl || recordedVideoUrl) && showPip && (
+                <div className={`absolute bottom-4 right-4 overflow-hidden rounded-lg border-2 border-white/20 shadow-lg md:bottom-20 ${
+                  recordedAspectRatio === "9:16" 
+                    ? "aspect-[9/16] h-28 md:h-40" 
+                    : recordedAspectRatio === "16:9"
+                      ? "aspect-video w-28 md:w-48"
+                      : "aspect-video w-28 md:w-48"
+                }`}>
+                  <video
+                    ref={pipVideoRef}
+                    src={sourceVideoUrl || recordedVideoUrl || ""}
+                    muted
+                    playsInline
+                    className="h-full w-full object-cover"
+                  />
                 </div>
               )}
               {/* Action buttons - below video on mobile, overlayed on desktop */}
@@ -401,6 +381,23 @@ export default function Home() {
                 >
                   New Video
                 </button>
+                {/* PiP toggle button - desktop */}
+                {(sourceVideoUrl || recordedVideoUrl) && (
+                  <button
+                    onClick={() => setShowPip(!showPip)}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2.5 font-sans text-[13px] font-medium shadow-xl backdrop-blur-md transition-all active:scale-95 ${
+                      showPip 
+                        ? "bg-white text-black hover:bg-neutral-100" 
+                        : "bg-white/90 text-black hover:bg-white"
+                    }`}
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <rect x="2" y="3" width="20" height="14" rx="2" />
+                      <rect x="12" y="10" width="8" height="5" rx="1" />
+                    </svg>
+                    {showPip ? "PiP on" : "PiP off"}
+                  </button>
+                )}
               </div>
             </div>
             {/* Mobile action buttons - below video */}
@@ -484,6 +481,23 @@ export default function Home() {
               >
                 New Video
               </button>
+              {/* PiP toggle button - mobile */}
+              {(sourceVideoUrl || recordedVideoUrl) && (
+                <button
+                  onClick={() => setShowPip(!showPip)}
+                  className={`flex items-center gap-2 rounded-lg px-4 py-2.5 font-sans text-[13px] font-medium shadow-lg transition-all active:scale-95 ${
+                    showPip 
+                      ? "bg-white text-black" 
+                      : "bg-white/90 text-black"
+                  }`}
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                    <rect x="12" y="10" width="8" height="5" rx="1" />
+                  </svg>
+                  {showPip ? "PiP" : "PiP"}
+                </button>
+              )}
             </div>
           </div>
         ) : recordedVideoUrl ? (
