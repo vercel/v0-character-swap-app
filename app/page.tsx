@@ -570,18 +570,17 @@ export default function Home() {
                 hasVideo={!!recordedVideo}
                 hasCharacter={!!selectedCharacter}
                 onGenerate={handleProcess}
-
               >
                 <GenerationsPanel
-                onSelectVideo={(url, sourceUrl, aspectRatio) => {
-                  setSelectedGeneratedVideo(url)
-                  setResultUrl(url)
-                  setSourceVideoUrl(sourceUrl)
-                  setCurrentAspectRatio(aspectRatio)
-                }}
-                className="mt-4"
-              />
-            </CharacterGrid>
+                  onSelectVideo={(url, sourceUrl, aspectRatio) => {
+                    setSelectedGeneratedVideo(url)
+                    setResultUrl(url)
+                    setSourceVideoUrl(sourceUrl)
+                    setCurrentAspectRatio(aspectRatio)
+                  }}
+                  className="mt-4"
+                />
+              </CharacterGrid>
           </div>
         </div>
       )}
