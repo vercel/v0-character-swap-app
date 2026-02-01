@@ -545,14 +545,21 @@ export default function Home() {
                     </p>
                     <div className="flex w-full flex-col items-center gap-2">
                       <div className="h-[2px] w-full overflow-hidden rounded-full bg-white/20">
-                        <div
-                          className="h-full rounded-full bg-white transition-all duration-300 ease-out"
-                          style={{ width: `${processingProgress?.percent || 0}%` }}
-                        />
+                        {isUploading ? (
+                          /* Animated indeterminate progress bar for upload */
+                          <div className="h-full w-1/3 animate-[shimmer_1.5s_ease-in-out_infinite] rounded-full bg-white" />
+                        ) : (
+                          <div
+                            className="h-full rounded-full bg-white transition-all duration-300 ease-out"
+                            style={{ width: `${Math.min(100, Math.max(0, processingProgress?.percent || 0))}%` }}
+                          />
+                        )}
                       </div>
-                      <p className="font-mono text-[13px] tabular-nums text-white/60">
-                        {processingProgress?.percent || 0}%
-                      </p>
+                      {!isUploading && (
+                        <p className="font-mono text-[13px] tabular-nums text-white/60">
+                          {Math.min(100, Math.max(0, processingProgress?.percent || 0))}%
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
