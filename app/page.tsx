@@ -11,27 +11,16 @@ import { GenerationsPanel } from "@/components/generations-panel"
 import { useCharacters } from "@/hooks/use-characters"
 import { useVideoGeneration } from "@/hooks/use-video-generation"
 import { useVideoRecording } from "@/hooks/use-video-recording"
+import { useVideoDownload } from "@/hooks/use-video-download"
 import { STORAGE_KEYS } from "@/lib/constants"
-import { createPipVideoClient, downloadBlob } from "@/lib/video-pip-client"
+import { cn, detectImageAspectRatio } from "@/lib/utils"
 
-// Helper to detect aspect ratio from character image
-function getCharacterAspectRatio(src: string): Promise<"9:16" | "16:9" | "fill"> {
-  return new Promise((resolve) => {
-    const img = new window.Image()
-    img.crossOrigin = "anonymous"
-    img.onload = () => {
-      const ratio = img.width / img.height
-      if (ratio < 0.75) {
-        resolve("9:16")
-      } else if (ratio > 1.33) {
-        resolve("16:9")
-      } else {
-        resolve("fill")
-      }
-    }
-    img.onerror = () => resolve("fill")
-    img.src = src
-  })
+// Helper to get character aspect ratio for generated video
+async function getCharacterAspectRatio(src: string): Promise<"9:16" | "16:9" | "fill"> {
+  const ratio = await detectImageAspectRatio(src)
+  if (ratio === "9:16" || ratio === "3:4") return "9:16"
+  if (ratio === "16:9" || ratio === "4:3") return "16:9"
+  return "fill"
 }
 
 export default function Home() {
@@ -51,8 +40,6 @@ export default function Home() {
   const [pendingAutoSubmit, setPendingAutoSubmit] = useState(false)
   // Detected aspect ratio of the generated video (from character image)
   const [generatedVideoAspectRatio, setGeneratedVideoAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
-  const [isDownloading, setIsDownloading] = useState(false)
-  const [downloadProgress, setDownloadProgress] = useState(0)
   const [showPip, setShowPip] = useState(true)
 
   // Video refs for sync
@@ -87,6 +74,15 @@ export default function Home() {
     restoreFromSession,
     saveToSession,
   } = useVideoRecording()
+
+  // Video download hook
+  const pipAspectRatio = sourceVideoUrl ? sourceVideoAspectRatio : recordedAspectRatio
+  const { isDownloading, downloadProgress, handleDownload } = useVideoDownload({
+    resultUrl,
+    pipVideoUrl: sourceVideoUrl || recordedVideoUrl,
+    showPip,
+    pipAspectRatio,
+  })
 
   const [errorToast, setErrorToast] = useState<string | null>(null)
   
@@ -227,16 +223,20 @@ export default function Home() {
   return (
     <main className="relative flex h-[100dvh] flex-row overflow-hidden bg-black">
       {/* Camera/Video Section */}
-      <div className={`flex flex-1 items-center justify-center ${isMobile ? "p-0" : (resultUrl || recordedVideoUrl) ? (generatedVideoAspectRatio === "fill" ? "p-0" : "p-1") : "p-0"}`}>
+      <div className={cn(
+        "flex flex-1 items-center justify-center",
+        isMobile ? "p-0" : (resultUrl || recordedVideoUrl) 
+          ? (generatedVideoAspectRatio === "fill" ? "p-0" : "p-1") 
+          : "p-0"
+      )}>
         {resultUrl ? (
           <div className="relative flex h-full w-full flex-col items-center justify-center md:flex-row">
-            <div className={`relative overflow-hidden bg-neutral-900 ${
-              generatedVideoAspectRatio === "9:16"
-                ? "aspect-[9/16] h-full max-h-[85vh] w-auto rounded-lg"
-                : generatedVideoAspectRatio === "16:9"
-                  ? "aspect-video w-full max-w-[95%] rounded-lg md:max-w-[90%]"
-                  : "h-full w-full"
-            }`}>
+            <div className={cn(
+              "relative overflow-hidden bg-neutral-900",
+              generatedVideoAspectRatio === "9:16" && "aspect-[9/16] h-full max-h-[85vh] w-auto rounded-lg",
+              generatedVideoAspectRatio === "16:9" && "aspect-video w-full max-w-[95%] rounded-lg md:max-w-[90%]",
+              generatedVideoAspectRatio === "fill" && "h-full w-full"
+            )}>
               <video 
                 ref={mainVideoRef}
                 src={resultUrl} 
@@ -282,14 +282,11 @@ export default function Home() {
               />
               {/* PiP video overlay - positioned at bottom right */}
               {(sourceVideoUrl || recordedVideoUrl) && showPip && (
-                <div className={`absolute bottom-4 right-4 overflow-hidden rounded-lg border-2 border-white/20 shadow-lg md:bottom-20 ${
-                  // Use sourceVideoAspectRatio from DB when viewing a generation, otherwise use recordedAspectRatio
-                  (sourceVideoUrl ? sourceVideoAspectRatio : recordedAspectRatio) === "9:16" 
-                    ? "aspect-[9/16] h-28 md:h-40" 
-                    : (sourceVideoUrl ? sourceVideoAspectRatio : recordedAspectRatio) === "16:9"
-                      ? "aspect-video w-28 md:w-48"
-                      : "aspect-video w-28 md:w-48"
-                }`}>
+                <div className={cn(
+                  "absolute bottom-4 right-4 overflow-hidden rounded-lg border-2 border-white/20 shadow-lg md:bottom-20",
+                  pipAspectRatio === "9:16" && "aspect-[9/16] h-28 md:h-40",
+                  pipAspectRatio !== "9:16" && "aspect-video w-28 md:w-48"
+                )}>
                   <video
                     ref={pipVideoRef}
                     src={sourceVideoUrl || recordedVideoUrl || ""}
@@ -303,62 +300,7 @@ export default function Home() {
               <div className="absolute bottom-16 left-1/2 hidden -translate-x-1/2 items-center gap-3 md:flex">
                 <button
                   disabled={isDownloading}
-                  onClick={async () => {
-                    const pipSource = sourceVideoUrl || recordedVideoUrl
-                    
-                    // If we have a PiP source and PiP is enabled, create video with PiP overlay
-                    if (showPip && pipSource) {
-                      try {
-                        setIsDownloading(true)
-                        setDownloadProgress(0)
-                        
-                        const pipBlob = await createPipVideoClient({
-                          mainVideoUrl: resultUrl,
-                          pipVideoUrl: pipSource,
-                          pipPosition: "bottom-right",
-                          pipScale: 0.25,
-                          pipAspectRatio: sourceVideoUrl ? sourceVideoAspectRatio : recordedAspectRatio,
-                          addWatermark: true,
-                          onProgress: setDownloadProgress,
-                        })
-                        
-                        downloadBlob(pipBlob, "generated-video-with-pip.mp4")
-                      } catch (error) {
-                        console.error("PiP download failed:", error)
-                        // Fallback to regular download
-                        const response = await fetch(resultUrl)
-                        const blob = await response.blob()
-                        downloadBlob(blob, "generated-video.mp4")
-                      } finally {
-                        setIsDownloading(false)
-                        setDownloadProgress(0)
-                      }
-                    } else {
-                      // No PiP, but still add watermark
-                      try {
-                        setIsDownloading(true)
-                        setDownloadProgress(0)
-                        
-                        const videoBlob = await createPipVideoClient({
-                          mainVideoUrl: resultUrl,
-                          pipVideoUrl: null,
-                          addWatermark: true,
-                          onProgress: setDownloadProgress,
-                        })
-                        
-                        downloadBlob(videoBlob, "generated-video.mp4")
-                      } catch (error) {
-                        console.error("Watermark failed, downloading original:", error)
-                        // Fallback to regular download
-                        const response = await fetch(resultUrl)
-                        const blob = await response.blob()
-                        downloadBlob(blob, "generated-video.mp4")
-                      } finally {
-                        setIsDownloading(false)
-                        setDownloadProgress(0)
-                      }
-                    }
-                  }}
+                  onClick={handleDownload}
                   className="flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 font-sans text-[13px] font-medium text-black shadow-xl transition-all hover:bg-neutral-100 active:scale-95 disabled:opacity-70"
                 >
                   {isDownloading ? (
@@ -407,58 +349,7 @@ export default function Home() {
             <div className="flex items-center justify-center gap-3 py-4 md:hidden">
               <button
                 disabled={isDownloading}
-                onClick={async () => {
-                  const pipSource = sourceVideoUrl || recordedVideoUrl
-                  
-                  if (showPip && pipSource) {
-                    try {
-                      setIsDownloading(true)
-                      setDownloadProgress(0)
-                      
-                      const pipBlob = await createPipVideoClient({
-                        mainVideoUrl: resultUrl,
-                        pipVideoUrl: pipSource,
-                        pipPosition: "bottom-right",
-                        pipScale: 0.25,
-                        pipAspectRatio: sourceVideoUrl ? sourceVideoAspectRatio : recordedAspectRatio,
-                        addWatermark: true,
-                        onProgress: setDownloadProgress,
-                      })
-                      
-                      downloadBlob(pipBlob, "generated-video-with-pip.mp4")
-                    } catch (error) {
-                      console.error("PiP download failed:", error)
-                      const response = await fetch(resultUrl)
-                      const blob = await response.blob()
-                      downloadBlob(blob, "generated-video.mp4")
-                    } finally {
-                      setIsDownloading(false)
-                      setDownloadProgress(0)
-                    }
-                  } else {
-                    try {
-                      setIsDownloading(true)
-                      setDownloadProgress(0)
-                      
-                      const videoBlob = await createPipVideoClient({
-                        mainVideoUrl: resultUrl,
-                        pipVideoUrl: null,
-                        addWatermark: true,
-                        onProgress: setDownloadProgress,
-                      })
-                      
-                      downloadBlob(videoBlob, "generated-video.mp4")
-                    } catch (error) {
-                      console.error("Watermark failed, downloading original:", error)
-                      const response = await fetch(resultUrl)
-                      const blob = await response.blob()
-                      downloadBlob(blob, "generated-video.mp4")
-                    } finally {
-                      setIsDownloading(false)
-                      setDownloadProgress(0)
-                    }
-                  }
-                }}
+                onClick={handleDownload}
                 className="flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 font-sans text-[13px] font-medium text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-95 disabled:opacity-70"
               >
                 {isDownloading ? (
@@ -619,64 +510,118 @@ export default function Home() {
         >
           {!bottomSheetExpanded && (
             <div>
-              <p className="mb-1.5 font-sans text-[9px] font-medium uppercase tracking-wider text-neutral-500">
-                Select Character
-              </p>
-              <div className="flex gap-1 overflow-x-auto pb-1">
-                {[...visibleDefaultCharacters, ...customCharacters].slice(0, 8).map((char) => (
-                  <button
-                    key={char.id}
-                    onClick={() => {
-                      setSelectedCharacter(char.id)
-                      if (recordedVideo) setBottomSheetExpanded(true)
+              {resultUrl ? (
+                /* When viewing a video, show other videos in peek */
+                <>
+                  <p className="mb-1.5 font-sans text-[9px] font-medium uppercase tracking-wider text-neutral-500">
+                    My Videos
+                  </p>
+                  <GenerationsPanel
+                    onSelectVideo={(url, sourceUrl, aspectRatio) => {
+                      setSelectedGeneratedVideo(url)
+                      setResultUrl(url)
+                      setSourceVideoUrl(sourceUrl)
+                      setSourceVideoAspectRatio(aspectRatio)
                     }}
-                    className={`relative h-12 w-9 shrink-0 overflow-hidden rounded ${
-                      selectedCharacter === char.id ? "ring-2 ring-white" : "ring-1 ring-neutral-800"
-                    }`}
-                  >
-                    <Image src={char.src || "/placeholder.svg"} alt={char.name} fill className="object-cover" sizes="36px" />
-                  </button>
-                ))}
-                <button
-                  onClick={() => setBottomSheetExpanded(true)}
-                  className="flex h-12 w-9 shrink-0 items-center justify-center rounded border border-dashed border-neutral-700"
-                >
-                  <svg className="h-3 w-3 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                </button>
-              </div>
+                    variant="compact"
+                  />
+                </>
+              ) : (
+                /* Default: show characters in peek */
+                <>
+                  <p className="mb-1.5 font-sans text-[9px] font-medium uppercase tracking-wider text-neutral-500">
+                    Select Character
+                  </p>
+                  <div className="flex gap-1 overflow-x-auto pb-1">
+                    {[...visibleDefaultCharacters, ...customCharacters].slice(0, 8).map((char) => (
+                      <button
+                        key={char.id}
+                        onClick={() => {
+                          setSelectedCharacter(char.id)
+                          if (recordedVideo) setBottomSheetExpanded(true)
+                        }}
+                        className={cn(
+                          "relative h-12 w-9 shrink-0 overflow-hidden rounded",
+                          selectedCharacter === char.id ? "ring-2 ring-white" : "ring-1 ring-neutral-800"
+                        )}
+                      >
+                        <Image src={char.src || "/placeholder.svg"} alt={char.name} fill className="object-cover" sizes="36px" />
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setBottomSheetExpanded(true)}
+                      className="flex h-12 w-9 shrink-0 items-center justify-center rounded border border-dashed border-neutral-700"
+                    >
+                      <svg className="h-3 w-3 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                      </svg>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
           {bottomSheetExpanded && (
             <>
               {renderAuthSection("mobile")}
-              <CharacterGrid
-                selectedId={selectedCharacter}
-                onSelect={setSelectedCharacter}
-                customCharacters={customCharacters}
-                onAddCustom={addCustomCharacter}
-                onDeleteCustom={deleteCustomCharacter}
-                hiddenDefaultIds={hiddenDefaultIds}
-                onHideDefault={hideDefaultCharacter}
-                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl && !isProcessingVideo && !isUploading}
-                hasVideo={!!recordedVideo}
-                hasCharacter={!!selectedCharacter}
-                onGenerate={handleProcess}
-
-              >
-                <GenerationsPanel
-                  onSelectVideo={(url, sourceUrl, aspectRatio) => {
-                    setSelectedGeneratedVideo(url)
-                    setResultUrl(url)
-                    setSourceVideoUrl(sourceUrl)
-                    setSourceVideoAspectRatio(aspectRatio)
-                    setBottomSheetExpanded(false)
-                  }}
-                  className="mt-4"
-                />
-              </CharacterGrid>
+              {resultUrl ? (
+                /* When viewing a video, show videos first then characters */
+                <>
+                  <GenerationsPanel
+                    onSelectVideo={(url, sourceUrl, aspectRatio) => {
+                      setSelectedGeneratedVideo(url)
+                      setResultUrl(url)
+                      setSourceVideoUrl(sourceUrl)
+                      setSourceVideoAspectRatio(aspectRatio)
+                      setBottomSheetExpanded(false)
+                    }}
+                    className="mb-6"
+                  />
+                  <p className="mb-3 font-sans text-[11px] font-medium uppercase tracking-wider text-neutral-500">
+                    Create New
+                  </p>
+                  <CharacterGrid
+                    selectedId={selectedCharacter}
+                    onSelect={setSelectedCharacter}
+                    customCharacters={customCharacters}
+                    onAddCustom={addCustomCharacter}
+                    onDeleteCustom={deleteCustomCharacter}
+                    hiddenDefaultIds={hiddenDefaultIds}
+                    onHideDefault={hideDefaultCharacter}
+                    canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl && !isProcessingVideo && !isUploading}
+                    hasVideo={!!recordedVideo}
+                    hasCharacter={!!selectedCharacter}
+                    onGenerate={handleProcess}
+                  />
+                </>
+              ) : (
+                /* Default: show characters with videos below */
+                <CharacterGrid
+                  selectedId={selectedCharacter}
+                  onSelect={setSelectedCharacter}
+                  customCharacters={customCharacters}
+                  onAddCustom={addCustomCharacter}
+                  onDeleteCustom={deleteCustomCharacter}
+                  hiddenDefaultIds={hiddenDefaultIds}
+                  onHideDefault={hideDefaultCharacter}
+                  canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl && !isProcessingVideo && !isUploading}
+                  hasVideo={!!recordedVideo}
+                  hasCharacter={!!selectedCharacter}
+                  onGenerate={handleProcess}
+                >
+                  <GenerationsPanel
+                    onSelectVideo={(url, sourceUrl, aspectRatio) => {
+                      setSelectedGeneratedVideo(url)
+                      setResultUrl(url)
+                      setSourceVideoUrl(sourceUrl)
+                      setSourceVideoAspectRatio(aspectRatio)
+                      setBottomSheetExpanded(false)
+                    }}
+                    className="mt-4"
+                  />
+                </CharacterGrid>
+              )}
             </>
           )}
         </BottomSheet>

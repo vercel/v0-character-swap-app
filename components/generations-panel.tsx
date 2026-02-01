@@ -27,14 +27,7 @@ async function requestNotificationPermission(): Promise<boolean> {
 
 // Show notification when video is ready
 function showVideoReadyNotification(characterName: string | null) {
-  console.log("[v0] showVideoReadyNotification called", {
-    hasNotificationAPI: "Notification" in window,
-    permission: "Notification" in window ? Notification.permission : "N/A",
-    characterName
-  })
-  
   if (!("Notification" in window) || Notification.permission !== "granted") {
-    console.log("[v0] Notification blocked - no API or permission denied")
     return
   }
   
@@ -72,11 +65,12 @@ interface Generation {
 interface GenerationsPanelProps {
   onSelectVideo?: (videoUrl: string, sourceVideoUrl: string | null, aspectRatio: "9:16" | "16:9" | "fill") => void
   className?: string
+  variant?: "default" | "compact"
 }
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
-export function GenerationsPanel({ onSelectVideo, className = "" }: GenerationsPanelProps) {
+export function GenerationsPanel({ onSelectVideo, className = "", variant = "default" }: GenerationsPanelProps) {
   const { user } = useAuth()
   const prevGenerationsRef = useRef<Generation[]>([])
   const hasRequestedPermission = useRef(false)
@@ -105,26 +99,12 @@ export function GenerationsPanel({ onSelectVideo, className = "" }: GenerationsP
   useEffect(() => {
     const prevGenerations = prevGenerationsRef.current
     
-    console.log("[v0] Checking generations for completion", {
-      prevCount: prevGenerations.length,
-      currentCount: generations.length,
-      prevStatuses: prevGenerations.map(g => ({ id: g.id, status: g.status })),
-      currentStatuses: generations.map(g => ({ id: g.id, status: g.status })),
-    })
-    
     // Check if any generation just completed
     for (const gen of generations) {
       if (gen.status === "completed") {
         const prevGen = prevGenerations.find(p => p.id === gen.id)
-        console.log("[v0] Found completed generation", { 
-          id: gen.id, 
-          prevStatus: prevGen?.status,
-          currentStatus: gen.status,
-          willNotify: prevGen && prevGen.status !== "completed"
-        })
         if (prevGen && prevGen.status !== "completed") {
           // This generation just completed!
-          console.log("[v0] Showing notification for", gen.character_name)
           showVideoReadyNotification(gen.character_name)
         }
       }
@@ -168,6 +148,7 @@ export function GenerationsPanel({ onSelectVideo, className = "" }: GenerationsP
 
   // Show sign in prompt if user is not logged in
   if (!user) {
+    if (variant === "compact") return null
     return (
       <div className={className}>
         <p className="mb-2 font-mono text-[11px] lowercase text-neutral-500">
@@ -182,6 +163,13 @@ export function GenerationsPanel({ onSelectVideo, className = "" }: GenerationsP
 
   // Show loading state
   if (isLoading) {
+    if (variant === "compact") {
+      return (
+        <div className="flex items-center justify-center py-2">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-700 border-t-white" />
+        </div>
+      )
+    }
     return (
       <div className={`${className}`}>
         <p className="font-mono text-[11px] lowercase text-neutral-500">
@@ -196,6 +184,7 @@ export function GenerationsPanel({ onSelectVideo, className = "" }: GenerationsP
 
   // Show empty state with helpful message
   if (generations.length === 0) {
+    if (variant === "compact") return null
     return (
       <div className={className}>
         <p className="mb-2 font-mono text-[11px] lowercase text-neutral-500">
@@ -206,6 +195,15 @@ export function GenerationsPanel({ onSelectVideo, className = "" }: GenerationsP
         </p>
       </div>
     )
+  }
+
+  // Only show completed videos in compact mode
+  const displayGenerations = variant === "compact" 
+    ? generations.filter(g => g.status === "completed" && g.video_url)
+    : generations.filter(g => g.status !== "cancelled")
+
+  if (variant === "compact" && displayGenerations.length === 0) {
+    return null
   }
 
   const formatTime = (dateString: string) => {
@@ -223,17 +221,21 @@ export function GenerationsPanel({ onSelectVideo, className = "" }: GenerationsP
 
   return (
     <div className={className}>
-      <p className="mb-1.5 font-mono text-[10px] lowercase text-neutral-500 md:mb-2 md:text-[11px]">
-        my videos
-      </p>
+      {variant !== "compact" && (
+        <p className="mb-1.5 font-mono text-[10px] lowercase text-neutral-500 md:mb-2 md:text-[11px]">
+          my videos
+        </p>
+      )}
       
-      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 pt-1">
-        {generations.filter(g => g.status !== "cancelled").map((gen) => {
+      <div className={variant === "compact" ? "flex gap-1 overflow-x-auto pb-1" : "-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 pt-1"}>
+        {displayGenerations.map((gen) => {
           // Determine thumbnail width based on aspect ratio
           const isLandscape = gen.aspect_ratio === "16:9"
-          const thumbnailClass = isLandscape 
-            ? "h-16 w-[85px] md:h-20 md:w-[107px]" // 16:9 ratio
-            : "h-16 w-11 md:h-20 md:w-14" // portrait/fill
+          const thumbnailClass = variant === "compact"
+            ? isLandscape ? "h-12 w-16" : "h-12 w-9"
+            : isLandscape 
+              ? "h-16 w-[85px] md:h-20 md:w-[107px]" // 16:9 ratio
+              : "h-16 w-11 md:h-20 md:w-14" // portrait/fill
           
           return (
           <div
