@@ -10,10 +10,10 @@ interface GenerationProgressProps {
   onCancel?: (e?: React.MouseEvent) => void
 }
 
-// Estimated time in seconds (~5:30 based on real usage data)
-const ESTIMATED_DURATION = 5.5 * 60
+// Estimated time in seconds (~7 min based on real usage data)
+const ESTIMATED_DURATION = 7 * 60
 // Max display time - after this, something might be wrong
-const MAX_DISPLAY_TIME = 10 * 60
+const MAX_DISPLAY_TIME = 12 * 60
 
 export function GenerationProgress({ 
   characterImageUrl, 
@@ -48,15 +48,15 @@ export function GenerationProgress({
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
-  // Status-specific messages (adjusted for ~5:30 total duration)
+  // Status-specific messages (adjusted for ~7 min total duration)
   const getStatusMessage = () => {
     if (status === "uploading") return "Uploading video..."
     if (status === "pending") return "In queue..."
     if (elapsedSeconds < 30) return "Starting AI model..."
-    if (elapsedSeconds < 90) return "Analyzing motion..."
-    if (elapsedSeconds < 180) return "Processing frames..."
-    if (elapsedSeconds < 270) return "Generating video..."
-    if (elapsedSeconds < 330) return "Rendering final..."
+    if (elapsedSeconds < 120) return "Analyzing motion..."
+    if (elapsedSeconds < 240) return "Processing frames..."
+    if (elapsedSeconds < 360) return "Generating video..."
+    if (elapsedSeconds < 420) return "Rendering final..."
     if (elapsedSeconds < MAX_DISPLAY_TIME) return "Almost done..."
     return "Taking longer than usual..."
   }
@@ -166,10 +166,10 @@ export function GenerationProgressExpanded({
     if (status === "uploading") return "Uploading video..."
     if (status === "pending") return "In queue..."
     if (elapsedSeconds < 30) return "Starting AI model..."
-    if (elapsedSeconds < 90) return "Analyzing motion..."
-    if (elapsedSeconds < 180) return "Processing frames..."
-    if (elapsedSeconds < 270) return "Generating video..."
-    if (elapsedSeconds < 330) return "Rendering final..."
+    if (elapsedSeconds < 120) return "Analyzing motion..."
+    if (elapsedSeconds < 240) return "Processing frames..."
+    if (elapsedSeconds < 360) return "Generating video..."
+    if (elapsedSeconds < 420) return "Rendering final..."
     return "Almost done..."
   }
 
