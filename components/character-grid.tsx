@@ -83,6 +83,9 @@ export function CharacterGrid({
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [showUploadTooltip, setShowUploadTooltip] = useState(false)
+  const [recentlyUploadedUrl, setRecentlyUploadedUrl] = useState<string | null>(null)
+  const [showSubmitPrompt, setShowSubmitPrompt] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Validate image dimensions (min 340x340 for fal.ai)
   const validateImageDimensions = (file: File): Promise<{ width: number; height: number }> => {
@@ -121,6 +124,10 @@ export function CharacterGrid({
       
       const newId = Math.max(...allCharacters.map(c => c.id), 0) + 1
       onAddCustom({ id: newId, src: blob.url, name: `Custom ${customCharacters.length + 1}` })
+      
+      // Show submit prompt after successful upload
+      setRecentlyUploadedUrl(blob.url)
+      setShowSubmitPrompt(true)
     } catch (error) {
       console.error("Failed to upload image:", error)
       setUploadError("Failed to upload image")
@@ -216,6 +223,30 @@ export function CharacterGrid({
         setGenerationProgress(0)
       }, 300)
     }
+  }
+
+  const handleSubmitToGallery = async () => {
+    if (!recentlyUploadedUrl || isSubmitting) return
+    
+    setIsSubmitting(true)
+    try {
+      await fetch("/api/submit-character", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: recentlyUploadedUrl }),
+      })
+      setShowSubmitPrompt(false)
+      setRecentlyUploadedUrl(null)
+    } catch (error) {
+      console.error("Failed to submit:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const dismissSubmitPrompt = () => {
+    setShowSubmitPrompt(false)
+    setRecentlyUploadedUrl(null)
   }
 
   return (
@@ -538,6 +569,32 @@ export function CharacterGrid({
                 className="cursor-pointer transition-colors hover:text-white"
               >
                 How it works
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Submit to gallery prompt - subtle toast */}
+      {showSubmitPrompt && (
+        <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 shadow-lg">
+            <p className="font-mono text-[11px] text-neutral-400">
+              share this character with others?
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSubmitToGallery}
+                disabled={isSubmitting}
+                className="rounded bg-white px-2.5 py-1 font-mono text-[10px] font-medium text-black transition-colors hover:bg-neutral-200 disabled:opacity-50"
+              >
+                {isSubmitting ? "..." : "submit"}
+              </button>
+              <button
+                onClick={dismissSubmitPrompt}
+                className="rounded px-2 py-1 font-mono text-[10px] text-neutral-500 transition-colors hover:text-white"
+              >
+                no thanks
               </button>
             </div>
           </div>
