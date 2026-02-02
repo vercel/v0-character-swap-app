@@ -31,7 +31,7 @@ export const CHARACTER_CATEGORIES: { id: CharacterCategory | "all"; label: strin
 // ===========================================
 
 export const DEFAULT_CHARACTERS: Character[] = [
-  { id: 1, src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/jdvance-oKoVK6voLTrIRvXMDVyb7Ixo1hiqOf.png", name: "JD Vance", category: "celebs" },
+  { id: 1, src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/jdvance-oKoVK6voLTrIRvXMDVyb7Ixo1hiqOf.png", name: "JD Vance", category: "memes" },
   { id: 2, src: "/characters/leodc.png", name: "Django", category: "celebs" },
   { id: 3, src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/aliens-rPpxM5sHYuGsDnqZcvSH8AWxQiTqXw.png", name: "Aliens", category: "memes" },
   { id: 4, src: "/characters/dolly.png", name: "Dolly Parton", category: "celebs" },
