@@ -477,7 +477,7 @@ export function CharacterGrid({
               </a>
               <button
                 onClick={() => setShowHowItWorks(true)}
-                className="transition-colors hover:text-white"
+                className="cursor-pointer transition-colors hover:text-white"
               >
                 How it works
               </button>
