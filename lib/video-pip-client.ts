@@ -42,10 +42,20 @@ export async function createPipVideoClient({
 }: PipOptions): Promise<Blob> {
   const ff = await getFFmpeg()
   
-  onProgress?.(0.1)
+  // Set up progress listener for ffmpeg processing
+  const progressHandler = ({ progress: p }: { progress: number }) => {
+    // Map ffmpeg progress (0-1) to 40-90% of total progress
+    const percent = 0.4 + p * 0.5
+    onProgress?.(percent)
+  }
+  ff.on("progress", progressHandler)
+  
+  onProgress?.(0.05)
   
   // Fetch main video (and pip video if provided)
+  onProgress?.(0.1)
   const mainData = await fetchFile(mainVideoUrl)
+  onProgress?.(0.2)
   const pipData = pipVideoUrl ? await fetchFile(pipVideoUrl) : null
   
   // Fetch font for watermark
@@ -59,7 +69,7 @@ export async function createPipVideoClient({
     }
   }
   
-  onProgress?.(0.3)
+  onProgress?.(0.35)
   
   // Write files to ffmpeg virtual filesystem
   await ff.writeFile("main.mp4", mainData)
@@ -135,6 +145,7 @@ export async function createPipVideoClient({
   // If no filters needed, just return the original video
   if (!filterComplex) {
     // Clean up
+    ff.off("progress", progressHandler)
     await ff.deleteFile("main.mp4")
     if (pipData) {
       await ff.deleteFile("pip.webm")
@@ -167,7 +178,10 @@ export async function createPipVideoClient({
   
   await ff.exec(ffmpegArgs)
   
-  onProgress?.(0.9)
+  // Remove progress listener
+  ff.off("progress", progressHandler)
+  
+  onProgress?.(0.92)
   
   // Read the output file
   const outputData = await ff.readFile("output.mp4")
