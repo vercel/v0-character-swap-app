@@ -79,6 +79,7 @@ export default function Home() {
     clearRecording,
     restoreFromSession,
     saveToSession,
+    getVideoForUpload,
   } = useVideoRecording()
 
   // Video download hook
@@ -179,11 +180,15 @@ export default function Home() {
     if (!recordedVideo || !selectedCharacter) return
     const character = allCharacters.find(c => c.id === selectedCharacter)
     if (character) {
+      // Get the processed video (waits for processing if still in progress)
+      const videoToUpload = await getVideoForUpload()
+      if (!videoToUpload) return
+      
       // Use character image aspect ratio for generated video, but also pass recorded video aspect ratio
       const characterAspectRatio = await getCharacterAspectRatio(character.src)
-      processVideo(recordedVideo, character, false, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio)
+      processVideo(videoToUpload, character, false, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio)
     }
-  }, [recordedVideo, selectedCharacter, allCharacters, processVideo, uploadedVideoUrl, recordedAspectRatio])
+  }, [recordedVideo, selectedCharacter, allCharacters, processVideo, uploadedVideoUrl, recordedAspectRatio, getVideoForUpload])
 
   const handleReset = useCallback(() => {
     clearRecording()
@@ -462,31 +467,13 @@ export default function Home() {
               >
                 New Video
               </button>
-              {/* Processing overlay */}
+              {/* Processing indicator - subtle, non-blocking */}
               {(isProcessingVideo || isUploading) && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60">
-                  <div className="flex w-full max-w-[280px] flex-col items-center gap-4 px-6">
-                    <p className="font-sans text-[15px] font-medium tracking-wide text-white">
-                      Processing video
-                    </p>
-                    <div className="flex w-full flex-col items-center gap-2">
-                      <div className="h-[2px] w-full overflow-hidden rounded-full bg-white/20">
-                        <div
-                          className="h-full rounded-full bg-white transition-all duration-200 ease-out"
-                          style={{ 
-                            width: `${isUploading 
-                              ? Math.round(uploadProgress) 
-                              : Math.min(100, Math.max(0, processingProgress?.percent || 0))}%` 
-                          }}
-                        />
-                      </div>
-                      <p className="font-mono text-[13px] tabular-nums text-white/60">
-                        {isUploading 
-                          ? Math.round(uploadProgress)
-                          : Math.min(100, Math.max(0, processingProgress?.percent || 0))}%
-                      </p>
-                    </div>
-                  </div>
+                <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/70 px-3 py-1.5 backdrop-blur-sm">
+                  <div className="h-2 w-2 animate-pulse rounded-full bg-white" />
+                  <span className="font-mono text-[11px] text-white/80">
+                    {isProcessingVideo ? "Processing" : "Uploading"}
+                  </span>
                 </div>
               )}
             </div>
@@ -513,7 +500,7 @@ export default function Home() {
                 hiddenDefaultIds={hiddenDefaultIds}
                 onHideDefault={hideDefaultCharacter}
                 onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
-                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl && !isProcessingVideo && !isUploading}
+                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
                 hasVideo={!!recordedVideo}
                 hasCharacter={!!selectedCharacter}
                 onGenerate={handleProcess}
@@ -622,7 +609,7 @@ export default function Home() {
                     hiddenDefaultIds={hiddenDefaultIds}
                     onHideDefault={hideDefaultCharacter}
                 onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
-                    canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl && !isProcessingVideo && !isUploading}
+                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
                     hasVideo={!!recordedVideo}
                     hasCharacter={!!selectedCharacter}
                     onGenerate={handleProcess}
@@ -639,7 +626,7 @@ export default function Home() {
                   hiddenDefaultIds={hiddenDefaultIds}
                   onHideDefault={hideDefaultCharacter}
                   onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
-                  canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl && !isProcessingVideo && !isUploading}
+                  canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
                   hasVideo={!!recordedVideo}
                   hasCharacter={!!selectedCharacter}
                   onGenerate={handleProcess}
