@@ -20,6 +20,8 @@ interface UseVideoRecordingReturn {
   clearRecording: () => void
   restoreFromSession: () => Promise<{ shouldAutoSubmit: boolean }>
   saveToSession: (video: Blob, characterId: number | null) => Promise<void>
+  /** Get the video blob ready for upload (processed if ready, original otherwise) */
+  getVideoForUpload: () => Promise<Blob | null>
 }
 
 export function useVideoRecording(): UseVideoRecordingReturn {
@@ -30,9 +32,18 @@ export function useVideoRecording(): UseVideoRecordingReturn {
   const [isUploading, setIsUploading] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   
-  // Video processor for client-side transcoding
-  const { processVideo, progress: processingProgress, isProcessing } = useVideoProcessor()
-  const processingRef = useRef(false)
+  // Video processor for background transcoding
+  const { 
+    startProcessing, 
+    awaitProcessedVideo, 
+    getProcessedVideo,
+    progress: processingProgress, 
+    isProcessing,
+    isComplete: processingComplete,
+    reset: resetProcessor,
+  } = useVideoProcessor()
+  
+  const uploadingRef = useRef(false)
 
   // Create object URL when video changes
   useEffect(() => {
@@ -45,34 +56,57 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     }
   }, [recordedVideo])
 
-  // Upload video to Vercel Blob
-  // Now we process the video client-side with ffmpeg.wasm before uploading
-  const uploadVideo = useCallback(async (blob: Blob) => {
-    // Prevent duplicate processing
-    if (processingRef.current) {
-      return
+  // Auto-upload when processing completes
+  useEffect(() => {
+    if (processingComplete && !uploadedVideoUrl && !uploadingRef.current) {
+      const processedVideo = getProcessedVideo()
+      if (processedVideo) {
+        uploadVideo(processedVideo)
+      }
     }
-    processingRef.current = true
+  }, [processingComplete, uploadedVideoUrl, getProcessedVideo])
+
+  // Upload video to Vercel Blob
+  const uploadVideo = useCallback(async (blob: Blob) => {
+    if (uploadingRef.current) return
+    uploadingRef.current = true
     
     setIsUploading(true)
     try {
-      // Process video with ffmpeg.wasm to fix metadata and ensure compatibility
-      const processedBlob = await processVideo(blob)
-      
-      // Upload the processed MP4 to Vercel Blob
-      const videoBlob = await upload(`videos/${Date.now()}-recording.mp4`, processedBlob, {
+      const videoBlob = await upload(`videos/${Date.now()}-recording.mp4`, blob, {
         access: "public",
         handleUploadUrl: "/api/upload",
       })
       setUploadedVideoUrl(videoBlob.url)
     } catch (error) {
-      console.error("Failed to process/upload video:", error)
-      // Don't fail - user can still generate, it will upload then
+      console.error("[v0] Failed to upload video:", error)
     } finally {
       setIsUploading(false)
-      processingRef.current = false
+      uploadingRef.current = false
     }
-  }, [processVideo])
+  }, [])
+
+  // Get video ready for generation (waits for processing if needed)
+  const getVideoForUpload = useCallback(async (): Promise<Blob | null> => {
+    if (!recordedVideo) return null
+    
+    // If we have uploaded URL, the processed video is already uploaded
+    if (uploadedVideoUrl) {
+      return getProcessedVideo() || recordedVideo
+    }
+    
+    // If processing is in progress, wait for it
+    if (isProcessing) {
+      return awaitProcessedVideo()
+    }
+    
+    // If processing is complete, return processed video
+    const processed = getProcessedVideo()
+    if (processed) return processed
+    
+    // Fallback to original
+    return recordedVideo
+  }, [recordedVideo, uploadedVideoUrl, isProcessing, awaitProcessedVideo, getProcessedVideo])
 
   const handleVideoRecorded = useCallback((blob: Blob, _aspectRatio: "9:16" | "16:9" | "fill") => {
     // Validate file size
@@ -88,8 +122,6 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     video.onloadedmetadata = () => {
       URL.revokeObjectURL(video.src)
       
-      // WebM from canvas.captureStream often reports Infinity or NaN duration
-      // Only reject if we have a valid duration that's clearly too long
       const duration = video.duration
       const hasValidDuration = isFinite(duration) && !isNaN(duration) && duration > 0
       
@@ -103,24 +135,26 @@ export function useVideoRecording(): UseVideoRecordingReturn {
       const { videoWidth, videoHeight } = video
       const detectedAspectRatio = detectVideoAspectRatio(videoWidth, videoHeight)
       
+      // Set video state immediately so user can see preview
       setRecordedVideo(blob)
       setRecordedAspectRatio(detectedAspectRatio)
       setShowPreview(true)
-      // Start converting and uploading immediately in background
-      uploadVideo(blob)
+      
+      // Start processing in background - doesn't block UI
+      startProcessing(blob)
     }
     
     video.onerror = () => {
       URL.revokeObjectURL(video.src)
-      // Still accept the video if we can't validate duration
+      // Still accept the video if we can't validate
       setRecordedVideo(blob)
-      setRecordedAspectRatio("fill") // Default to fill if can't detect
+      setRecordedAspectRatio("fill")
       setShowPreview(true)
-      uploadVideo(blob)
+      startProcessing(blob)
     }
     
     video.src = URL.createObjectURL(blob)
-  }, [uploadVideo])
+  }, [startProcessing])
 
   const clearRecording = useCallback(() => {
     setRecordedVideo(null)
@@ -128,15 +162,16 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     setUploadedVideoUrl(null)
     setRecordedAspectRatio("fill")
     setShowPreview(false)
-  }, [])
+    resetProcessor()
+    uploadingRef.current = false
+  }, [resetProcessor])
 
   const saveToSession = useCallback(async (video: Blob, characterId: number | null) => {
     if (characterId) {
       sessionStorage.setItem(STORAGE_KEYS.PENDING_CHARACTER, String(characterId))
     }
-    // Save aspect ratio
     sessionStorage.setItem(STORAGE_KEYS.PENDING_ASPECT_RATIO, recordedAspectRatio)
-    // Save uploaded URL if available, otherwise save blob as data URL
+    
     if (uploadedVideoUrl) {
       sessionStorage.setItem(STORAGE_KEYS.PENDING_VIDEO_URL, uploadedVideoUrl)
       sessionStorage.setItem(STORAGE_KEYS.PENDING_UPLOADED, "true")
@@ -146,7 +181,7 @@ export function useVideoRecording(): UseVideoRecordingReturn {
         sessionStorage.setItem(STORAGE_KEYS.PENDING_VIDEO_URL, dataUrl)
         sessionStorage.setItem(STORAGE_KEYS.PENDING_UPLOADED, "false")
       } catch (e) {
-        console.error("Failed to save video:", e)
+        console.error("[v0] Failed to save video:", e)
       }
     }
     sessionStorage.setItem(STORAGE_KEYS.PENDING_AUTO_SUBMIT, "true")
@@ -161,21 +196,17 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     if (savedVideoUrl) {
       try {
         if (wasUploaded) {
-          // It's already uploaded to blob storage
           setUploadedVideoUrl(savedVideoUrl)
-          // We need to fetch it to create a local blob for preview
           const response = await fetch(savedVideoUrl)
           const blob = await response.blob()
           setRecordedVideo(blob)
         } else {
-          // It's a data URL, convert back to blob
           const response = await fetch(savedVideoUrl)
           const blob = await response.blob()
           setRecordedVideo(blob)
-          // Re-upload in background
-          uploadVideo(blob)
+          // Start processing in background
+          startProcessing(blob)
         }
-        // Restore aspect ratio
         if (savedAspectRatio) {
           setRecordedAspectRatio(savedAspectRatio)
         }
@@ -193,7 +224,7 @@ export function useVideoRecording(): UseVideoRecordingReturn {
       }
     }
     return { shouldAutoSubmit: false }
-  }, [uploadVideo])
+  }, [startProcessing])
 
   return {
     recordedVideo,
@@ -209,10 +240,10 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     clearRecording,
     restoreFromSession,
     saveToSession,
+    getVideoForUpload,
   }
 }
 
-// Helper function
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
