@@ -39,6 +39,7 @@ export function useVideoProcessor(): UseVideoProcessorReturn {
   const originalBlobRef = useRef<Blob | null>(null)
   const resolveRef = useRef<((blob: Blob) => void) | null>(null)
   const rejectRef = useRef<((error: Error) => void) | null>(null)
+  const processingStartedRef = useRef(false) // Track if processing was initiated
 
   // Cleanup worker on unmount
   useEffect(() => {
@@ -58,11 +59,13 @@ export function useVideoProcessor(): UseVideoProcessorReturn {
     originalBlobRef.current = null
     resolveRef.current = null
     rejectRef.current = null
+    processingStartedRef.current = false
   }, [])
 
   const startProcessing = useCallback((inputBlob: Blob) => {
     // Reset state
     reset()
+    processingStartedRef.current = true // Mark that processing has been initiated
     setIsProcessing(true)
     originalBlobRef.current = inputBlob
     processedBlobRef.current = null
@@ -154,31 +157,40 @@ export function useVideoProcessor(): UseVideoProcessorReturn {
       return Promise.resolve(processedBlobRef.current)
     }
 
-    // If not processing and we have an original, return that
-    if (!isProcessing && originalBlobRef.current) {
+    // If processing was never started and we have an original, return that
+    if (!processingStartedRef.current && originalBlobRef.current) {
       return Promise.resolve(originalBlobRef.current)
     }
 
-    // Wait for processing to complete
-    return new Promise((resolve, reject) => {
-      resolveRef.current = resolve
-      rejectRef.current = reject
-      
-      // Timeout after 60 seconds
-      setTimeout(() => {
-        if (resolveRef.current) {
-          console.warn("[v0] Processing timeout, using original video")
-          const fallback = originalBlobRef.current || processedBlobRef.current
-          if (fallback) {
-            resolveRef.current(fallback)
-          } else {
-            rejectRef.current?.(new Error("Processing timeout and no fallback available"))
+    // If processing was started (or is in progress), wait for it to complete
+    if (processingStartedRef.current || isProcessing) {
+      return new Promise((resolve, reject) => {
+        resolveRef.current = resolve
+        rejectRef.current = reject
+        
+        // Timeout after 60 seconds
+        setTimeout(() => {
+          if (resolveRef.current) {
+            console.warn("[v0] Processing timeout, using original video")
+            const fallback = originalBlobRef.current || processedBlobRef.current
+            if (fallback) {
+              resolveRef.current(fallback)
+            } else {
+              rejectRef.current?.(new Error("Processing timeout and no fallback available"))
+            }
+            resolveRef.current = null
+            rejectRef.current = null
           }
-          resolveRef.current = null
-          rejectRef.current = null
-        }
-      }, 60000)
-    })
+        }, 60000)
+      })
+    }
+
+    // Fallback to original if available
+    if (originalBlobRef.current) {
+      return Promise.resolve(originalBlobRef.current)
+    }
+
+    return Promise.reject(new Error("No video available"))
   }, [isComplete, isProcessing])
 
   const getProcessedVideo = useCallback((): Blob | null => {
