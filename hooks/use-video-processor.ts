@@ -15,32 +15,15 @@ interface UseVideoProcessorReturn {
 }
 
 /**
- * Detect if the browser is Chrome (or Chromium-based)
- * Chrome outputs WebM which fal.ai can handle directly
- */
-function isChromeBrowser(): boolean {
-  if (typeof navigator === "undefined") return false
-  const ua = navigator.userAgent
-  return ua.includes("Chrome") && !ua.includes("Edg")
-}
-
-/**
  * Hook to process video using MediaBunny (lightweight WebCodecs-based converter)
- * This fixes Safari MP4 metadata issues by re-muxing with fastStart enabled
- * Chrome is skipped since it outputs WebM which fal.ai handles directly
+ * Converts all videos to MP4 with H.264 codec and fastStart enabled
+ * This ensures fal.ai can process videos from any browser (Chrome WebM, Safari MOV, etc.)
  */
 export function useVideoProcessor(): UseVideoProcessorReturn {
   const [progress, setProgress] = useState<ProcessingProgress | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
   const processVideo = useCallback(async (inputBlob: Blob): Promise<Blob> => {
-    // Skip processing for Chrome - outputs WebM which fal.ai handles fine
-    if (isChromeBrowser()) {
-      console.log("[v0] Chrome detected, skipping video processing")
-      setProgress({ stage: "done", percent: 100, message: "Ready!" })
-      return inputBlob
-    }
-
     setIsProcessing(true)
     setProgress({ stage: "loading", percent: 0, message: "Loading processor..." })
 
