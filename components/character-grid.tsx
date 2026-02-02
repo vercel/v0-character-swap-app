@@ -600,7 +600,7 @@ export function CharacterGrid({
                 <p>
                   <a href="https://nextjs.org" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">next.js 16</a>
                   <span className="text-neutral-500"> + </span>
-                  <a href="https://v0.dev" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">v0</a>
+                  <a href="https://v0.app" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">v0</a>
                   <span className="text-neutral-500"> + </span>
                   <a href="https://vercel.com" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">vercel</a>
                 </p>
