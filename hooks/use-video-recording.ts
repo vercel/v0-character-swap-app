@@ -90,23 +90,17 @@ export function useVideoRecording(): UseVideoRecordingReturn {
   const getVideoForUpload = useCallback(async (): Promise<Blob | null> => {
     if (!recordedVideo) return null
     
-    // If we have uploaded URL, the processed video is already uploaded
-    if (uploadedVideoUrl) {
-      return getProcessedVideo() || recordedVideo
+    // Always use awaitProcessedVideo - it handles all the logic:
+    // - Returns processed video if complete
+    // - Waits for processing if in progress
+    // - Falls back to original if processing never started or failed
+    try {
+      return await awaitProcessedVideo()
+    } catch (error) {
+      console.error("[v0] Failed to get processed video:", error)
+      return recordedVideo // Fallback to original
     }
-    
-    // If processing is in progress, wait for it
-    if (isProcessing) {
-      return awaitProcessedVideo()
-    }
-    
-    // If processing is complete, return processed video
-    const processed = getProcessedVideo()
-    if (processed) return processed
-    
-    // Fallback to original
-    return recordedVideo
-  }, [recordedVideo, uploadedVideoUrl, isProcessing, awaitProcessedVideo, getProcessedVideo])
+  }, [recordedVideo, awaitProcessedVideo])
 
   const handleVideoRecorded = useCallback((blob: Blob, _aspectRatio: "9:16" | "16:9" | "fill") => {
     // Validate file size
