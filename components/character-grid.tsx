@@ -550,46 +550,62 @@ export function CharacterGrid({
             <div className="space-y-6 font-mono text-[11px] text-neutral-400">
               <div>
                 <p className="mb-2 text-neutral-500">// ai model</p>
-                <p className="text-neutral-300">
+                <a 
+                  href="https://fal.ai/models/fal-ai/kling-video/v2.6/standard/motion-control"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-neutral-300 hover:text-white"
+                >
                   fal.ai/kling-video/v2.6 motion-control
-                </p>
+                </a>
                 <p className="mt-1">
-                  extracts facial landmarks + head pose from source video, applies motion to target image
+                  analyzes facial landmarks, expressions, and head pose frame-by-frame from your recorded video. transfers this motion data onto the target character image while preserving their appearance.
                 </p>
               </div>
               
               <div>
-                <p className="mb-2 text-neutral-500">// client</p>
+                <p className="mb-2 text-neutral-500">// client processing</p>
                 <p className="text-neutral-300">ffmpeg.wasm in web worker</p>
                 <p className="mt-1">
-                  re-encodes recorded video for safari compatibility, generates pip overlay on download
+                  runs video encoding entirely in your browser using webassembly. handles safari mp4 compatibility (moov atom positioning), and composites the final picture-in-picture overlay with rounded corners and watermark on download.
                 </p>
               </div>
               
               <div>
-                <p className="mb-2 text-neutral-500">// server</p>
-                <div className="mt-2 space-y-1">
-                  <p><span className="text-neutral-300">workflow</span> — durable execution, handles fal webhook callbacks</p>
-                  <p><span className="text-neutral-300">blob</span> — video + image storage</p>
-                  <p><span className="text-neutral-300">neon</span> — postgres for generations state</p>
-                  <p><span className="text-neutral-300">ai gateway</span> — routes ai requests</p>
+                <p className="mb-2 text-neutral-500">// infrastructure</p>
+                <div className="mt-2 space-y-2">
+                  <p>
+                    <a href="https://vercel.com/docs/workflow" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">workflow</a>
+                    <span className="text-neutral-500"> — </span>
+                    durable function execution that survives timeouts. orchestrates the generation pipeline: receives request → calls fal api → waits for webhook → updates database.
+                  </p>
+                  <p>
+                    <a href="https://vercel.com/docs/storage/vercel-blob" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">blob</a>
+                    <span className="text-neutral-500"> — </span>
+                    stores uploaded videos, character images, and generated results. serves assets via edge cdn.
+                  </p>
+                  <p>
+                    <a href="https://neon.tech" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">neon</a>
+                    <span className="text-neutral-500"> — </span>
+                    serverless postgres. tracks generation state (pending → processing → completed/failed) with user associations.
+                  </p>
+                  <p>
+                    <a href="https://vercel.com/docs/ai-gateway" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">ai gateway</a>
+                    <span className="text-neutral-500"> — </span>
+                    unified routing layer for ai model requests. handles authentication, rate limiting, and provider abstraction.
+                  </p>
                 </div>
               </div>
               
               <div>
-                <p className="mb-2 text-neutral-500">// built with</p>
-                <p>next.js 16, v0, vercel</p>
-              </div>
-              
-              <div className="border-t border-neutral-800 pt-4">
-                <a 
-                  href="https://github.com/vercel/ai-face-swap"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-neutral-500 transition-colors hover:text-white"
-                >
-                  view source →
-                </a>
+                <p className="mb-2 text-neutral-500">// stack</p>
+                <p>
+                  <a href="https://nextjs.org" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">next.js 16</a>
+                  <span className="text-neutral-500"> + </span>
+                  <a href="https://v0.dev" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">v0</a>
+                  <span className="text-neutral-500"> + </span>
+                  <a href="https://vercel.com" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">vercel</a>
+                </p>
               </div>
             </div>
           </div>
