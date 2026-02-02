@@ -4,8 +4,8 @@ import React, { useRef, useState, useEffect } from "react"
 import Image from "next/image"
 import { cn, detectImageAspectRatio } from "@/lib/utils"
 import { upload } from "@vercel/blob/client"
-import type { Character } from "@/lib/types"
-import { defaultCharacters } from "@/lib/constants"
+import type { Character, CharacterCategory } from "@/lib/types"
+import { defaultCharacters, CHARACTER_CATEGORIES } from "@/lib/constants"
 
 // Re-export for backwards compatibility
 export { defaultCharacters }
@@ -27,6 +27,10 @@ interface CharacterGridProps {
   hasVideo?: boolean
   hasCharacter?: boolean
   onGenerate?: () => void
+  // Category filter props
+  selectedCategory?: CharacterCategory | "all"
+  onCategoryChange?: (category: CharacterCategory | "all") => void
+  filteredCharacters?: Character[]
 }
 
 export function CharacterGrid({ 
@@ -44,6 +48,9 @@ export function CharacterGrid({
   hasVideo = false,
   hasCharacter = false,
   onGenerate,
+  selectedCategory = "popular",
+  onCategoryChange,
+  filteredCharacters: externalFilteredCharacters,
 }: CharacterGridProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [prompt, setPrompt] = useState("")
@@ -56,6 +63,9 @@ export function CharacterGrid({
   
   const visibleDefaultCharacters = defaultCharacters.filter(c => !hiddenDefaultIds.includes(c.id))
   const allCharacters = [...visibleDefaultCharacters, ...customCharacters]
+  
+  // Use external filtered characters if provided, otherwise use all
+  const displayCharacters = externalFilteredCharacters || allCharacters
   
   // Track detected aspect ratios for each character image
   const [aspectRatios, setAspectRatios] = useState<Record<number, string>>({})
@@ -234,10 +244,30 @@ export function CharacterGrid({
           select character
         </p>
         
+        {/* Category tabs */}
+        {onCategoryChange && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {CHARACTER_CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => onCategoryChange(cat.id)}
+                className={cn(
+                  "rounded-full px-2.5 py-1 font-mono text-[10px] transition-all",
+                  selectedCategory === cat.id
+                    ? "bg-white text-black"
+                    : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white"
+                )}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+        )}
+        
         {/* Grid container - flex wrap with fixed height */}
         <div className="pb-1 pt-1">
           <div className="flex flex-wrap gap-1.5 md:gap-3">
-          {allCharacters.map((char) => {
+          {displayCharacters.map((char) => {
             const isCustom = customCharacters.some(c => c.id === char.id)
             const isDefault = visibleDefaultCharacters.some(c => c.id === char.id)
             const canDelete = (isCustom && onDeleteCustom) || (isDefault && onHideDefault)
