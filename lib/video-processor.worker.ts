@@ -52,10 +52,6 @@ self.onmessage = async (e: MessageEvent<ProcessMessage>) => {
       // Load ffmpeg with CORS-enabled URLs
       const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm"
 
-      ffmpeg.on("log", ({ message }: { message: string }) => {
-        console.log("[ffmpeg worker]", message)
-      })
-
       ffmpeg.on("progress", ({ progress: p }: { progress: number }) => {
         const percent = Math.round(30 + p * 60) // 30-90% for processing
         postProgress("processing", percent, "Processing video...")
