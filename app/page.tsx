@@ -511,7 +511,6 @@ export default function Home() {
                     setResultUrl(url)
                     setSourceVideoUrl(sourceUrl)
                     setSourceVideoAspectRatio(aspectRatio)
-                    setCurrentAspectRatio(aspectRatio)
                   }}
                   className="mt-4"
                 />
