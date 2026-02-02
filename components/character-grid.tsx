@@ -466,30 +466,6 @@ export function CharacterGrid({
       {onGenerate && (
         <div className="shrink-0 pt-2 md:pt-4">
           <div className="flex flex-col gap-1.5 md:gap-4">
-            <div className="hidden flex-col items-start gap-1 font-mono text-[10px] text-neutral-500 md:flex">
-              <a 
-                href="https://vercel.com/templates/next.js/ai-face-swap"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="transition-colors hover:text-white"
-              >
-                Make this app your own
-              </a>
-              <button
-                onClick={() => setShowHowItWorks(true)}
-                className="cursor-pointer transition-colors hover:text-white"
-              >
-                How it works
-              </button>
-              <a 
-                href="https://x.com/EstebanSuarez"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="transition-colors hover:text-white"
-              >
-                @EstebanSuarez
-              </a>
-            </div>
             {generateError && (
               <p className="font-mono text-[10px] text-amber-400 md:text-[11px]">
                 {generateError}
@@ -517,6 +493,23 @@ export function CharacterGrid({
             >
               Generate video
             </button>
+            <div className="hidden items-center justify-center gap-3 font-mono text-[10px] text-neutral-500 md:flex">
+              <a 
+                href="https://vercel.com/templates/next.js/ai-face-swap"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-white"
+              >
+                Make this app your own
+              </a>
+              <span className="text-neutral-700">·</span>
+              <button
+                onClick={() => setShowHowItWorks(true)}
+                className="cursor-pointer transition-colors hover:text-white"
+              >
+                How it works
+              </button>
+            </div>
           </div>
         </div>
       )}
