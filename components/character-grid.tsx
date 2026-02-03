@@ -356,7 +356,7 @@ export function CharacterGrid({
                   }}
                   disabled={disabled}
                   data-selected={isSelected}
-                  className={`relative h-[50px] overflow-hidden rounded-lg transition-all outline outline-1 outline-neutral-800 hover:outline-neutral-600 data-[selected=true]:outline-2 data-[selected=true]:outline-white disabled:cursor-not-allowed disabled:opacity-50 md:h-[56px] ${widthClass}`}
+                  className={`relative h-[50px] overflow-hidden rounded-lg transition-all ring-1 ring-neutral-800 ring-offset-0 ring-offset-neutral-950 hover:ring-neutral-600 data-[selected=true]:ring-2 data-[selected=true]:ring-white data-[selected=true]:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:h-[56px] ${widthClass}`}
                 >
                   <Image
                     src={char.src || "/placeholder.svg"}
