@@ -182,6 +182,10 @@ export function useCharacters({ user }: UseCharactersOptions): UseCharactersRetu
     : selectedCategory === "all"
     ? allCharacters
     : allCharacters.filter(c => c.category === selectedCategory)
+  
+  console.log("[v0] selectedCategory:", selectedCategory)
+  console.log("[v0] allCharacters with categories:", allCharacters.map(c => ({ id: c.id, name: c.name, category: c.category })))
+  console.log("[v0] filteredCharacters:", filteredCharacters.length)
 
   return {
     customCharacters,
