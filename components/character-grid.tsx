@@ -77,6 +77,7 @@ export function CharacterGrid({
     allCharacters.forEach(async (char) => {
       if (!aspectRatios[char.id] && char.src) {
         const ar = await detectImageAspectRatio(char.src)
+        console.log("[v0] Detected aspect ratio for", char.name, char.id, ":", ar)
         setAspectRatios(prev => ({ ...prev, [char.id]: ar }))
       }
     })
