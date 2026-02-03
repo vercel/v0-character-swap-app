@@ -245,8 +245,12 @@ export function CharacterGrid({
       })
       
       // Update the custom character's category locally so it appears in filtered view
+      console.log("[v0] recentlyUploadedId:", recentlyUploadedId, "category:", category, "onUpdateCharacterCategory:", !!onUpdateCharacterCategory)
       if (recentlyUploadedId && onUpdateCharacterCategory) {
+        console.log("[v0] Calling onUpdateCharacterCategory with", recentlyUploadedId, category)
         onUpdateCharacterCategory(recentlyUploadedId, category)
+      } else {
+        console.log("[v0] NOT calling onUpdateCharacterCategory - missing recentlyUploadedId or callback")
       }
       
       setSubmitDone(true)

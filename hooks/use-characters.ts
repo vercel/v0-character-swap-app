@@ -155,10 +155,14 @@ export function useCharacters({ user }: UseCharactersOptions): UseCharactersRetu
 
   // Update custom character category (when user shares it)
   const updateCustomCharacterCategory = useCallback((characterId: number, category: CharacterCategory) => {
-    setCustomCharacters(prev => 
-      prev.map(c => c.id === characterId ? { ...c, category } : c)
-    )
-  }, [])
+    console.log("[v0] updateCustomCharacterCategory called with", characterId, category)
+    console.log("[v0] Current customCharacters:", customCharacters)
+    setCustomCharacters(prev => {
+      const updated = prev.map(c => c.id === characterId ? { ...c, category } : c)
+      console.log("[v0] Updated customCharacters:", updated)
+      return updated
+    })
+  }, [customCharacters])
 
   // Add usage count to characters and sort by popularity
   const charactersWithUsage = DEFAULT_CHARACTERS.map(c => ({
