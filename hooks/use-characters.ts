@@ -31,6 +31,7 @@ export function useCharacters({ user }: UseCharactersOptions): UseCharactersRetu
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null)
   const [usageMap, setUsageMap] = useState<Record<string, number>>({})
   const [selectedCategory, setSelectedCategory] = useState<CharacterCategory | "all">("popular")
+  const [approvedCharacters, setApprovedCharacters] = useState<Character[]>([])
 
   // Load hidden default characters from localStorage
   useEffect(() => {
@@ -51,6 +52,25 @@ export function useCharacters({ user }: UseCharactersOptions): UseCharactersRetu
       .then(data => {
         if (data.usage) {
           setUsageMap(data.usage)
+        }
+      })
+      .catch(console.error)
+  }, [])
+
+  // Fetch approved characters (community-submitted and admin-approved)
+  useEffect(() => {
+    fetch("/api/approved-characters")
+      .then(res => res.json())
+      .then(data => {
+        if (data.characters) {
+          // Convert DB format to Character format with high IDs to avoid conflicts
+          const approved = data.characters.map((c: { id: number; image_url: string; suggested_name: string | null; suggested_category: string | null }, i: number) => ({
+            id: 5000 + c.id, // Use high IDs to avoid conflicts with defaults and customs
+            src: c.image_url,
+            name: c.suggested_name || `Community ${i + 1}`,
+            category: c.suggested_category as CharacterCategory,
+          }))
+          setApprovedCharacters(approved)
         }
       })
       .catch(console.error)
@@ -155,14 +175,10 @@ export function useCharacters({ user }: UseCharactersOptions): UseCharactersRetu
 
   // Update custom character category (when user shares it)
   const updateCustomCharacterCategory = useCallback((characterId: number, category: CharacterCategory) => {
-    console.log("[v0] updateCustomCharacterCategory called with", characterId, category)
-    console.log("[v0] Current customCharacters:", customCharacters)
-    setCustomCharacters(prev => {
-      const updated = prev.map(c => c.id === characterId ? { ...c, category } : c)
-      console.log("[v0] Updated customCharacters:", updated)
-      return updated
-    })
-  }, [customCharacters])
+    setCustomCharacters(prev =>
+      prev.map(c => c.id === characterId ? { ...c, category } : c)
+    )
+  }, [])
 
   // Add usage count to characters and sort by popularity
   const charactersWithUsage = DEFAULT_CHARACTERS.map(c => ({
@@ -174,7 +190,7 @@ export function useCharacters({ user }: UseCharactersOptions): UseCharactersRetu
     c => !hiddenDefaultIds.includes(c.id)
   )
 
-  const allCharacters = [...visibleDefaultCharacters, ...customCharacters]
+  const allCharacters = [...visibleDefaultCharacters, ...approvedCharacters, ...customCharacters]
 
   // Filter characters by category
   const filteredCharacters = selectedCategory === "popular"
@@ -182,10 +198,6 @@ export function useCharacters({ user }: UseCharactersOptions): UseCharactersRetu
     : selectedCategory === "all"
     ? allCharacters
     : allCharacters.filter(c => c.category === selectedCategory)
-  
-  console.log("[v0] selectedCategory:", selectedCategory)
-  console.log("[v0] allCharacters with categories:", allCharacters.map(c => ({ id: c.id, name: c.name, category: c.category })))
-  console.log("[v0] filteredCharacters:", filteredCharacters.length)
 
   return {
     customCharacters,
