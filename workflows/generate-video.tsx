@@ -1,6 +1,3 @@
-// Route segment config - increase maxDuration for long-running video generation
-export const maxDuration = 800
-
 /**
  * Input for the video generation workflow
  */
@@ -29,7 +26,7 @@ export async function generateVideoWorkflow(input: GenerateVideoInput) {
   const { generationId, videoUrl, characterImageUrl, characterName, userEmail } = input
 
   const workflowStartTime = Date.now()
-  console.log(`[Workflow] [${new Date().toISOString()}] Starting generation ${generationId} via AI Gateway (v51-error-logging)`)
+  console.log(`[Workflow] [${new Date().toISOString()}] Starting generation ${generationId} via AI Gateway`)
 
   // Generate video using AI SDK + KlingAI motion control
   let videoData: Uint8Array
@@ -87,65 +84,20 @@ async function generateVideoWithAISDK(
   const { Agent } = await import("undici")
   const { updateGenerationRunId } = await import("@/lib/db")
 
-  // Custom fetch with retry logic for individual HTTP requests
-  // This prevents a single poll failure from killing the entire generateVideo call
-  const longTimeoutAgent = new Agent({
-    headersTimeout: 15 * 60 * 1000,
-    bodyTimeout: 15 * 60 * 1000,
-  })
-
-  const fetchWithRetry = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    const maxRetries = 3
-    let lastError: unknown
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const response = await fetch(url, {
-          ...init,
-          dispatcher: longTimeoutAgent,
-        } as RequestInit)
-
-        // Retry on server errors (5xx) - these are transient
-        if (response.status >= 500 && attempt < maxRetries) {
-          console.warn(`[Workflow Step] [${new Date().toISOString()}] HTTP ${response.status} on attempt ${attempt}/${maxRetries}, retrying in 5s...`)
-          await new Promise(resolve => setTimeout(resolve, 5000))
-          continue
-        }
-
-        return response
-      } catch (err) {
-        lastError = err
-        if (attempt < maxRetries) {
-          console.warn(`[Workflow Step] [${new Date().toISOString()}] Fetch error on attempt ${attempt}/${maxRetries}: ${err instanceof Error ? err.message : String(err)}, retrying in 5s...`)
-          await new Promise(resolve => setTimeout(resolve, 5000))
-        }
-      }
-    }
-
-    throw lastError
-  }
-
+  // Custom gateway with extended timeouts for video generation (can take 10+ minutes)
   const gateway = createGateway({
-    fetch: fetchWithRetry as typeof globalThis.fetch,
+    fetch: (url, init) =>
+      fetch(url, {
+        ...init,
+        dispatcher: new Agent({
+          headersTimeout: 15 * 60 * 1000,
+          bodyTimeout: 15 * 60 * 1000,
+        }),
+      } as RequestInit),
   })
 
   console.log(`[Workflow Step] [${new Date().toISOString()}] Imports done (+${Date.now() - stepStartTime}ms)`)
   console.log(`[Workflow Step] [${new Date().toISOString()}] Input: characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
-
-  // Validate that both URLs are accessible before calling generateVideo
-  const [imageCheck, videoCheck] = await Promise.all([
-    fetch(characterImageUrl, { method: "HEAD" }).catch(e => ({ ok: false, status: 0, statusText: String(e) })),
-    fetch(videoUrl, { method: "HEAD" }).catch(e => ({ ok: false, status: 0, statusText: String(e) })),
-  ])
-  console.log(`[Workflow Step] [${new Date().toISOString()}] URL check - image: ${imageCheck.ok ? "OK" : `FAIL ${imageCheck.status}`}, video: ${videoCheck.ok ? "OK" : `FAIL ${videoCheck.status}`}`)
-  
-  if (!imageCheck.ok || !videoCheck.ok) {
-    const { RetryableError } = await import("workflow")
-    throw new RetryableError(
-      `Input URLs not accessible - image: ${imageCheck.ok}, video: ${videoCheck.ok}`,
-      { retryAfter: "10s" }
-    )
-  }
 
   // Update run ID with a placeholder so UI knows it's processing
   await updateGenerationRunId(generationId, `ai-gateway-${generationId}`)
@@ -155,89 +107,26 @@ async function generateVideoWithAISDK(
   console.log(`[Workflow Step] [${new Date().toISOString()}] Calling experimental_generateVideo with klingai/kling-v2.6-motion-control...`)
 
   const generateStart = Date.now()
-  let result: Awaited<ReturnType<typeof generateVideo>>
-
-  try {
-    result = await generateVideo({
-      model: gateway.video("klingai/kling-v2.6-motion-control"),
-      prompt: {
-        image: characterImageUrl,
+  const result = await generateVideo({
+    model: gateway.video("klingai/kling-v2.6-motion-control"),
+    prompt: {
+      image: characterImageUrl,
+    },
+    providerOptions: {
+      klingai: {
+        // Reference motion video URL - the user's recorded video
+        videoUrl: videoUrl,
+        // Match orientation from the reference video
+        characterOrientation: "video" as const,
+        // Standard mode (cost-effective)
+        mode: "std" as const,
+        // Poll every 5 seconds for faster completion detection
+        pollIntervalMs: 5_000,
+        // Extended poll timeout since video generation takes minutes
+        pollTimeoutMs: 14 * 60 * 1000, // 14 minutes
       },
-      providerOptions: {
-        klingai: {
-          // Reference motion video URL - the user's recorded video
-          videoUrl: videoUrl,
-          // Match orientation from the reference video
-          characterOrientation: "video" as const,
-          // Standard mode (cost-effective)
-          mode: "std" as const,
-          // Poll every 5 seconds for faster completion detection
-          pollIntervalMs: 5_000,
-          // Extended poll timeout since video generation takes minutes
-          pollTimeoutMs: 14 * 60 * 1000, // 14 minutes
-        },
-      },
-    })
-  } catch (error) {
-    const elapsed = Date.now() - generateStart
-    const ts = new Date().toISOString()
-    
-    console.error(`[Workflow Step] [${ts}] === generateVideo FAILED after ${elapsed}ms (${(elapsed / 1000).toFixed(1)}s) ===`)
-    console.error(`[Workflow Step] [${ts}] Error type: ${typeof error}`)
-    console.error(`[Workflow Step] [${ts}] Error constructor: ${error?.constructor?.name ?? "unknown"}`)
-    
-    let errorMsg = "Unknown error"
-
-    if (error instanceof Error) {
-      errorMsg = error.message
-      console.error(`[Workflow Step] [${ts}] Error.name: ${error.name}`)
-      console.error(`[Workflow Step] [${ts}] Error.message: ${error.message}`)
-      console.error(`[Workflow Step] [${ts}] Error.stack: ${error.stack}`)
-      
-      // AI SDK errors like NoVideoGeneratedError have .cause and .responses
-      const aiErr = error as Error & { cause?: unknown; responses?: unknown; value?: unknown; data?: unknown; statusCode?: number; responseBody?: unknown }
-      if (aiErr.cause !== undefined) console.error(`[Workflow Step] [${ts}] Error.cause:`, JSON.stringify(aiErr.cause, null, 2))
-      if (aiErr.responses !== undefined) console.error(`[Workflow Step] [${ts}] Error.responses:`, JSON.stringify(aiErr.responses, null, 2))
-      if (aiErr.value !== undefined) console.error(`[Workflow Step] [${ts}] Error.value:`, JSON.stringify(aiErr.value, null, 2))
-      if (aiErr.data !== undefined) console.error(`[Workflow Step] [${ts}] Error.data:`, JSON.stringify(aiErr.data, null, 2))
-      if (aiErr.statusCode !== undefined) console.error(`[Workflow Step] [${ts}] Error.statusCode: ${aiErr.statusCode}`)
-      if (aiErr.responseBody !== undefined) console.error(`[Workflow Step] [${ts}] Error.responseBody:`, JSON.stringify(aiErr.responseBody, null, 2))
-      
-      // Enumerate ALL own properties (including non-enumerable)
-      const allProps = Object.getOwnPropertyNames(error)
-      console.error(`[Workflow Step] [${ts}] All error properties: [${allProps.join(", ")}]`)
-      for (const prop of allProps) {
-        if (!["name", "message", "stack"].includes(prop)) {
-          try {
-            console.error(`[Workflow Step] [${ts}] Error.${prop}:`, JSON.stringify((error as Record<string, unknown>)[prop], null, 2))
-          } catch {
-            console.error(`[Workflow Step] [${ts}] Error.${prop}: [not serializable]`)
-          }
-        }
-      }
-    } else if (error && typeof error === "object") {
-      // Non-Error object - enumerate everything
-      const allProps = Object.getOwnPropertyNames(error)
-      console.error(`[Workflow Step] [${ts}] Non-Error object properties: [${allProps.join(", ")}]`)
-      for (const prop of allProps) {
-        try {
-          console.error(`[Workflow Step] [${ts}] error.${prop}:`, JSON.stringify((error as Record<string, unknown>)[prop], null, 2))
-        } catch {
-          console.error(`[Workflow Step] [${ts}] error.${prop}: [not serializable]`)
-        }
-      }
-      try { errorMsg = JSON.stringify(error) } catch { errorMsg = String(error) }
-    } else {
-      errorMsg = String(error)
-      console.error(`[Workflow Step] [${ts}] Primitive error value: ${errorMsg}`)
-    }
-
-    console.error(`[Workflow Step] [${ts}] === END ERROR DETAILS ===`)
-    
-    // Throw RetryableError so workflow retries with backoff
-    const { RetryableError } = await import("workflow")
-    throw new RetryableError(`Video generation failed: ${errorMsg}`, { retryAfter: "30s" })
-  }
+    },
+  })
 
   const generateTime = Date.now() - generateStart
   console.log(`[Workflow Step] [${new Date().toISOString()}] generateVideo completed in ${generateTime}ms (${(generateTime / 1000).toFixed(1)}s)`)
