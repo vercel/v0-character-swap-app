@@ -1,8 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    ".well-known/workflow/v1/step": {
-      "maxDuration": 800
-    }
-  }
+  "fluid": true
 }
