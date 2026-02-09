@@ -99,6 +99,21 @@ async function generateVideoWithAISDK(
   console.log(`[Workflow Step] [${new Date().toISOString()}] Imports done (+${Date.now() - stepStartTime}ms)`)
   console.log(`[Workflow Step] [${new Date().toISOString()}] Input: characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
 
+  // Validate that both URLs are accessible before calling generateVideo
+  const [imageCheck, videoCheck] = await Promise.all([
+    fetch(characterImageUrl, { method: "HEAD" }).catch(e => ({ ok: false, status: 0, statusText: String(e) })),
+    fetch(videoUrl, { method: "HEAD" }).catch(e => ({ ok: false, status: 0, statusText: String(e) })),
+  ])
+  console.log(`[Workflow Step] [${new Date().toISOString()}] URL check - image: ${imageCheck.ok ? "OK" : `FAIL ${imageCheck.status}`}, video: ${videoCheck.ok ? "OK" : `FAIL ${videoCheck.status}`}`)
+  
+  if (!imageCheck.ok || !videoCheck.ok) {
+    const { RetryableError } = await import("workflow")
+    throw new RetryableError(
+      `Input URLs not accessible - image: ${imageCheck.ok}, video: ${videoCheck.ok}`,
+      { retryAfter: "10s" }
+    )
+  }
+
   // Update run ID with a placeholder so UI knows it's processing
   await updateGenerationRunId(generationId, `ai-gateway-${generationId}`)
 
@@ -132,10 +147,22 @@ async function generateVideoWithAISDK(
     })
   } catch (error) {
     const elapsed = Date.now() - generateStart
-    const errorMsg = error instanceof Error ? error.message : String(error)
-    console.error(`[Workflow Step] [${new Date().toISOString()}] generateVideo failed after ${elapsed}ms: ${errorMsg}`)
+    // Safely extract error details - some errors may not be standard Error instances
+    let errorMsg: string
+    if (error instanceof Error) {
+      errorMsg = error.message
+      console.error(`[Workflow Step] [${new Date().toISOString()}] generateVideo Error after ${elapsed}ms: ${error.message}`)
+      console.error(`[Workflow Step] Stack: ${error.stack}`)
+    } else if (error && typeof error === "object" && "message" in error) {
+      errorMsg = String((error as { message: unknown }).message)
+      console.error(`[Workflow Step] [${new Date().toISOString()}] generateVideo object error after ${elapsed}ms: ${errorMsg}`)
+    } else {
+      errorMsg = `Unknown error type: ${typeof error}`
+      try { errorMsg = JSON.stringify(error) } catch { /* ignore */ }
+      console.error(`[Workflow Step] [${new Date().toISOString()}] generateVideo unknown error after ${elapsed}ms: ${errorMsg}`)
+    }
     
-    // If it's a timeout or transient error, throw RetryableError so workflow retries with backoff
+    // Throw RetryableError so workflow retries with backoff
     const { RetryableError } = await import("workflow")
     throw new RetryableError(`Video generation failed: ${errorMsg}`, { retryAfter: "30s" })
   }
