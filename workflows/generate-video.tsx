@@ -80,7 +80,6 @@ async function generateVideoWithAISDK(
   console.log(`[Workflow Step] [${new Date().toISOString()}] generateVideoWithAISDK starting...`)
 
   const { experimental_generateVideo: generateVideo } = await import("ai")
-  const { klingai } = await import("@ai-sdk/klingai")
   const { updateGenerationRunId } = await import("@/lib/db")
 
   console.log(`[Workflow Step] [${new Date().toISOString()}] Imports done (+${Date.now() - stepStartTime}ms)`)
@@ -103,7 +102,7 @@ async function generateVideoWithAISDK(
 
   const generateStart = Date.now()
   const result = await generateVideo({
-    model: klingai.video("kling-v2.6-motion-control"),
+    model: "klingai/kling-v2.6-motion-control",
     prompt: {
       image: imageBuffer,
       text: "Perform the motion from the reference video",
