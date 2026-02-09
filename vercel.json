@@ -1,8 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    ".well-known/workflow/v1/step": {
+    ".well-known/workflow/**": {
       "maxDuration": 800
+    },
+    "api/**": {
+      "maxDuration": 60
     }
   }
 }
