@@ -84,16 +84,46 @@ async function generateVideoWithAISDK(
   const { Agent } = await import("undici")
   const { updateGenerationRunId } = await import("@/lib/db")
 
-  // Custom gateway with extended timeouts for video generation (can take 10+ minutes)
+  // Custom fetch with retry logic for individual HTTP requests
+  // This prevents a single poll failure from killing the entire generateVideo call
+  const longTimeoutAgent = new Agent({
+    headersTimeout: 15 * 60 * 1000,
+    bodyTimeout: 15 * 60 * 1000,
+  })
+
+  const fetchWithRetry = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const maxRetries = 3
+    let lastError: unknown
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, {
+          ...init,
+          dispatcher: longTimeoutAgent,
+        } as RequestInit)
+
+        // Retry on server errors (5xx) - these are transient
+        if (response.status >= 500 && attempt < maxRetries) {
+          console.warn(`[Workflow Step] [${new Date().toISOString()}] HTTP ${response.status} on attempt ${attempt}/${maxRetries}, retrying in 5s...`)
+          await new Promise(resolve => setTimeout(resolve, 5000))
+          continue
+        }
+
+        return response
+      } catch (err) {
+        lastError = err
+        if (attempt < maxRetries) {
+          console.warn(`[Workflow Step] [${new Date().toISOString()}] Fetch error on attempt ${attempt}/${maxRetries}: ${err instanceof Error ? err.message : String(err)}, retrying in 5s...`)
+          await new Promise(resolve => setTimeout(resolve, 5000))
+        }
+      }
+    }
+
+    throw lastError
+  }
+
   const gateway = createGateway({
-    fetch: (url, init) =>
-      fetch(url, {
-        ...init,
-        dispatcher: new Agent({
-          headersTimeout: 15 * 60 * 1000,
-          bodyTimeout: 15 * 60 * 1000,
-        }),
-      } as RequestInit),
+    fetch: fetchWithRetry as typeof globalThis.fetch,
   })
 
   console.log(`[Workflow Step] [${new Date().toISOString()}] Imports done (+${Date.now() - stepStartTime}ms)`)
