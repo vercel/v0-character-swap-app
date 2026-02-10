@@ -15,10 +15,9 @@ export interface GenerateVideoInput {
  * Durable workflow for video generation using AI SDK + AI Gateway.
  *
  * Flow:
- * 1. Generate video via AI SDK with KlingAI motion control (step)
- * 2. Save resulting video bytes to Vercel Blob (step)
- * 3. Update the database with completed status (step)
- * 4. Send email notification if requested (step)
+ * 1. Generate video via AI SDK and save to Blob in one step (avoids passing Uint8Array across step boundaries)
+ * 2. Update the database with completed status (step)
+ * 3. Send email notification if requested (step)
  *
  * Each step is automatically retried on transient errors and its result
  * is persisted so the workflow can resume from where it left off.
@@ -30,10 +29,11 @@ export async function generateVideoWorkflow(input: GenerateVideoInput) {
 
   console.log(`[Workflow] Starting generation ${generationId}`)
 
-  // Step 1: Generate video via AI SDK + KlingAI
-  let videoData: Uint8Array
+  // Step 1: Generate video + save to blob in a single step
+  // We combine these to avoid serializing Uint8Array across step boundaries
+  let blobUrl: string
   try {
-    videoData = await generateVideoWithAISDK(generationId, videoUrl, characterImageUrl)
+    blobUrl = await generateAndSaveVideo(generationId, videoUrl, characterImageUrl)
   } catch (error) {
     // If generation fails, mark it as failed in DB before re-throwing
     const errorMessage = error instanceof Error ? error.message : String(error)
@@ -41,13 +41,10 @@ export async function generateVideoWorkflow(input: GenerateVideoInput) {
     throw error
   }
 
-  // Step 2: Save video to Vercel Blob
-  const blobUrl = await saveVideoToBlob(generationId, videoData)
-
-  // Step 3: Update database with completed status
+  // Step 2: Update database with completed status
   await markGenerationComplete(generationId, blobUrl)
 
-  // Step 4: Send email notification
+  // Step 3: Send email notification
   if (userEmail) {
     await sendCompletionEmail(userEmail, blobUrl, characterName)
   }
@@ -60,22 +57,28 @@ export async function generateVideoWorkflow(input: GenerateVideoInput) {
 // STEP FUNCTIONS (full Node.js access + retry)
 // ============================================
 
-async function generateVideoWithAISDK(
+/**
+ * Single step that generates the video AND saves it to Vercel Blob.
+ * Combined into one step so we never need to serialize Uint8Array
+ * across the workflow<->step boundary. Returns a plain string URL.
+ */
+async function generateAndSaveVideo(
   generationId: number,
   videoUrl: string,
   characterImageUrl: string,
-): Promise<Uint8Array> {
+): Promise<string> {
   "use step"
 
   const { experimental_generateVideo: generateVideo } = await import("ai")
   const { createGateway } = await import("@ai-sdk/gateway")
   const { Agent } = await import("undici")
+  const { put } = await import("@vercel/blob")
   const { updateGenerationRunId } = await import("@/lib/db")
 
   // Custom gateway with extended timeouts for video generation (can take 10+ minutes)
   const gateway = createGateway({
     fetch: (url, init) =>
-      fetch(url, {
+      globalThis.fetch(url, {
         ...init,
         dispatcher: new Agent({
           headersTimeout: 15 * 60 * 1000,
@@ -87,7 +90,7 @@ async function generateVideoWithAISDK(
   // Update run ID so UI knows it's processing
   await updateGenerationRunId(generationId, `workflow-${generationId}`)
 
-  console.log(`[Step:generateVideo] Calling klingai/kling-v2.6-motion-control for generation ${generationId}`)
+  console.log(`[Step:generateAndSave] Calling klingai/kling-v2.6-motion-control for generation ${generationId}`)
 
   let result: Awaited<ReturnType<typeof generateVideo>>
   try {
@@ -116,33 +119,30 @@ async function generateVideoWithAISDK(
     throw error
   }
 
-  console.log(`[Step:generateVideo] Generated ${result.videos.length} video(s)`)
+  console.log(`[Step:generateAndSave] Generated ${result.videos.length} video(s)`)
 
   if (result.videos.length === 0) {
     throw new FatalError("No videos were generated")
   }
 
-  return result.videos[0].uint8Array
+  // Save to Vercel Blob immediately within the same step
+  const videoBytes = result.videos[0].uint8Array
+  console.log(`[Step:generateAndSave] Saving ${videoBytes.length} bytes to blob`)
+
+  const { url: blobUrl } = await put(
+    `generations/${generationId}-${Date.now()}.mp4`,
+    videoBytes,
+    { access: "public", contentType: "video/mp4" },
+  )
+
+  console.log(`[Step:generateAndSave] Saved to: ${blobUrl}`)
+
+  // Return a plain string - fully serializable
+  return blobUrl
 }
 
-// Allow up to 2 retries for the video generation step (3 total attempts)
-generateVideoWithAISDK.maxRetries = 2
-
-async function saveVideoToBlob(generationId: number, videoData: Uint8Array): Promise<string> {
-  "use step"
-
-  const { put } = await import("@vercel/blob")
-
-  console.log(`[Step:saveBlob] Saving ${videoData.length} bytes for generation ${generationId}`)
-
-  const { url } = await put(`generations/${generationId}-${Date.now()}.mp4`, videoData, {
-    access: "public",
-    contentType: "video/mp4",
-  })
-
-  console.log(`[Step:saveBlob] Saved to: ${url}`)
-  return url
-}
+// Allow up to 2 retries for the generation step (3 total attempts)
+generateAndSaveVideo.maxRetries = 2
 
 async function markGenerationComplete(generationId: number, videoUrl: string): Promise<void> {
   "use step"
