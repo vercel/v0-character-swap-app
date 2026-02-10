@@ -1,8 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { start } from "workflow/api"
 import { createGeneration, updateGenerationStartProcessing } from "@/lib/db"
-import { toWorkflowErrorObject } from "@/lib/workflow-errors"
-import { generateVideoWorkflow } from "@/workflows/generate-video"
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,28 +45,35 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Start the durable workflow using workflow/api
-    // This returns immediately - the workflow runs in the background
-    const run = await start(generateVideoWorkflow, [{
-      generationId,
-      videoUrl,
-      characterImageUrl,
-      characterName: characterName || undefined,
-      userEmail: sendEmail ? userEmail : undefined,
-    }])
+    // Fire-and-forget: call the generate-video API route in the background
+    // This runs as a separate serverless function with maxDuration=800 (13+ min)
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : `http://localhost:${process.env.PORT || 3000}`
+
+    fetch(`${baseUrl}/api/generate-video`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        generationId,
+        videoUrl,
+        characterImageUrl,
+        characterName: characterName || undefined,
+        userEmail: sendEmail ? userEmail : undefined,
+      }),
+    }).catch((err) => {
+      console.error("[Generate] Failed to trigger background generation:", err)
+    })
 
     return NextResponse.json({
       success: true,
       generationId,
-      runId: run.runId,
       message: "Video generation started",
     })
   } catch (error) {
     console.error("Generate error:", error)
-    const message =
-      error instanceof Error ? error.message : "Failed to start video generation"
     return NextResponse.json(
-      { error: toWorkflowErrorObject(message) },
+      { error: error instanceof Error ? error.message : "Failed to start video generation" },
       { status: 500 }
     )
   }
