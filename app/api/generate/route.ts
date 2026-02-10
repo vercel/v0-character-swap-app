@@ -9,14 +9,10 @@ import { createGeneration, updateGenerationStartProcessing, updateGenerationComp
 // 13+ minutes - enough for KlingAI to finish
 export const maxDuration = 800
 
-// Single reusable agent with extended timeouts (per AI Gateway team recommendation)
-const longTimeoutAgent = new Agent({
-  headersTimeout: 15 * 60 * 1000, // 15 minutes
-  bodyTimeout: 15 * 60 * 1000,
-})
-
+// Custom gateway with extended timeouts per official docs:
+// https://vercel.com/docs/ai-gateway/capabilities/video-generation
 const gateway = createGateway({
-  fetch: async (url, init) => {
+  fetch: (url, init) => {
     const ts = new Date().toISOString()
     const method = (init as RequestInit)?.method || "GET"
     const urlStr = typeof url === "string" ? url : (url as URL).toString()
@@ -24,15 +20,17 @@ const gateway = createGateway({
     console.log(`[GenerateVideo] [${ts}] Gateway request: ${method} ${urlStr.substring(0, 120)}`)
     
     const fetchStart = Date.now()
-    const response = await fetch(url, {
+    return fetch(url, {
       ...init,
-      dispatcher: longTimeoutAgent,
-    } as RequestInit)
-    
-    const fetchTime = Date.now() - fetchStart
-    console.log(`[GenerateVideo] [${new Date().toISOString()}] Gateway response: ${response.status} in ${(fetchTime / 1000).toFixed(1)}s`)
-    
-    return response
+      dispatcher: new Agent({
+        headersTimeout: 15 * 60 * 1000, // 15 minutes
+        bodyTimeout: 15 * 60 * 1000,
+      }),
+    } as RequestInit).then(response => {
+      const fetchTime = Date.now() - fetchStart
+      console.log(`[GenerateVideo] [${new Date().toISOString()}] Gateway response: ${response.status} in ${(fetchTime / 1000).toFixed(1)}s`)
+      return response
+    })
   },
 })
 
@@ -51,65 +49,22 @@ async function runVideoGeneration(params: {
   await updateGenerationRunId(generationId, `direct-${generationId}`)
 
   try {
-    const MAX_RETRIES = 3
-    let result: Awaited<ReturnType<typeof generateVideo>> | null = null
+    console.log(`[GenerateVideo] [${new Date().toISOString()}] Calling generateVideo...`)
 
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        console.log(`[GenerateVideo] [${new Date().toISOString()}] Calling generateVideo (attempt ${attempt}/${MAX_RETRIES})...`)
-
-        result = await generateVideo({
-          model: gateway.video("klingai/kling-v2.6-motion-control"),
-          prompt: {
-            image: characterImageUrl,
-          },
-          providerOptions: {
-            klingai: {
-              videoUrl: videoUrl,
-              characterOrientation: "video" as const,
-              mode: "std" as const,
-              pollTimeoutMs: 12 * 60 * 1000, // 12 minutes (default is 5min which causes timeout)
-            },
-          },
-        })
-
-        // Success - break out of retry loop
-        break
-      } catch (retryError: unknown) {
-        // The error may arrive as a Promise wrapping an Error (Gateway behavior)
-        // Resolve it first to get the actual error
-        let resolvedError: unknown = retryError
-        if (retryError && typeof (retryError as Promise<unknown>).then === 'function') {
-          try {
-            resolvedError = await (retryError as Promise<unknown>)
-          } catch (innerErr) {
-            resolvedError = innerErr
-          }
-          console.log(`[GenerateVideo] [${new Date().toISOString()}] Unwrapped Promise error: ${resolvedError instanceof Error ? resolvedError.constructor.name : typeof resolvedError}`)
-        }
-
-        const errName = resolvedError instanceof Error ? resolvedError.constructor.name : typeof resolvedError
-        const errMsg = resolvedError instanceof Error ? resolvedError.message : String(resolvedError)
-        const errStatus = (resolvedError as { statusCode?: number })?.statusCode
-        console.error(`[GenerateVideo] [${new Date().toISOString()}] Caught error on attempt ${attempt}: name=${errName}, status=${errStatus}, msg=${errMsg.substring(0, 200)}`)
-
-        // For Gateway errors, always retry if we have attempts left
-        // The 340s timeout is a known Gateway limitation
-        if (attempt < MAX_RETRIES) {
-          const waitSec = attempt * 10
-          console.warn(`[GenerateVideo] [${new Date().toISOString()}] Retrying in ${waitSec}s (attempt ${attempt}/${MAX_RETRIES})...`)
-          await new Promise(resolve => setTimeout(resolve, waitSec * 1000))
-          continue
-        }
-
-        // Last attempt - rethrow the resolved error
-        throw resolvedError
-      }
-    }
-
-    if (!result) {
-      throw new Error("generateVideo returned no result after all retries")
-    }
+    const result = await generateVideo({
+      model: gateway.video("klingai/kling-v2.6-motion-control"),
+      prompt: {
+        image: characterImageUrl,
+      },
+      providerOptions: {
+        klingai: {
+          videoUrl: videoUrl,
+          characterOrientation: "video" as const,
+          mode: "std" as const,
+          pollTimeoutMs: 12 * 60 * 1000, // 12 minutes (default is 5min which causes timeout)
+        },
+      },
+    })
 
     const generateTime = Date.now() - startTime
     console.log(`[GenerateVideo] [${new Date().toISOString()}] generateVideo completed in ${(generateTime / 1000).toFixed(1)}s, ${result.videos.length} video(s)`)
