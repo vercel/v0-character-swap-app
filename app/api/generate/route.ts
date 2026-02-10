@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { after } from "next/server"
 import { experimental_generateVideo as generateVideo } from "ai"
 import { createGateway } from "@ai-sdk/gateway"
-import { Agent, fetch as undiciFetch } from "undici"
+import { Agent } from "undici"
 import { put } from "@vercel/blob"
 import { createGeneration, updateGenerationStartProcessing, updateGenerationComplete, updateGenerationFailed, updateGenerationRunId } from "@/lib/db"
 
@@ -12,29 +12,14 @@ export const maxDuration = 800
 // Custom gateway with extended timeouts per official docs:
 // https://vercel.com/docs/ai-gateway/capabilities/video-generation
 const gateway = createGateway({
-  fetch: (url, init) => {
-    const ts = new Date().toISOString()
-    const method = (init as RequestInit)?.method || "GET"
-    const urlStr = typeof url === "string" ? url : (url as URL).toString()
-    
-    console.log(`[GenerateVideo] [${ts}] Gateway request: ${method} ${urlStr.substring(0, 120)} [using undici.fetch]`)
-    
-    const fetchStart = Date.now()
-    return undiciFetch(url as string, {
-      ...(init as Record<string, unknown>),
+  fetch: (url, init) =>
+    fetch(url, {
+      ...init,
       dispatcher: new Agent({
-        headersTimeout: 15 * 60 * 1000,
+        headersTimeout: 15 * 60 * 1000, // 15 minutes
         bodyTimeout: 15 * 60 * 1000,
-        keepAliveTimeout: 15 * 60 * 1000,
-        keepAliveMaxTimeout: 15 * 60 * 1000,
-        connect: { timeout: 15 * 60 * 1000 },
       }),
-    }).then(response => {
-      const fetchTime = Date.now() - fetchStart
-      console.log(`[GenerateVideo] [${new Date().toISOString()}] Gateway response: ${response.status} in ${(fetchTime / 1000).toFixed(1)}s`)
-      return response as unknown as Response
-    })
-  },
+    } as RequestInit),
 })
 
 async function runVideoGeneration(params: {
