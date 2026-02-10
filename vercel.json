@@ -1,6 +1,6 @@
 {
   "functions": {
-    ".well-known/workflow/v1/step": {
+    "app/api/generate-video/route.ts": {
       "maxDuration": 800
     }
   }
