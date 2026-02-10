@@ -1,27 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { after } from "next/server"
 import { experimental_generateVideo as generateVideo } from "ai"
-import { createGateway } from "@ai-sdk/gateway"
-import { Agent, setGlobalDispatcher } from "undici"
+import { gateway } from "@/lib/gateway"
 import { put } from "@vercel/blob"
 import { createGeneration, updateGenerationStartProcessing, updateGenerationComplete, updateGenerationFailed, updateGenerationRunId } from "@/lib/db"
 
 // 13+ minutes - enough for KlingAI to finish
 export const maxDuration = 800
 
-// Set the global dispatcher so ALL fetch() calls use extended timeouts
-// This ensures Node's built-in fetch() respects our timeout settings
-// even if passing `dispatcher` as an option is ignored in this runtime
-const longTimeoutAgent = new Agent({
-  headersTimeout: 15 * 60 * 1000, // 15 minutes
-  bodyTimeout: 15 * 60 * 1000,
-})
-setGlobalDispatcher(longTimeoutAgent)
-
-const gateway = createGateway({
-  fetch: (url, init) =>
-    fetch(url, { ...init, dispatcher: longTimeoutAgent } as any),
-})
+// Gateway imported from @/lib/gateway with extended timeouts for video generation
 
 async function runVideoGeneration(params: {
   generationId: number

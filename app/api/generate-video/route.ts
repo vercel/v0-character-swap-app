@@ -1,40 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { experimental_generateVideo as generateVideo } from "ai"
-import { createGateway } from "@ai-sdk/gateway"
-import { Agent } from "undici"
+import { gateway } from "@/lib/gateway"
 import { put } from "@vercel/blob"
 import { updateGenerationComplete, updateGenerationFailed, updateGenerationRunId } from "@/lib/db"
 
 // 13+ minutes - enough for KlingAI to finish
 export const maxDuration = 800
 
-// Custom gateway with extended timeouts and request logging for video generation
-let pollCount = 0
-const gateway = createGateway({
-  fetch: async (url, init) => {
-    pollCount++
-    const reqNum = pollCount
-    const ts = new Date().toISOString()
-    const method = (init as RequestInit)?.method || "GET"
-    const urlStr = typeof url === "string" ? url : (url as URL).toString()
-    
-    console.log(`[GenerateVideo] [${ts}] Gateway request #${reqNum}: ${method} ${urlStr.substring(0, 120)}`)
-    
-    const fetchStart = Date.now()
-    const response = await fetch(url, {
-      ...init,
-      dispatcher: new Agent({
-        headersTimeout: 15 * 60 * 1000,
-        bodyTimeout: 15 * 60 * 1000,
-      }),
-    } as RequestInit)
-    
-    const fetchTime = Date.now() - fetchStart
-    console.log(`[GenerateVideo] [${new Date().toISOString()}] Gateway response #${reqNum}: ${response.status} in ${fetchTime}ms (${(fetchTime / 1000).toFixed(1)}s)`)
-    
-    return response
-  },
-})
+// Gateway imported from @/lib/gateway with extended timeouts for video generation
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
@@ -55,7 +28,6 @@ export async function POST(request: NextRequest) {
 
   const { generationId, videoUrl, characterImageUrl, characterName, userEmail } = body
 
-  pollCount = 0
   console.log(`[GenerateVideo] [${new Date().toISOString()}] Starting generation ${generationId} (maxDuration=800, no workflow)`)
 
   // Update run ID so UI knows it's processing
@@ -75,8 +47,7 @@ export async function POST(request: NextRequest) {
           videoUrl: videoUrl,
           characterOrientation: "video" as const,
           mode: "std" as const,
-          pollIntervalMs: 5_000,
-          pollTimeoutMs: 14 * 60 * 1000,
+          pollTimeoutMs: 12 * 60 * 1000,
         },
       },
     })
