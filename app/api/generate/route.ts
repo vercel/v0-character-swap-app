@@ -9,7 +9,12 @@ import { createGeneration, updateGenerationStartProcessing, updateGenerationComp
 // 13+ minutes - enough for KlingAI to finish
 export const maxDuration = 800
 
-// Custom gateway with extended timeouts and request logging
+// Single reusable agent with extended timeouts (per AI Gateway team recommendation)
+const longTimeoutAgent = new Agent({
+  headersTimeout: 15 * 60 * 1000, // 15 minutes
+  bodyTimeout: 15 * 60 * 1000,
+})
+
 const gateway = createGateway({
   fetch: async (url, init) => {
     const ts = new Date().toISOString()
@@ -21,10 +26,7 @@ const gateway = createGateway({
     const fetchStart = Date.now()
     const response = await fetch(url, {
       ...init,
-      dispatcher: new Agent({
-        headersTimeout: 15 * 60 * 1000,
-        bodyTimeout: 15 * 60 * 1000,
-      }),
+      dispatcher: longTimeoutAgent,
     } as RequestInit)
     
     const fetchTime = Date.now() - fetchStart
@@ -66,8 +68,7 @@ async function runVideoGeneration(params: {
               videoUrl: videoUrl,
               characterOrientation: "video" as const,
               mode: "std" as const,
-              pollIntervalMs: 5_000,
-              pollTimeoutMs: 14 * 60 * 1000,
+              pollTimeoutMs: 12 * 60 * 1000,
             },
           },
         })
