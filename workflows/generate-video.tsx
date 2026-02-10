@@ -1,5 +1,3 @@
-import { FatalError } from "workflow"
-
 /**
  * Input for the video generation workflow
  */
@@ -11,74 +9,148 @@ export interface GenerateVideoInput {
   userEmail?: string
 }
 
+type ProviderErrorPayload = {
+  kind: "provider_error"
+  provider: "kling"
+  model: string
+  code: string
+  summary: string
+  details: string
+}
+
+const PROVIDER_ERROR_PREFIX = "WF_PROVIDER_ERROR::"
+
+async function serializeUnknownError(error: unknown): Promise<string> {
+  if (error instanceof Error) {
+    return error.stack ?? error.message
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "then" in error &&
+    typeof (error as { then?: unknown }).then === "function"
+  ) {
+    try {
+      const resolved = await (error as Promise<unknown>)
+      return `Promise rejection: ${await serializeUnknownError(resolved)}`
+    } catch (promiseError) {
+      return `Promise rejection: ${await serializeUnknownError(promiseError)}`
+    }
+  }
+
+  if (typeof error === "string") {
+    return error
+  }
+
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return String(error)
+  }
+}
+
+function buildProviderErrorPayload(details: string): ProviderErrorPayload {
+  if (details.includes("GatewayInternalServerError")) {
+    return {
+      kind: "provider_error",
+      provider: "kling",
+      model: "klingai/kling-v2.6-motion-control",
+      code: "GATEWAY_INTERNAL_SERVER_ERROR",
+      summary: "AI Gateway/provider returned an internal server error.",
+      details,
+    }
+  }
+
+  return {
+    kind: "provider_error",
+    provider: "kling",
+    model: "klingai/kling-v2.6-motion-control",
+    code: "PROVIDER_ERROR",
+    summary: "Provider request failed.",
+    details,
+  }
+}
+
 /**
- * Durable workflow for video generation using AI SDK + AI Gateway.
- *
+ * Durable workflow for video generation using AI SDK + AI Gateway
+ * 
  * Flow:
- * 1. Generate video via AI SDK and save to Blob in one step (avoids passing Uint8Array across step boundaries)
- * 2. Update the database with completed status (step)
- * 3. Send email notification if requested (step)
- *
- * Each step is automatically retried on transient errors and its result
- * is persisted so the workflow can resume from where it left off.
+ * 1. Workflow calls generateVideo via AI SDK with KlingAI motion control
+ * 2. AI SDK handles polling internally until video is ready
+ * 3. Workflow saves the resulting video to Vercel Blob
+ * 4. Workflow updates the database and sends email notification
+ * 
+ * No webhook needed - AI SDK handles the entire generation lifecycle.
  */
 export async function generateVideoWorkflow(input: GenerateVideoInput) {
   "use workflow"
 
   const { generationId, videoUrl, characterImageUrl, characterName, userEmail } = input
 
-  console.log(`[Workflow] Starting generation ${generationId}`)
+  const workflowStartTime = Date.now()
+  console.log(`[Workflow] [${new Date().toISOString()}] Starting generation ${generationId} via AI Gateway`)
 
-  // Step 1: Generate video + save to blob in a single step
-  // We combine these to avoid serializing Uint8Array across step boundaries
-  let blobUrl: string
+  // Generate video using AI SDK + KlingAI motion control
+  let videoData: Uint8Array
   try {
-    blobUrl = await generateAndSaveVideo(generationId, videoUrl, characterImageUrl)
-  } catch (error) {
-    // If generation fails, mark it as failed in DB before re-throwing
-    const errorMessage = error instanceof Error ? error.message : String(error)
+    const generateStartTime = Date.now()
+    videoData = await generateVideoWithAISDK(generationId, videoUrl, characterImageUrl)
+    const generateTime = Date.now() - generateStartTime
+    console.log(`[Workflow] [${new Date().toISOString()}] Video generated in ${generateTime}ms (${(generateTime / 1000).toFixed(1)}s)`)
+  } catch (genError) {
+    console.error(`[Workflow] [${new Date().toISOString()}] Video generation failed:`, genError)
+    const errorMessage = genError instanceof Error ? genError.message : String(genError)
     await markGenerationFailed(generationId, errorMessage)
-    throw error
+    return { success: false, error: errorMessage }
   }
 
-  // Step 2: Update database with completed status
+  // Save video to Vercel Blob
+  const blobStartTime = Date.now()
+  const blobUrl = await saveVideoToBlob(generationId, videoData)
+  console.log(`[Workflow] [${new Date().toISOString()}] saveVideoToBlob took ${Date.now() - blobStartTime}ms`)
+
+  // Update database
+  const dbStartTime = Date.now()
   await markGenerationComplete(generationId, blobUrl)
+  console.log(`[Workflow] [${new Date().toISOString()}] markGenerationComplete took ${Date.now() - dbStartTime}ms`)
 
-  // Step 3: Send email notification
+  // Send email notification
   if (userEmail) {
+    const emailStartTime = Date.now()
     await sendCompletionEmail(userEmail, blobUrl, characterName)
+    console.log(`[Workflow] [${new Date().toISOString()}] sendCompletionEmail took ${Date.now() - emailStartTime}ms`)
   }
 
-  console.log(`[Workflow] Generation ${generationId} completed: ${blobUrl}`)
+  const totalTime = Date.now() - workflowStartTime
+  console.log(`[Workflow] [${new Date().toISOString()}] Generation ${generationId} completed: ${blobUrl}`)
+  console.log(`[Workflow] [TIMING SUMMARY] Total: ${totalTime}ms (${(totalTime / 1000).toFixed(1)}s)`)
   return { success: true, videoUrl: blobUrl }
 }
 
 // ============================================
-// STEP FUNCTIONS (full Node.js access + retry)
+// STEP FUNCTIONS (have full Node.js access)
 // ============================================
 
-/**
- * Single step that generates the video AND saves it to Vercel Blob.
- * Combined into one step so we never need to serialize Uint8Array
- * across the workflow<->step boundary. Returns a plain string URL.
- */
-async function generateAndSaveVideo(
+async function generateVideoWithAISDK(
   generationId: number,
   videoUrl: string,
   characterImageUrl: string,
-): Promise<string> {
+): Promise<Uint8Array> {
   "use step"
+
+  const stepStartTime = Date.now()
+  console.log(`[Workflow Step] [${new Date().toISOString()}] generateVideoWithAISDK starting...`)
 
   const { experimental_generateVideo: generateVideo } = await import("ai")
   const { createGateway } = await import("@ai-sdk/gateway")
   const { Agent } = await import("undici")
-  const { put } = await import("@vercel/blob")
   const { updateGenerationRunId } = await import("@/lib/db")
 
   // Custom gateway with extended timeouts for video generation (can take 10+ minutes)
   const gateway = createGateway({
     fetch: (url, init) =>
-      globalThis.fetch(url, {
+      fetch(url, {
         ...init,
         dispatcher: new Agent({
           headersTimeout: 15 * 60 * 1000,
@@ -87,11 +159,17 @@ async function generateAndSaveVideo(
       } as RequestInit),
   })
 
-  // Update run ID so UI knows it's processing
-  await updateGenerationRunId(generationId, `workflow-${generationId}`)
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Imports done (+${Date.now() - stepStartTime}ms)`)
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Input: characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
 
-  console.log(`[Step:generateAndSave] Calling klingai/kling-v2.6-motion-control for generation ${generationId}`)
+  // Update run ID with a placeholder so UI knows it's processing
+  await updateGenerationRunId(generationId, `ai-gateway-${generationId}`)
 
+  // Generate video using AI SDK with KlingAI motion control
+  // Pass image as URL string directly - avoids downloading and re-uploading the image
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Calling experimental_generateVideo with klingai/kling-v2.6-motion-control...`)
+
+  const generateStart = Date.now()
   let result: Awaited<ReturnType<typeof generateVideo>>
   try {
     result = await generateVideo({
@@ -101,55 +179,65 @@ async function generateAndSaveVideo(
       },
       providerOptions: {
         klingai: {
+          // Reference motion video URL - the user's recorded video
           videoUrl: videoUrl,
+          // Match orientation from the reference video
           characterOrientation: "video" as const,
+          // Standard mode (cost-effective)
           mode: "std" as const,
+          // Poll every 5 seconds for faster completion detection
           pollIntervalMs: 5_000,
-          pollTimeoutMs: 14 * 60 * 1000,
+          // Extended poll timeout since video generation takes minutes
+          pollTimeoutMs: 14 * 60 * 1000, // 14 minutes
         },
       },
     })
   } catch (error) {
-    // Client errors (4xx) are not retryable
-    const message = error instanceof Error ? error.message : String(error)
-    if (message.includes("400") || message.includes("401") || message.includes("403") || message.includes("422")) {
-      throw new FatalError(`Provider client error: ${message}`)
-    }
-    // All other errors are retryable by default
-    throw error
+    const details = await serializeUnknownError(error)
+    const payload = buildProviderErrorPayload(details)
+    throw new Error(`${PROVIDER_ERROR_PREFIX}${JSON.stringify(payload)}`)
   }
 
-  console.log(`[Step:generateAndSave] Generated ${result.videos.length} video(s)`)
+  const generateTime = Date.now() - generateStart
+  console.log(`[Workflow Step] [${new Date().toISOString()}] generateVideo completed in ${generateTime}ms (${(generateTime / 1000).toFixed(1)}s)`)
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Generated ${result.videos.length} video(s)`)
 
   if (result.videos.length === 0) {
-    throw new FatalError("No videos were generated")
+    throw new Error("No videos were generated")
   }
 
-  // Save to Vercel Blob immediately within the same step
+  // Return the first video's raw bytes
   const videoBytes = result.videos[0].uint8Array
-  console.log(`[Step:generateAndSave] Saving ${videoBytes.length} bytes to blob`)
-
-  const { url: blobUrl } = await put(
-    `generations/${generationId}-${Date.now()}.mp4`,
-    videoBytes,
-    { access: "public", contentType: "video/mp4" },
-  )
-
-  console.log(`[Step:generateAndSave] Saved to: ${blobUrl}`)
-
-  // Return a plain string - fully serializable
-  return blobUrl
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Video size: ${videoBytes.length} bytes, total step time: ${Date.now() - stepStartTime}ms`)
+  
+  return videoBytes
 }
 
-// Allow up to 2 retries for the generation step (3 total attempts)
-generateAndSaveVideo.maxRetries = 2
+async function saveVideoToBlob(generationId: number, videoData: Uint8Array): Promise<string> {
+  "use step"
+
+  const stepStartTime = Date.now()
+  const { put } = await import("@vercel/blob")
+
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Saving ${videoData.length} bytes to Vercel Blob`)
+
+  const putStartTime = Date.now()
+  const { url } = await put(`generations/${generationId}-${Date.now()}.mp4`, videoData, {
+    access: "public",
+    contentType: "video/mp4",
+  })
+  console.log(`[Workflow Step] [${new Date().toISOString()}] put() to Vercel Blob took ${Date.now() - putStartTime}ms`)
+
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Saved to blob: ${url}, total step time: ${Date.now() - stepStartTime}ms`)
+  return url
+}
 
 async function markGenerationComplete(generationId: number, videoUrl: string): Promise<void> {
   "use step"
 
   const { updateGenerationComplete } = await import("@/lib/db")
   await updateGenerationComplete(generationId, videoUrl)
-  console.log(`[Step:markComplete] Generation ${generationId} marked as complete`)
+  console.log(`[Workflow Step] Marked generation ${generationId} as complete`)
 }
 
 async function markGenerationFailed(generationId: number, error: string): Promise<void> {
@@ -157,14 +245,15 @@ async function markGenerationFailed(generationId: number, error: string): Promis
 
   const { updateGenerationFailed } = await import("@/lib/db")
   await updateGenerationFailed(generationId, error)
-  console.log(`[Step:markFailed] Generation ${generationId} marked as failed: ${error}`)
+  console.log(`[Workflow Step] Marked generation ${generationId} as failed: ${error}`)
 }
 
 async function sendCompletionEmail(email: string, videoUrl: string, characterName?: string): Promise<void> {
   "use step"
 
+  const { Resend } = await import("resend")
+
   try {
-    const { Resend } = await import("resend")
     const resend = new Resend(process.env.RESEND_API_KEY)
     await resend.emails.send({
       from: "v0 Face Swap <noreply@resend.dev>",
@@ -178,11 +267,8 @@ async function sendCompletionEmail(email: string, videoUrl: string, characterNam
         <p style="margin-top:20px;color:#666;font-size:14px;">Or copy this link: ${videoUrl}</p>
       `,
     })
-    console.log(`[Step:sendEmail] Email sent to ${email}`)
+    console.log(`[Workflow Step] Email sent to ${email}`)
   } catch (error) {
-    // Email failures should not block the workflow
-    console.error("[Step:sendEmail] Failed to send email:", error)
+    console.error("[Workflow Step] Failed to send email:", error)
   }
 }
-// Don't retry email failures
-sendCompletionEmail.maxRetries = 0

@@ -482,19 +482,6 @@ export default function Home() {
                 />
               </CharacterGrid>
           </div>
-          <div className="shrink-0 border-t border-neutral-800 pt-3 mt-3">
-            <p className="font-mono text-[10px] text-neutral-600 text-center">
-              created by{" "}
-              <a
-                href="https://github.com/suarezesteban"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-neutral-500 transition-colors hover:text-white"
-              >
-                estebansuarez
-              </a>
-            </p>
-          </div>
         </div>
       )}
 
@@ -630,21 +617,6 @@ export default function Home() {
                 </CharacterGrid>
               )}
             </>
-          )}
-          {bottomSheetExpanded && (
-            <div className="shrink-0 border-t border-neutral-800 pt-3 mt-4">
-              <p className="font-mono text-[10px] text-neutral-600 text-center">
-                created by{" "}
-                <a
-                  href="https://github.com/suarezesteban"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-neutral-500 transition-colors hover:text-white"
-                >
-                  estebansuarez
-                </a>
-              </p>
-            </div>
           )}
         </BottomSheet>
       )}
