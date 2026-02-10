@@ -68,6 +68,7 @@ async function runVideoGeneration(params: {
               videoUrl: videoUrl,
               characterOrientation: "video" as const,
               mode: "std" as const,
+              pollTimeoutMs: 12 * 60 * 1000, // 12 minutes (default is 5min which causes timeout)
             },
           },
         })
