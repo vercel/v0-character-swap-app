@@ -74,30 +74,49 @@ async function runVideoGeneration(params: {
 
         // Success - break out of retry loop
         break
-      } catch (retryError) {
-        // Walk the full cause chain to find socket/connection errors
+      } catch (retryError: unknown) {
+        // Log the error details to debug retry detection
+        const errName = retryError instanceof Error ? retryError.constructor.name : typeof retryError
+        const errMsg = retryError instanceof Error ? retryError.message : String(retryError)
+        const errStatus = (retryError as { statusCode?: number })?.statusCode
+        console.error(`[GenerateVideo] [${new Date().toISOString()}] Caught error on attempt ${attempt}: name=${errName}, status=${errStatus}, msg=${errMsg.substring(0, 150)}`)
+
+        // Check retryable by walking the full cause chain
         // Error structure: GatewayResponseError -> AI_APICallError -> SocketError
         const isRetryable = (() => {
+          // Check stringified error as ultimate fallback
+          const fullStr = String(retryError)
+          if (fullStr.includes("other side closed") || fullStr.includes("ECONNRESET")) {
+            return true
+          }
+          
           let err: unknown = retryError
-          while (err instanceof Error) {
-            if (
-              err.message.includes("other side closed") ||
-              err.message.includes("socket") ||
-              err.message.includes("ECONNRESET") ||
-              err.message.includes("Cannot connect to API") ||
-              err.message.includes("Gateway request failed") ||
-              (err as { isRetryable?: boolean }).isRetryable === true
-            ) {
-              return true
+          while (err != null) {
+            if (err instanceof Error) {
+              if (
+                err.message.includes("other side closed") ||
+                err.message.includes("socket") ||
+                err.message.includes("ECONNRESET") ||
+                err.message.includes("Cannot connect to API") ||
+                err.message.includes("Gateway request failed") ||
+                (err as { isRetryable?: boolean }).isRetryable === true ||
+                (err as { statusCode?: number }).statusCode === 500
+              ) {
+                return true
+              }
+              err = err.cause
+            } else {
+              break
             }
-            err = err.cause
           }
           return false
         })()
 
+        console.log(`[GenerateVideo] [${new Date().toISOString()}] isRetryable=${isRetryable}, attempt=${attempt}/${MAX_RETRIES}`)
+
         if (isRetryable && attempt < MAX_RETRIES) {
           const waitSec = attempt * 10
-          console.warn(`[GenerateVideo] [${new Date().toISOString()}] Gateway error on attempt ${attempt}. Retrying in ${waitSec}s...`)
+          console.warn(`[GenerateVideo] [${new Date().toISOString()}] Retrying in ${waitSec}s...`)
           await new Promise(resolve => setTimeout(resolve, waitSec * 1000))
           continue
         }
