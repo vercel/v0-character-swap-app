@@ -688,7 +688,7 @@ export function CharacterGrid({
                 rel="noopener noreferrer"
                 className="transition-colors hover:text-white"
               >
-                Open template in v0
+                Make this app your own
               </a>
               <span className="text-neutral-700">·</span>
               <button
