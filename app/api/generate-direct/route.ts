@@ -146,25 +146,33 @@ async function generateAndSaveVideoDirect(
     // Create a NEW Agent instance on each request (per official Vercel docs)
     // This ensures fresh connections without any stale state
     const gateway = createGateway({
-      fetch: (url, init) =>
-        fetch(url, {
+      fetch: (url, init) => {
+        const agent = new Agent({
+          headersTimeout: 15 * 60 * 1000, // 15 minutes
+          bodyTimeout: 15 * 60 * 1000, // 15 minutes
+        })
+        console.log(`[GenerateDirect] [${new Date().toISOString()}] Creating new Agent for request to ${url}`)
+        console.log(`[GenerateDirect] [${new Date().toISOString()}] Agent config: headersTimeout=${15 * 60 * 1000}ms, bodyTimeout=${15 * 60 * 1000}ms`)
+
+        return fetch(url, {
           ...init,
-          dispatcher: new Agent({
-            headersTimeout: 15 * 60 * 1000, // 15 minutes
-            bodyTimeout: 15 * 60 * 1000, // 15 minutes
-          }),
-        } as RequestInit),
+          dispatcher: agent,
+        } as RequestInit)
+      },
     })
 
-    console.log(`[GenerateDirect] [${new Date().toISOString()}] Gateway created with fresh Agent per request`)
+    console.log(`[GenerateDirect] [${new Date().toISOString()}] Gateway created with custom fetch wrapper`)
 
     console.log(`[GenerateDirect] [${new Date().toISOString()}] Setup done (+${Date.now() - stepStartTime}ms)`)
     console.log(`[GenerateDirect] [${new Date().toISOString()}] characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
 
   // Generate video using AI SDK with KlingAI motion control
-  console.log(`[GenerateDirect] [${new Date().toISOString()}] Calling experimental_generateVideo...`)
+  console.log(`[GenerateDirect] [${new Date().toISOString()}] Calling experimental_generateVideo with klingai/kling-v2.6-motion-control...`)
+  console.log(`[GenerateDirect] [${new Date().toISOString()}] Using gateway.video() with custom fetch/dispatcher`)
+  console.log(`[GenerateDirect] [${new Date().toISOString()}] Provider options: pollIntervalMs=5000, pollTimeoutMs=${14 * 60 * 1000}ms`)
 
   const generateStart = Date.now()
+  console.log(`[GenerateDirect] [${new Date().toISOString()}] Starting generateVideo call at ${generateStart}...`)
   const result = await generateVideo({
     model: gateway.video("klingai/kling-v2.6-motion-control"),
     prompt: {
@@ -201,9 +209,28 @@ async function generateAndSaveVideoDirect(
     console.log(`[GenerateDirect] [${new Date().toISOString()}] Saved to blob: ${blobUrl}, total time: ${Date.now() - stepStartTime}ms`)
     return blobUrl
   } catch (error) {
-    console.error(`[GenerateDirect] Error in generateAndSaveVideoDirect:`, error)
-    console.error(`[GenerateDirect] Error type:`, typeof error)
-    console.error(`[GenerateDirect] Error constructor:`, error?.constructor?.name)
+    const elapsedMs = Date.now() - generateStart
+    console.error(`[GenerateDirect] [${new Date().toISOString()}] generateVideo FAILED after ${elapsedMs}ms (${(elapsedMs / 1000).toFixed(1)}s)`)
+    console.error(`[GenerateDirect] Error type: ${error?.constructor?.name}`)
+    console.error(`[GenerateDirect] Error message: ${error instanceof Error ? error.message : String(error)}`)
+
+    // Log detailed error information
+    if (error && typeof error === "object") {
+      if ("cause" in error) {
+        console.error(`[GenerateDirect] Error cause:`, (error as { cause: unknown }).cause)
+      }
+      if ("statusCode" in error) {
+        console.error(`[GenerateDirect] Status code: ${(error as { statusCode: unknown }).statusCode}`)
+      }
+      if ("url" in error) {
+        console.error(`[GenerateDirect] Request URL: ${(error as { url: unknown }).url}`)
+      }
+      if ("requestBodyValues" in error) {
+        console.error(`[GenerateDirect] Request body:`, (error as { requestBodyValues: unknown }).requestBodyValues)
+      }
+    }
+
+    console.error(`[GenerateDirect] Full error object:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
     throw error
   }
 }

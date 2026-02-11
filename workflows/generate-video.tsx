@@ -143,20 +143,27 @@ async function generateAndSaveVideo(
   const { put } = await import("@vercel/blob")
   const { updateGenerationRunId } = await import("@/lib/db")
 
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Imports loaded, creating gateway...`)
+
   // Create a NEW Agent instance on each request (per official Vercel docs)
   // This ensures fresh connections without any stale state
   const gateway = createGateway({
-    fetch: (url, init) =>
-      fetch(url, {
+    fetch: (url, init) => {
+      const agent = new Agent({
+        headersTimeout: 15 * 60 * 1000, // 15 minutes
+        bodyTimeout: 15 * 60 * 1000, // 15 minutes
+      })
+      console.log(`[Workflow Step] [${new Date().toISOString()}] Creating new Agent for request to ${url}`)
+      console.log(`[Workflow Step] [${new Date().toISOString()}] Agent config: headersTimeout=${15 * 60 * 1000}ms, bodyTimeout=${15 * 60 * 1000}ms`)
+
+      return fetch(url, {
         ...init,
-        dispatcher: new Agent({
-          headersTimeout: 15 * 60 * 1000, // 15 minutes
-          bodyTimeout: 15 * 60 * 1000, // 15 minutes
-        }),
-      } as RequestInit),
+        dispatcher: agent,
+      } as RequestInit)
+    },
   })
 
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Imports done, gateway created with 15min timeouts (+${Date.now() - stepStartTime}ms)`)
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Gateway created (+${Date.now() - stepStartTime}ms)`)
   console.log(`[Workflow Step] [${new Date().toISOString()}] Input: characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
 
   // Update run ID with a placeholder so UI knows it's processing
@@ -164,10 +171,13 @@ async function generateAndSaveVideo(
 
   // Generate video using AI SDK with KlingAI motion control
   console.log(`[Workflow Step] [${new Date().toISOString()}] Calling experimental_generateVideo with klingai/kling-v2.6-motion-control...`)
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Using gateway.video() with custom fetch/dispatcher`)
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Provider options: pollIntervalMs=5000, pollTimeoutMs=${14 * 60 * 1000}ms`)
 
   const generateStart = Date.now()
   let result: Awaited<ReturnType<typeof generateVideo>>
   try {
+    console.log(`[Workflow Step] [${new Date().toISOString()}] Starting generateVideo call at ${generateStart}...`)
     result = await generateVideo({
       model: gateway.video("klingai/kling-v2.6-motion-control"),
       prompt: {
@@ -187,12 +197,31 @@ async function generateAndSaveVideo(
     const { FatalError } = await import("workflow")
     const elapsedMs = Date.now() - generateStart
     console.error(`[Workflow Step] [${new Date().toISOString()}] generateVideo FAILED after ${elapsedMs}ms (${(elapsedMs / 1000).toFixed(1)}s)`)
-    console.error(`[Workflow Step] Error type: ${error?.constructor?.name}, message: ${error instanceof Error ? error.message : String(error)}`)
-    if (error && typeof error === "object" && "cause" in error) {
-      console.error(`[Workflow Step] Error cause:`, (error as { cause: unknown }).cause)
+    console.error(`[Workflow Step] Error type: ${error?.constructor?.name}`)
+    console.error(`[Workflow Step] Error message: ${error instanceof Error ? error.message : String(error)}`)
+
+    // Log detailed error information
+    if (error && typeof error === "object") {
+      if ("cause" in error) {
+        console.error(`[Workflow Step] Error cause:`, (error as { cause: unknown }).cause)
+      }
+      if ("statusCode" in error) {
+        console.error(`[Workflow Step] Status code: ${(error as { statusCode: unknown }).statusCode}`)
+      }
+      if ("url" in error) {
+        console.error(`[Workflow Step] Request URL: ${(error as { url: unknown }).url}`)
+      }
+      if ("requestBodyValues" in error) {
+        console.error(`[Workflow Step] Request body:`, (error as { requestBodyValues: unknown }).requestBodyValues)
+      }
     }
+
     const details = await serializeUnknownError(error)
+    console.error(`[Workflow Step] Serialized error details: ${details.substring(0, 500)}...`)
+
     const payload = buildProviderErrorPayload(details)
+    console.error(`[Workflow Step] Error payload:`, payload)
+
     // Use FatalError to skip retries - provider errors won't be fixed by retrying
     throw new FatalError(`${PROVIDER_ERROR_PREFIX}${JSON.stringify(payload)}`)
   }
