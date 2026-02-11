@@ -139,24 +139,21 @@ async function generateAndSaveVideo(
   console.log(`[Workflow Step] [${new Date().toISOString()}] generateAndSaveVideo starting...`)
 
   const { experimental_generateVideo: generateVideo, createGateway } = await import("ai")
-  const { Agent, setGlobalDispatcher } = await import("undici")
+  const { Agent } = await import("undici")
   const { put } = await import("@vercel/blob")
   const { updateGenerationRunId } = await import("@/lib/db")
 
-  // Set global dispatcher for this step execution context
-  // This affects all fetch calls in this step, including AI SDK's internal calls
-  const longTimeoutAgent = new Agent({
-    headersTimeout: 15 * 60 * 1000, // 15 minutes
-    bodyTimeout: 15 * 60 * 1000, // 15 minutes
-    connectTimeout: 2 * 60 * 1000, // 2 minutes to establish connection
-    keepAliveTimeout: 15 * 60 * 1000,
-    keepAliveMaxTimeout: 15 * 60 * 1000,
-  })
-
-  setGlobalDispatcher(longTimeoutAgent)
-
+  // Create a NEW Agent instance on each request (per official Vercel docs)
+  // This ensures fresh connections without any stale state
   const gateway = createGateway({
-    fetch: fetch, // use global fetch (now with extended timeouts from dispatcher)
+    fetch: (url, init) =>
+      fetch(url, {
+        ...init,
+        dispatcher: new Agent({
+          headersTimeout: 15 * 60 * 1000, // 15 minutes
+          bodyTimeout: 15 * 60 * 1000, // 15 minutes
+        }),
+      } as RequestInit),
   })
 
   console.log(`[Workflow Step] [${new Date().toISOString()}] Imports done, gateway created with 15min timeouts (+${Date.now() - stepStartTime}ms)`)

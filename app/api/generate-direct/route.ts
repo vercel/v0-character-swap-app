@@ -136,29 +136,27 @@ async function generateAndSaveVideoDirect(
     console.log(`[GenerateDirect] [${new Date().toISOString()}] generateAndSaveVideoDirect starting for generation ${generationId}`)
 
     const { experimental_generateVideo: generateVideo, createGateway } = await import("ai")
-    const { Agent, setGlobalDispatcher } = await import("undici")
+    const { Agent } = await import("undici")
     const { put } = await import("@vercel/blob")
 
     console.log(`[GenerateDirect] [${new Date().toISOString()}] Imports loaded successfully`)
 
     const stepStartTime = Date.now()
 
-    // Set global dispatcher for extended timeouts
-    const longTimeoutAgent = new Agent({
-      headersTimeout: 15 * 60 * 1000, // 15 minutes
-      bodyTimeout: 15 * 60 * 1000, // 15 minutes
-      connectTimeout: 2 * 60 * 1000, // 2 minutes to establish connection
-      keepAliveTimeout: 15 * 60 * 1000,
-      keepAliveMaxTimeout: 15 * 60 * 1000,
-    })
-
-    setGlobalDispatcher(longTimeoutAgent)
-
-    console.log(`[GenerateDirect] [${new Date().toISOString()}] Agent created with 15min timeouts`)
-
+    // Create a NEW Agent instance on each request (per official Vercel docs)
+    // This ensures fresh connections without any stale state
     const gateway = createGateway({
-      fetch: fetch,
+      fetch: (url, init) =>
+        fetch(url, {
+          ...init,
+          dispatcher: new Agent({
+            headersTimeout: 15 * 60 * 1000, // 15 minutes
+            bodyTimeout: 15 * 60 * 1000, // 15 minutes
+          }),
+        } as RequestInit),
     })
+
+    console.log(`[GenerateDirect] [${new Date().toISOString()}] Gateway created with fresh Agent per request`)
 
     console.log(`[GenerateDirect] [${new Date().toISOString()}] Setup done (+${Date.now() - stepStartTime}ms)`)
     console.log(`[GenerateDirect] [${new Date().toISOString()}] characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
