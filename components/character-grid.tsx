@@ -7,9 +7,6 @@ import { upload } from "@vercel/blob/client"
 import type { Character, CharacterCategory } from "@/lib/types"
 import { DEFAULT_CHARACTERS, CHARACTER_CATEGORIES } from "@/lib/constants"
 
-export { DEFAULT_CHARACTERS }
-export type { Character }
-
 interface CharacterGridProps {
   selectedId: number | null
   onSelect: (id: number) => void
@@ -728,15 +725,15 @@ export function CharacterGrid({
               <div>
                 <p className="mb-2 text-neutral-500">// ai model</p>
                 <a 
-                  href="https://vercel.com/ai-gateway/models?type=video"
+                  href="https://fal.ai/models/half-moon-ai/ai-face-swap/faceswapvideo"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-neutral-300 hover:text-white"
                 >
-                  klingai/kling-v2.6-motion-control via AI Gateway
+                  half-moon-ai/ai-face-swap via fal.ai
                 </a>
                 <p className="mt-1">
-                  analyzes facial landmarks, expressions, and head pose frame-by-frame from your recorded video. transfers this motion data onto the target character image while preserving their appearance.
+                  replaces faces in the target video with the selected character face while maintaining natural movements and expressions throughout the clip.
                 </p>
               </div>
               
@@ -767,9 +764,9 @@ export function CharacterGrid({
                     serverless postgres. tracks generation state (pending → processing → completed/failed) with user associations.
                   </p>
                   <p>
-                    <a href="https://vercel.com/docs/ai-gateway" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">ai gateway</a>
+                    <a href="https://fal.ai" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">fal.ai</a>
                     <span className="text-neutral-500"> — </span>
-                    unified routing layer for ai model requests. handles authentication, rate limiting, and provider abstraction.
+                    serverless ai inference platform. handles face swap video generation with queued execution and automatic polling.
                   </p>
                 </div>
               </div>

@@ -125,112 +125,75 @@ export async function POST(request: NextRequest) {
 
 /**
  * Generate video and save to blob — runs directly in the route handler (no workflow step).
- * Uses the exact same pattern as shaper's working code.
+ * Uses fal.ai face swap (half-moon-ai/ai-face-swap/faceswapvideo).
  */
 async function generateAndSaveVideoDirect(
   generationId: number,
   videoUrl: string,
   characterImageUrl: string,
 ): Promise<string> {
-  try {
-    console.log(`[GenerateDirect] [${new Date().toISOString()}] generateAndSaveVideoDirect starting for generation ${generationId}`)
+  const stepStartTime = Date.now()
+  console.log(`[GenerateDirect] [${new Date().toISOString()}] generateAndSaveVideoDirect starting for generation ${generationId}`)
 
-    const { experimental_generateVideo: generateVideo, createGateway } = await import("ai")
-    const { Agent } = await import("undici")
-    const { put } = await import("@vercel/blob")
+  const { fal } = await import("@fal-ai/client")
+  const { put } = await import("@vercel/blob")
 
-    console.log(`[GenerateDirect] [${new Date().toISOString()}] Imports loaded successfully`)
+  // Configure fal client with credentials
+  fal.config({
+    credentials: process.env.FAL_KEY,
+  })
 
-    const stepStartTime = Date.now()
+  console.log(`[GenerateDirect] [${new Date().toISOString()}] fal client configured (+${Date.now() - stepStartTime}ms)`)
+  console.log(`[GenerateDirect] [${new Date().toISOString()}] characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
 
-    // Create a NEW Agent instance on each request (per official Vercel docs)
-    // This ensures fresh connections without any stale state
-    const gateway = createGateway({
-      fetch: (url, init) => {
-        const agent = new Agent({
-          headersTimeout: 15 * 60 * 1000, // 15 minutes
-          bodyTimeout: 15 * 60 * 1000, // 15 minutes
-        })
-        console.log(`[GenerateDirect] [${new Date().toISOString()}] Creating new Agent for request to ${url}`)
-        console.log(`[GenerateDirect] [${new Date().toISOString()}] Agent config: headersTimeout=${15 * 60 * 1000}ms, bodyTimeout=${15 * 60 * 1000}ms`)
-
-        return fetch(url, {
-          ...init,
-          dispatcher: agent,
-        } as RequestInit)
-      },
-    })
-
-    console.log(`[GenerateDirect] [${new Date().toISOString()}] Gateway created with custom fetch wrapper`)
-
-    console.log(`[GenerateDirect] [${new Date().toISOString()}] Setup done (+${Date.now() - stepStartTime}ms)`)
-    console.log(`[GenerateDirect] [${new Date().toISOString()}] characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
-
-  // Generate video using AI SDK with KlingAI motion control
-  console.log(`[GenerateDirect] [${new Date().toISOString()}] Calling experimental_generateVideo with klingai/kling-v2.6-motion-control...`)
-  console.log(`[GenerateDirect] [${new Date().toISOString()}] Using gateway.video() with custom fetch/dispatcher`)
-  console.log(`[GenerateDirect] [${new Date().toISOString()}] Provider options: pollIntervalMs=5000, pollTimeoutMs=${14 * 60 * 1000}ms`)
+  // Generate face swap video using fal.ai
+  console.log(`[GenerateDirect] [${new Date().toISOString()}] Calling fal.subscribe with half-moon-ai/ai-face-swap/faceswapvideo...`)
 
   const generateStart = Date.now()
-  console.log(`[GenerateDirect] [${new Date().toISOString()}] Starting generateVideo call at ${generateStart}...`)
-  const result = await generateVideo({
-    model: gateway.video("klingai/kling-v2.6-motion-control"),
-    prompt: {
-      image: characterImageUrl,
-    },
-    providerOptions: {
-      klingai: {
-        videoUrl: videoUrl,
-        characterOrientation: "video" as const,
-        mode: "std" as const,
-        pollIntervalMs: 5_000,
-        pollTimeoutMs: 14 * 60 * 1000, // 14 minutes
+  try {
+    const result = await fal.subscribe("half-moon-ai/ai-face-swap/faceswapvideo", {
+      input: {
+        source_face_url: characterImageUrl,
+        target_video_url: videoUrl,
       },
-    },
-  })
+      logs: true,
+      onQueueUpdate: (update) => {
+        if (update.status === "IN_PROGRESS") {
+          update.logs?.map((log) => log.message).forEach((msg) => console.log(`[GenerateDirect] [fal] ${msg}`))
+        }
+      },
+    }) as { data: { video: { url: string } }; requestId: string }
 
-  const generateTime = Date.now() - generateStart
-  console.log(`[GenerateDirect] [${new Date().toISOString()}] generateVideo completed in ${generateTime}ms (${(generateTime / 1000).toFixed(1)}s)`)
-  console.log(`[GenerateDirect] [${new Date().toISOString()}] Generated ${result.videos.length} video(s)`)
+    const generateTime = Date.now() - generateStart
+    console.log(`[GenerateDirect] [${new Date().toISOString()}] fal face swap completed in ${generateTime}ms (${(generateTime / 1000).toFixed(1)}s)`)
 
-  if (result.videos.length === 0) {
-    throw new Error("No videos were generated")
-  }
+    const falVideoUrl = result.data?.video?.url
+    if (!falVideoUrl) {
+      throw new Error("No video URL returned from fal face swap")
+    }
 
-  // Save to Vercel Blob
-  const videoBytes = result.videos[0].uint8Array
-  console.log(`[GenerateDirect] [${new Date().toISOString()}] Video size: ${videoBytes.length} bytes, saving to Blob...`)
+    console.log(`[GenerateDirect] [${new Date().toISOString()}] fal video URL: ${falVideoUrl}, downloading and saving to Blob...`)
 
-  const { url: blobUrl } = await put(`generations/${generationId}-${Date.now()}.mp4`, videoBytes, {
-    access: "public",
-    contentType: "video/mp4",
-  })
+    // Download the video from fal and save to Vercel Blob
+    const videoResponse = await fetch(falVideoUrl)
+    if (!videoResponse.ok) {
+      throw new Error(`Failed to download video from fal: ${videoResponse.status}`)
+    }
+    const videoBuffer = await videoResponse.arrayBuffer()
+    console.log(`[GenerateDirect] [${new Date().toISOString()}] Video size: ${videoBuffer.byteLength} bytes`)
+
+    const { url: blobUrl } = await put(`generations/${generationId}-${Date.now()}.mp4`, Buffer.from(videoBuffer), {
+      access: "public",
+      contentType: "video/mp4",
+    })
 
     console.log(`[GenerateDirect] [${new Date().toISOString()}] Saved to blob: ${blobUrl}, total time: ${Date.now() - stepStartTime}ms`)
     return blobUrl
   } catch (error) {
     const elapsedMs = Date.now() - generateStart
-    console.error(`[GenerateDirect] [${new Date().toISOString()}] generateVideo FAILED after ${elapsedMs}ms (${(elapsedMs / 1000).toFixed(1)}s)`)
+    console.error(`[GenerateDirect] [${new Date().toISOString()}] fal face swap FAILED after ${elapsedMs}ms (${(elapsedMs / 1000).toFixed(1)}s)`)
     console.error(`[GenerateDirect] Error type: ${error?.constructor?.name}`)
     console.error(`[GenerateDirect] Error message: ${error instanceof Error ? error.message : String(error)}`)
-
-    // Log detailed error information
-    if (error && typeof error === "object") {
-      if ("cause" in error) {
-        console.error(`[GenerateDirect] Error cause:`, (error as { cause: unknown }).cause)
-      }
-      if ("statusCode" in error) {
-        console.error(`[GenerateDirect] Status code: ${(error as { statusCode: unknown }).statusCode}`)
-      }
-      if ("url" in error) {
-        console.error(`[GenerateDirect] Request URL: ${(error as { url: unknown }).url}`)
-      }
-      if ("requestBodyValues" in error) {
-        console.error(`[GenerateDirect] Request body:`, (error as { requestBodyValues: unknown }).requestBodyValues)
-      }
-    }
-
-    console.error(`[GenerateDirect] Full error object:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
     throw error
   }
 }
