@@ -1,14 +1,11 @@
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-/**
- * Detect aspect ratio from an image URL
- * Returns common aspect ratio strings: "9:16", "3:4", "1:1", "4:3", "16:9"
- */
+/** Detect aspect ratio from an image URL. */
 export function detectImageAspectRatio(src: string): Promise<string> {
   return new Promise((resolve) => {
     if (typeof window === "undefined") {
@@ -36,16 +33,13 @@ export function detectImageAspectRatio(src: string): Promise<string> {
   })
 }
 
-/**
- * Detect video aspect ratio from dimensions
- * Returns: "9:16" (portrait), "16:9" (landscape), or "fill" (square-ish)
- */
+/** Detect video aspect ratio from dimensions. */
 export function detectVideoAspectRatio(width: number, height: number): "9:16" | "16:9" | "fill" {
   const ratio = width / height
   if (ratio < 0.7) {
-    return "9:16" // Portrait
+    return "9:16"
   } else if (ratio > 1.4) {
-    return "16:9" // Landscape
+    return "16:9"
   }
-  return "fill" // Square-ish
+  return "fill"
 }

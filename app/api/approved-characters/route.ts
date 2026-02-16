@@ -1,9 +1,10 @@
-import { sql } from "@/lib/db"
+import { getDb } from "@/lib/db"
 import { NextResponse } from "next/server"
 
 // Get all approved characters (available to all users)
 export async function GET() {
   try {
+    const sql = getDb()
     const characters = await sql`
       SELECT id, image_url, suggested_name, suggested_category 
       FROM character_submissions 

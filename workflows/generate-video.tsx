@@ -11,7 +11,7 @@ export interface GenerateVideoInput {
 
 type ProviderErrorPayload = {
   kind: "provider_error"
-  provider: "kling"
+  provider: "fal"
   model: string
   code: string
   summary: string
@@ -51,37 +51,24 @@ async function serializeUnknownError(error: unknown): Promise<string> {
 }
 
 function buildProviderErrorPayload(details: string): ProviderErrorPayload {
-  if (details.includes("GatewayInternalServerError")) {
-    return {
-      kind: "provider_error",
-      provider: "kling",
-      model: "klingai/kling-v2.6-motion-control",
-      code: "GATEWAY_INTERNAL_SERVER_ERROR",
-      summary: "AI Gateway/provider returned an internal server error.",
-      details,
-    }
-  }
-
   return {
     kind: "provider_error",
-    provider: "kling",
-    model: "klingai/kling-v2.6-motion-control",
+    provider: "fal",
+    model: "half-moon-ai/ai-face-swap/faceswapvideo",
     code: "PROVIDER_ERROR",
-    summary: "Provider request failed.",
+    summary: "Fal face swap request failed.",
     details,
   }
 }
 
 /**
- * Durable workflow for video generation using AI SDK + AI Gateway
+ * Durable workflow for video generation using fal.ai face swap
  * 
  * Flow:
- * 1. Workflow calls generateVideo via AI SDK with KlingAI motion control
- * 2. AI SDK handles polling internally until video is ready
- * 3. Workflow saves the resulting video to Vercel Blob
+ * 1. Workflow calls fal.ai face swap API (half-moon-ai/ai-face-swap/faceswapvideo)
+ * 2. fal.subscribe handles polling internally until video is ready
+ * 3. Workflow downloads the resulting video and saves to Vercel Blob
  * 4. Workflow updates the database and sends email notification
- * 
- * No webhook needed - AI SDK handles the entire generation lifecycle.
  */
 export async function generateVideoWorkflow(input: GenerateVideoInput) {
   "use workflow"
@@ -89,7 +76,7 @@ export async function generateVideoWorkflow(input: GenerateVideoInput) {
   const { generationId, videoUrl, characterImageUrl, characterName, userEmail } = input
 
   const workflowStartTime = Date.now()
-  console.log(`[Workflow] [${new Date().toISOString()}] Starting generation ${generationId} via AI Gateway`)
+  console.log(`[Workflow] [${new Date().toISOString()}] Starting generation ${generationId} via fal.ai face swap`)
 
   // Generate video AND save to blob in a single step
   // This avoids serializing large video bytes between steps
@@ -138,83 +125,46 @@ async function generateAndSaveVideo(
   const stepStartTime = Date.now()
   console.log(`[Workflow Step] [${new Date().toISOString()}] generateAndSaveVideo starting...`)
 
-  const { experimental_generateVideo: generateVideo, createGateway } = await import("ai")
-  const { Agent } = await import("undici")
+  const { fal } = await import("@fal-ai/client")
   const { put } = await import("@vercel/blob")
   const { updateGenerationRunId } = await import("@/lib/db")
 
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Imports loaded, creating gateway...`)
-
-  // Create a NEW Agent instance on each request (per official Vercel docs)
-  // This ensures fresh connections without any stale state
-  const gateway = createGateway({
-    fetch: (url, init) => {
-      const agent = new Agent({
-        headersTimeout: 15 * 60 * 1000, // 15 minutes
-        bodyTimeout: 15 * 60 * 1000, // 15 minutes
-      })
-      console.log(`[Workflow Step] [${new Date().toISOString()}] Creating new Agent for request to ${url}`)
-      console.log(`[Workflow Step] [${new Date().toISOString()}] Agent config: headersTimeout=${15 * 60 * 1000}ms, bodyTimeout=${15 * 60 * 1000}ms`)
-
-      return fetch(url, {
-        ...init,
-        dispatcher: agent,
-      } as RequestInit)
-    },
+  // Configure fal client with credentials
+  fal.config({
+    credentials: process.env.FAL_KEY,
   })
 
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Gateway created (+${Date.now() - stepStartTime}ms)`)
+  console.log(`[Workflow Step] [${new Date().toISOString()}] fal client configured (+${Date.now() - stepStartTime}ms)`)
   console.log(`[Workflow Step] [${new Date().toISOString()}] Input: characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
 
   // Update run ID with a placeholder so UI knows it's processing
-  await updateGenerationRunId(generationId, `ai-gateway-${generationId}`)
+  await updateGenerationRunId(generationId, `fal-${generationId}`)
 
-  // Generate video using AI SDK with KlingAI motion control
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Calling experimental_generateVideo with klingai/kling-v2.6-motion-control...`)
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Using gateway.video() with custom fetch/dispatcher`)
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Provider options: pollIntervalMs=5000, pollTimeoutMs=${14 * 60 * 1000}ms`)
+  // Generate face swap video using fal.ai
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Calling fal.subscribe with half-moon-ai/ai-face-swap/faceswapvideo...`)
 
   const generateStart = Date.now()
-  let result: Awaited<ReturnType<typeof generateVideo>>
+  let result: { data: { video: { url: string } }; requestId: string }
   try {
-    console.log(`[Workflow Step] [${new Date().toISOString()}] Starting generateVideo call at ${generateStart}...`)
-    result = await generateVideo({
-      model: gateway.video("klingai/kling-v2.6-motion-control"),
-      prompt: {
-        image: characterImageUrl,
+    console.log(`[Workflow Step] [${new Date().toISOString()}] Starting fal face swap call at ${generateStart}...`)
+    result = await fal.subscribe("half-moon-ai/ai-face-swap/faceswapvideo", {
+      input: {
+        source_face_url: characterImageUrl,
+        target_video_url: videoUrl,
       },
-      providerOptions: {
-        klingai: {
-          videoUrl: videoUrl,
-          characterOrientation: "video" as const,
-          mode: "std" as const,
-          pollIntervalMs: 5_000,
-          pollTimeoutMs: 14 * 60 * 1000, // 14 minutes
-        },
+      logs: true,
+      onQueueUpdate: (update) => {
+        if (update.status === "IN_PROGRESS") {
+          update.logs?.map((log) => log.message).forEach((msg) => console.log(`[Workflow Step] [fal] ${msg}`))
+        }
       },
-    })
+    }) as { data: { video: { url: string } }; requestId: string }
   } catch (error) {
     const { FatalError } = await import("workflow")
     const elapsedMs = Date.now() - generateStart
-    console.error(`[Workflow Step] [${new Date().toISOString()}] generateVideo FAILED after ${elapsedMs}ms (${(elapsedMs / 1000).toFixed(1)}s)`)
+    console.error(`[Workflow Step] [${new Date().toISOString()}] fal face swap FAILED after ${elapsedMs}ms (${(elapsedMs / 1000).toFixed(1)}s)`)
     console.error(`[Workflow Step] Error type: ${error?.constructor?.name}`)
     console.error(`[Workflow Step] Error message: ${error instanceof Error ? error.message : String(error)}`)
-
-    // Log detailed error information
-    if (error && typeof error === "object") {
-      if ("cause" in error) {
-        console.error(`[Workflow Step] Error cause:`, (error as { cause: unknown }).cause)
-      }
-      if ("statusCode" in error) {
-        console.error(`[Workflow Step] Status code: ${(error as { statusCode: unknown }).statusCode}`)
-      }
-      if ("url" in error) {
-        console.error(`[Workflow Step] Request URL: ${(error as { url: unknown }).url}`)
-      }
-      if ("requestBodyValues" in error) {
-        console.error(`[Workflow Step] Request body:`, (error as { requestBodyValues: unknown }).requestBodyValues)
-      }
-    }
 
     const details = await serializeUnknownError(error)
     console.error(`[Workflow Step] Serialized error details: ${details.substring(0, 500)}...`)
@@ -227,18 +177,24 @@ async function generateAndSaveVideo(
   }
 
   const generateTime = Date.now() - generateStart
-  console.log(`[Workflow Step] [${new Date().toISOString()}] generateVideo completed in ${generateTime}ms (${(generateTime / 1000).toFixed(1)}s)`)
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Generated ${result.videos.length} video(s)`)
+  console.log(`[Workflow Step] [${new Date().toISOString()}] fal face swap completed in ${generateTime}ms (${(generateTime / 1000).toFixed(1)}s)`)
 
-  if (result.videos.length === 0) {
-    throw new Error("No videos were generated")
+  const falVideoUrl = result.data?.video?.url
+  if (!falVideoUrl) {
+    throw new Error("No video URL returned from fal face swap")
   }
 
-  // Save video bytes directly to Vercel Blob (avoid serializing large bytes between steps)
-  const videoBytes = result.videos[0].uint8Array
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Video size: ${videoBytes.length} bytes, saving to Blob...`)
+  console.log(`[Workflow Step] [${new Date().toISOString()}] fal video URL: ${falVideoUrl}, downloading and saving to Blob...`)
 
-  const { url: blobUrl } = await put(`generations/${generationId}-${Date.now()}.mp4`, videoBytes, {
+  // Download the video from fal and save to Vercel Blob
+  const videoResponse = await fetch(falVideoUrl)
+  if (!videoResponse.ok) {
+    throw new Error(`Failed to download video from fal: ${videoResponse.status}`)
+  }
+  const videoBuffer = await videoResponse.arrayBuffer()
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Video size: ${videoBuffer.byteLength} bytes`)
+
+  const { url: blobUrl } = await put(`generations/${generationId}-${Date.now()}.mp4`, Buffer.from(videoBuffer), {
     access: "public",
     contentType: "video/mp4",
   })

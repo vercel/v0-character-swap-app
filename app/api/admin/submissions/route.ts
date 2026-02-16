@@ -1,9 +1,10 @@
-import { sql } from "@/lib/db"
+import { getDb } from "@/lib/db"
 import { NextResponse } from "next/server"
 
 // Get all submissions
 export async function GET() {
   try {
+    const sql = getDb()
     const submissions = await sql`
       SELECT * FROM character_submissions 
       ORDER BY created_at DESC
@@ -28,6 +29,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
 
+    const sql = getDb()
     await sql`
       UPDATE character_submissions 
       SET status = ${status}, 
@@ -52,6 +54,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "ID required" }, { status: 400 })
     }
 
+    const sql = getDb()
     await sql`DELETE FROM character_submissions WHERE id = ${id}`
 
     return NextResponse.json({ success: true })

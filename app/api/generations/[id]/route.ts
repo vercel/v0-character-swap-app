@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server"
 import { verifySession } from "@/lib/auth"
-import { neon } from "@neondatabase/serverless"
-import { updateGenerationFailed } from "@/lib/db"
-
-const sql = neon(process.env.DATABASE_URL!)
+import { getDb, updateGenerationFailed } from "@/lib/db"
 
 // Update generation status (e.g., mark as failed)
 export async function PATCH(
@@ -27,6 +24,7 @@ export async function PATCH(
     const { status, errorMessage } = await request.json()
 
     // Verify ownership first
+    const sql = getDb()
     const ownership = await sql`
       SELECT id FROM generations 
       WHERE id = ${generationId} AND user_id = ${session.user.id}
@@ -69,6 +67,7 @@ export async function DELETE(
     }
 
     // Delete the generation (user can only delete their own)
+    const sql = getDb()
     const result = await sql`
       DELETE FROM generations 
       WHERE id = ${generationId} 
