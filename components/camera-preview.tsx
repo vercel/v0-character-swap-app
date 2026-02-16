@@ -127,7 +127,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     let mimeType: string
     
     // Find best supported type
-    // Prefer MP4 — fal.ai face swap accepts MP4 and modern Chrome supports it natively,
+    // Prefer MP4 — KlingAI requires MP4 and modern Chrome supports it natively,
     // avoiding the need for client-side FFmpeg transcoding
     const findSupportedType = () => {
       const preferredOrder = [
@@ -322,12 +322,12 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
               <div className="flex flex-col gap-0.5">
                 <p className="font-mono text-[12px] text-neutral-400">
                   Using{" "}
-                  <span className="text-white">fal.ai Face Swap</span>
+                  <span className="text-white">Kling v2.6 Motion Control</span>
                 </p>
                 <p className="font-mono text-[12px] text-neutral-400">
                   via{" "}
                   <a 
-                    href="https://fal.ai/models/half-moon-ai/ai-face-swap/faceswapvideo" 
+                    href="https://fal.ai/models/fal-ai/kling-video/v2.6/standard/motion-control" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-white underline underline-offset-2 hover:text-neutral-300"

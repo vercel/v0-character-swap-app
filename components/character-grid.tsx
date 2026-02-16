@@ -725,15 +725,15 @@ export function CharacterGrid({
               <div>
                 <p className="mb-2 text-neutral-500">// ai model</p>
                 <a 
-                  href="https://fal.ai/models/half-moon-ai/ai-face-swap/faceswapvideo"
+                  href="https://fal.ai/models/fal-ai/kling-video/v2.6/standard/motion-control"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-neutral-300 hover:text-white"
                 >
-                  half-moon-ai/ai-face-swap via fal.ai
+                  kling-v2.6-motion-control via fal.ai
                 </a>
                 <p className="mt-1">
-                  replaces faces in the target video with the selected character face while maintaining natural movements and expressions throughout the clip.
+                  analyzes facial landmarks, expressions, and head pose frame-by-frame from your recorded video. transfers this motion data onto the target character image while preserving their appearance.
                 </p>
               </div>
               
@@ -751,7 +751,7 @@ export function CharacterGrid({
                   <p>
                     <a href="https://vercel.com/docs/workflow" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">workflow</a>
                     <span className="text-neutral-500"> — </span>
-                    durable function execution that survives timeouts. orchestrates the generation pipeline: receives request → calls fal api → waits for webhook → updates database.
+                    durable function execution that survives timeouts. orchestrates the generation pipeline: receives request → calls fal/kling api → polls until complete → updates database.
                   </p>
                   <p>
                     <a href="https://vercel.com/docs/storage/vercel-blob" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">blob</a>
@@ -766,7 +766,7 @@ export function CharacterGrid({
                   <p>
                     <a href="https://fal.ai" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">fal.ai</a>
                     <span className="text-neutral-500"> — </span>
-                    serverless ai inference platform. handles face swap video generation with queued execution and automatic polling.
+                    serverless ai inference platform. runs kling v2.6 motion control with queued execution and automatic polling.
                   </p>
                 </div>
               </div>

@@ -54,18 +54,18 @@ function buildProviderErrorPayload(details: string): ProviderErrorPayload {
   return {
     kind: "provider_error",
     provider: "fal",
-    model: "half-moon-ai/ai-face-swap/faceswapvideo",
+    model: "fal-ai/kling-video/v2.6/standard/motion-control",
     code: "PROVIDER_ERROR",
-    summary: "Fal face swap request failed.",
+    summary: "Kling v2.6 motion control via fal.ai request failed.",
     details,
   }
 }
 
 /**
- * Durable workflow for video generation using fal.ai face swap
+ * Durable workflow for video generation using Kling v2.6 motion control via fal.ai
  * 
  * Flow:
- * 1. Workflow calls fal.ai face swap API (half-moon-ai/ai-face-swap/faceswapvideo)
+ * 1. Workflow calls fal.ai Kling motion control API (fal-ai/kling-video/v2.6/standard/motion-control)
  * 2. fal.subscribe handles polling internally until video is ready
  * 3. Workflow downloads the resulting video and saves to Vercel Blob
  * 4. Workflow updates the database and sends email notification
@@ -76,7 +76,7 @@ export async function generateVideoWorkflow(input: GenerateVideoInput) {
   const { generationId, videoUrl, characterImageUrl, characterName, userEmail } = input
 
   const workflowStartTime = Date.now()
-  console.log(`[Workflow] [${new Date().toISOString()}] Starting generation ${generationId} via fal.ai face swap`)
+  console.log(`[Workflow] [${new Date().toISOString()}] Starting generation ${generationId} via Kling v2.6 motion control (fal.ai)`)
 
   // Generate video AND save to blob in a single step
   // This avoids serializing large video bytes between steps
@@ -138,31 +138,32 @@ async function generateAndSaveVideo(
   console.log(`[Workflow Step] [${new Date().toISOString()}] Input: characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
 
   // Update run ID with a placeholder so UI knows it's processing
-  await updateGenerationRunId(generationId, `fal-${generationId}`)
+  await updateGenerationRunId(generationId, `fal-kling-${generationId}`)
 
-  // Generate face swap video using fal.ai
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Calling fal.subscribe with half-moon-ai/ai-face-swap/faceswapvideo...`)
+  // Generate video using Kling v2.6 motion control via fal.ai
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Calling fal.subscribe with fal-ai/kling-video/v2.6/standard/motion-control...`)
 
   const generateStart = Date.now()
-  let result: { data: { video: { url: string } }; requestId: string }
+  let result: { data: { video: { url: string; file_name: string; content_type: string } }; requestId: string }
   try {
-    console.log(`[Workflow Step] [${new Date().toISOString()}] Starting fal face swap call at ${generateStart}...`)
-    result = await fal.subscribe("half-moon-ai/ai-face-swap/faceswapvideo", {
+    console.log(`[Workflow Step] [${new Date().toISOString()}] Starting Kling motion control call at ${generateStart}...`)
+    result = await fal.subscribe("fal-ai/kling-video/v2.6/standard/motion-control", {
       input: {
-        source_face_url: characterImageUrl,
-        target_video_url: videoUrl,
+        image_url: characterImageUrl,
+        video_url: videoUrl,
+        character_orientation: "video" as const,
       },
       logs: true,
       onQueueUpdate: (update) => {
         if (update.status === "IN_PROGRESS") {
-          update.logs?.map((log) => log.message).forEach((msg) => console.log(`[Workflow Step] [fal] ${msg}`))
+          update.logs?.map((log) => log.message).forEach((msg) => console.log(`[Workflow Step] [fal/kling] ${msg}`))
         }
       },
-    }) as { data: { video: { url: string } }; requestId: string }
+    }) as { data: { video: { url: string; file_name: string; content_type: string } }; requestId: string }
   } catch (error) {
     const { FatalError } = await import("workflow")
     const elapsedMs = Date.now() - generateStart
-    console.error(`[Workflow Step] [${new Date().toISOString()}] fal face swap FAILED after ${elapsedMs}ms (${(elapsedMs / 1000).toFixed(1)}s)`)
+    console.error(`[Workflow Step] [${new Date().toISOString()}] Kling motion control FAILED after ${elapsedMs}ms (${(elapsedMs / 1000).toFixed(1)}s)`)
     console.error(`[Workflow Step] Error type: ${error?.constructor?.name}`)
     console.error(`[Workflow Step] Error message: ${error instanceof Error ? error.message : String(error)}`)
 
@@ -177,11 +178,11 @@ async function generateAndSaveVideo(
   }
 
   const generateTime = Date.now() - generateStart
-  console.log(`[Workflow Step] [${new Date().toISOString()}] fal face swap completed in ${generateTime}ms (${(generateTime / 1000).toFixed(1)}s)`)
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Kling motion control completed in ${generateTime}ms (${(generateTime / 1000).toFixed(1)}s)`)
 
   const falVideoUrl = result.data?.video?.url
   if (!falVideoUrl) {
-    throw new Error("No video URL returned from fal face swap")
+    throw new Error("No video URL returned from Kling motion control via fal.ai")
   }
 
   console.log(`[Workflow Step] [${new Date().toISOString()}] fal video URL: ${falVideoUrl}, downloading and saving to Blob...`)
