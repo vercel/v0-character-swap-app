@@ -1,6 +1,13 @@
 import { neon } from "@neondatabase/serverless"
 
-export const sql = neon(process.env.DATABASE_URL!)
+let _sql: ReturnType<typeof neon> | null = null
+
+export function getDb() {
+  if (!_sql) {
+    _sql = neon(process.env.DATABASE_URL!)
+  }
+  return _sql
+}
 
 export interface Generation {
   id: number
@@ -26,6 +33,7 @@ export async function createGeneration(data: {
   characterName?: string
   characterImageUrl?: string
 }) {
+  const sql = getDb()
   const result = await sql`
     INSERT INTO generations (user_id, user_email, video_url, character_name, character_image_url, status)
     VALUES (${data.userId}, ${data.userEmail || null}, ${data.videoUrl}, ${data.characterName || null}, ${data.characterImageUrl || null}, 'processing')
@@ -43,6 +51,7 @@ export async function createPendingGeneration(data: {
   aspectRatio?: "9:16" | "16:9" | "fill"
   sourceVideoAspectRatio?: "9:16" | "16:9" | "fill"
 }) {
+  const sql = getDb()
   const result = await sql`
     INSERT INTO generations (user_id, user_email, character_name, character_image_url, aspect_ratio, source_video_aspect_ratio, status)
     VALUES (${data.userId}, ${data.userEmail || null}, ${data.characterName || null}, ${data.characterImageUrl || null}, ${data.aspectRatio || "fill"}, ${data.sourceVideoAspectRatio || "fill"}, 'uploading')
@@ -53,6 +62,7 @@ export async function createPendingGeneration(data: {
 
 // Update generation after upload is complete, then start processing
 export async function updateGenerationStartProcessing(id: number, videoUrl: string, characterImageUrl: string) {
+  const sql = getDb()
   await sql`
     UPDATE generations 
     SET source_video_url = ${videoUrl}, character_image_url = ${characterImageUrl}, status = 'processing'
@@ -61,6 +71,7 @@ export async function updateGenerationStartProcessing(id: number, videoUrl: stri
 }
 
 export async function updateGenerationRunId(id: number, runId: string) {
+  const sql = getDb()
   await sql`
     UPDATE generations 
     SET run_id = ${runId}
@@ -69,6 +80,7 @@ export async function updateGenerationRunId(id: number, runId: string) {
 }
 
 export async function updateGenerationComplete(id: number, videoUrl: string) {
+  const sql = getDb()
   await sql`
     UPDATE generations 
     SET status = 'completed', video_url = ${videoUrl}, completed_at = NOW()
@@ -77,6 +89,7 @@ export async function updateGenerationComplete(id: number, videoUrl: string) {
 }
 
 export async function updateGenerationFailed(id: number, errorMessage?: string) {
+  const sql = getDb()
   await sql`
     UPDATE generations 
     SET status = 'failed', completed_at = NOW(), error_message = ${errorMessage || null}
@@ -85,6 +98,7 @@ export async function updateGenerationFailed(id: number, errorMessage?: string) 
 }
 
 export async function getUserGenerations(userId: string): Promise<Generation[]> {
+  const sql = getDb()
   const result = await sql`
     SELECT * FROM generations 
     WHERE user_id = ${userId} 
@@ -109,6 +123,7 @@ export async function createReferenceImage(data: {
   name: string
   imageUrl: string
 }): Promise<number> {
+  const sql = getDb()
   const result = await sql`
     INSERT INTO reference_images (user_id, name, image_url)
     VALUES (${data.userId}, ${data.name}, ${data.imageUrl})
@@ -118,6 +133,7 @@ export async function createReferenceImage(data: {
 }
 
 export async function getUserReferenceImages(userId: string): Promise<ReferenceImage[]> {
+  const sql = getDb()
   const result = await sql`
     SELECT * FROM reference_images 
     WHERE user_id = ${userId} 
@@ -127,6 +143,7 @@ export async function getUserReferenceImages(userId: string): Promise<ReferenceI
 }
 
 export async function deleteReferenceImage(id: number, userId: string): Promise<boolean> {
+  const sql = getDb()
   const result = await sql`
     DELETE FROM reference_images 
     WHERE id = ${id} AND user_id = ${userId}
@@ -136,6 +153,7 @@ export async function deleteReferenceImage(id: number, userId: string): Promise<
 }
 
 export async function updateReferenceImageCategory(id: number, userId: string, category: string): Promise<boolean> {
+  const sql = getDb()
   const result = await sql`
     UPDATE reference_images 
     SET category = ${category}
