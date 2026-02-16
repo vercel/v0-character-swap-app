@@ -18,8 +18,8 @@ export async function POST(request: NextRequest) {
 
     if (!userId) {
       return NextResponse.json(
-        { error: "User must be logged in" },
-        { status: 401 }
+        { error: "User ID is required" },
+        { status: 400 }
       )
     }
 

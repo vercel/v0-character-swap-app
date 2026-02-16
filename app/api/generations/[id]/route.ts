@@ -1,16 +1,24 @@
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import { verifySession } from "@/lib/auth"
 import { getDb, updateGenerationFailed } from "@/lib/db"
 
+async function resolveUserId(request: NextRequest): Promise<string | null> {
+  const session = await verifySession().catch(() => null)
+  if (session?.user?.id) return session.user.id
+  const anonId = request.headers.get("x-anonymous-user-id")
+  if (anonId && anonId.startsWith("anon_")) return anonId
+  return null
+}
+
 // Update generation status (e.g., mark as failed)
 export async function PATCH(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await verifySession()
+    const userId = await resolveUserId(request)
     
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -27,7 +35,7 @@ export async function PATCH(
     const sql = getDb()
     const ownership = await sql`
       SELECT id FROM generations 
-      WHERE id = ${generationId} AND user_id = ${session.user.id}
+      WHERE id = ${generationId} AND user_id = ${userId}
     `
     
     if (ownership.length === 0) {
@@ -49,13 +57,13 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await verifySession()
+    const userId = await resolveUserId(request)
     
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -71,7 +79,7 @@ export async function DELETE(
     const result = await sql`
       DELETE FROM generations 
       WHERE id = ${generationId} 
-        AND user_id = ${session.user.id}
+        AND user_id = ${userId}
       RETURNING id
     `
 

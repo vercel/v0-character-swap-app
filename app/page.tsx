@@ -30,8 +30,6 @@ export default function Home() {
   
   // State
   const [mounted, setMounted] = useState(false)
-  const [showLoginModal, setShowLoginModal] = useState(false)
-  const [isLoggingIn, setIsLoggingIn] = useState(false)
 
   const [resultUrl, setResultUrl] = useState<string | null>(null)
   const [sourceVideoUrl, setSourceVideoUrl] = useState<string | null>(null)
@@ -104,7 +102,7 @@ export default function Home() {
     processVideo,
   } = useVideoGeneration({
     user,
-    onLoginRequired: () => setShowLoginModal(true),
+    onLoginRequired: () => {},
     onSuccess: () => {
       // Don't clear recording - allow user to generate with another character
       setSelectedCharacter(null)
@@ -219,22 +217,13 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [resultUrl, recordedVideoUrl, handleReset])
 
-  const handleLoginAndContinue = useCallback(async () => {
-    setIsLoggingIn(true)
-    if (recordedVideo) {
-      await saveToSession(recordedVideo, selectedCharacter)
-    }
-    login()
-  }, [recordedVideo, selectedCharacter, saveToSession, login])
-
   // Render helpers
+  const isAnonymous = user?.id?.startsWith("anon_")
+
   const renderAuthSection = (size: "desktop" | "mobile") => {
     if (!mounted) return null
     
-    const avatarSize = size === "desktop" ? "h-5 w-5" : "h-6 w-6"
-    const textSize = size === "desktop" ? "text-[12px]" : "text-[13px]"
-    
-    if (user) {
+    if (user && !isAnonymous) {
       return (
         <div className="mb-4 flex items-center justify-between">
           <span className="font-mono text-[11px] text-neutral-500">{user.name?.toLowerCase()}</span>
@@ -621,50 +610,6 @@ export default function Home() {
           )}
         </BottomSheet>
       )}
-
-      {/* Login Modal */}
-      {showLoginModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-sm rounded-lg bg-neutral-900 p-6">
-            <h2 className="mb-2 font-sans text-lg font-semibold text-white">Sign in to generate</h2>
-            <p className="mb-6 font-sans text-[13px] text-neutral-400">
-              Create an account to generate your video. Your recording and character selection will be saved.
-            </p>
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={handleLoginAndContinue}
-                disabled={isLoggingIn}
-                className="flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-sans text-[13px] font-medium text-black transition-all hover:bg-neutral-200 active:scale-[0.98] disabled:opacity-70"
-              >
-                {isLoggingIn ? (
-                  <>
-                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <svg className="h-4 w-4" viewBox="0 0 76 65" fill="currentColor">
-                      <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
-                    </svg>
-                    Continue with Vercel
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => setShowLoginModal(false)}
-                disabled={isLoggingIn}
-                className="rounded-lg px-4 py-3 font-sans text-[13px] text-neutral-400 transition-colors hover:text-white disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
 
       {/* Error Toast */}
       {errorToast && (
