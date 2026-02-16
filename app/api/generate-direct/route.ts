@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
 
 /**
  * Generate video and save to blob — runs directly in the route handler (no workflow step).
- * Uses fal.ai face swap (half-moon-ai/ai-face-swap/faceswapvideo).
+ * Uses Kling v2.6 motion control via fal.ai (fal-ai/kling-video/v2.6/standard/motion-control).
  */
 async function generateAndSaveVideoDirect(
   generationId: number,
@@ -146,30 +146,31 @@ async function generateAndSaveVideoDirect(
   console.log(`[GenerateDirect] [${new Date().toISOString()}] fal client configured (+${Date.now() - stepStartTime}ms)`)
   console.log(`[GenerateDirect] [${new Date().toISOString()}] characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
 
-  // Generate face swap video using fal.ai
-  console.log(`[GenerateDirect] [${new Date().toISOString()}] Calling fal.subscribe with half-moon-ai/ai-face-swap/faceswapvideo...`)
+  // Generate video using Kling v2.6 motion control via fal.ai
+  console.log(`[GenerateDirect] [${new Date().toISOString()}] Calling fal.subscribe with fal-ai/kling-video/v2.6/standard/motion-control...`)
 
   const generateStart = Date.now()
   try {
-    const result = await fal.subscribe("half-moon-ai/ai-face-swap/faceswapvideo", {
+    const result = await fal.subscribe("fal-ai/kling-video/v2.6/standard/motion-control", {
       input: {
-        source_face_url: characterImageUrl,
-        target_video_url: videoUrl,
+        image_url: characterImageUrl,
+        video_url: videoUrl,
+        character_orientation: "video" as const,
       },
       logs: true,
       onQueueUpdate: (update) => {
         if (update.status === "IN_PROGRESS") {
-          update.logs?.map((log) => log.message).forEach((msg) => console.log(`[GenerateDirect] [fal] ${msg}`))
+          update.logs?.map((log) => log.message).forEach((msg) => console.log(`[GenerateDirect] [fal/kling] ${msg}`))
         }
       },
-    }) as { data: { video: { url: string } }; requestId: string }
+    }) as { data: { video: { url: string; file_name: string; content_type: string } }; requestId: string }
 
     const generateTime = Date.now() - generateStart
-    console.log(`[GenerateDirect] [${new Date().toISOString()}] fal face swap completed in ${generateTime}ms (${(generateTime / 1000).toFixed(1)}s)`)
+    console.log(`[GenerateDirect] [${new Date().toISOString()}] Kling motion control completed in ${generateTime}ms (${(generateTime / 1000).toFixed(1)}s)`)
 
     const falVideoUrl = result.data?.video?.url
     if (!falVideoUrl) {
-      throw new Error("No video URL returned from fal face swap")
+      throw new Error("No video URL returned from Kling motion control via fal.ai")
     }
 
     console.log(`[GenerateDirect] [${new Date().toISOString()}] fal video URL: ${falVideoUrl}, downloading and saving to Blob...`)
@@ -191,7 +192,7 @@ async function generateAndSaveVideoDirect(
     return blobUrl
   } catch (error) {
     const elapsedMs = Date.now() - generateStart
-    console.error(`[GenerateDirect] [${new Date().toISOString()}] fal face swap FAILED after ${elapsedMs}ms (${(elapsedMs / 1000).toFixed(1)}s)`)
+    console.error(`[GenerateDirect] [${new Date().toISOString()}] Kling motion control FAILED after ${elapsedMs}ms (${(elapsedMs / 1000).toFixed(1)}s)`)
     console.error(`[GenerateDirect] Error type: ${error?.constructor?.name}`)
     console.error(`[GenerateDirect] Error message: ${error instanceof Error ? error.message : String(error)}`)
     throw error
