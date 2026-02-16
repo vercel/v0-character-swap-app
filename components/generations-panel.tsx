@@ -77,12 +77,21 @@ interface GenerationsPanelProps {
   variant?: "default" | "compact"
 }
 
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+function makeFetcher(userId: string | undefined) {
+  return (url: string) => {
+    const headers: Record<string, string> = {}
+    if (userId?.startsWith("anon_")) {
+      headers["x-anonymous-user-id"] = userId
+    }
+    return fetch(url, { headers }).then(res => res.json())
+  }
+}
 
 export function GenerationsPanel({ onSelectVideo, className = "", variant = "default" }: GenerationsPanelProps) {
   const { user } = useAuth()
   const prevGenerationsRef = useRef<Generation[]>([])
   const hasRequestedPermission = useRef(false)
+  const fetcher = makeFetcher(user?.id)
   
   const { data, isLoading, mutate } = useSWR(
     user?.id ? "/api/generations" : null,
@@ -144,8 +153,13 @@ export function GenerationsPanel({ onSelectVideo, className = "", variant = "def
   const handleDelete = async (generationId: number, e?: React.MouseEvent) => {
     e?.stopPropagation()
     try {
+      const headers: Record<string, string> = {}
+      if (user?.id?.startsWith("anon_")) {
+        headers["x-anonymous-user-id"] = user.id
+      }
       const response = await fetch(`/api/generations/${generationId}`, {
         method: "DELETE",
+        headers,
       })
       if (response.ok) {
         mutate()
@@ -153,21 +167,6 @@ export function GenerationsPanel({ onSelectVideo, className = "", variant = "def
     } catch (error) {
       console.error("Failed to delete generation:", error)
     }
-  }
-
-  // Show sign in prompt if user is not logged in
-  if (!user) {
-    if (variant === "compact") return null
-    return (
-      <div className={className}>
-        <p className="mb-2 font-mono text-[11px] lowercase text-neutral-500">
-          my videos
-        </p>
-        <p className="font-mono text-[11px] text-neutral-600">
-          sign in to see your videos
-        </p>
-      </div>
-    )
   }
 
   // Show loading state

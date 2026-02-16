@@ -64,11 +64,6 @@ export function useVideoGeneration({
     aspectRatio: "9:16" | "16:9" | "fill" = "fill",
     sourceVideoAspectRatio: "9:16" | "16:9" | "fill" = "fill"
   ) => {
-    if (!user) {
-      onLoginRequired()
-      return
-    }
-
     // Prevent double-submit
     if (processingRef.current) return
     processingRef.current = true
@@ -93,10 +88,16 @@ export function useVideoGeneration({
           }
         }
 
+        // Build headers (include anon ID for unauthenticated users)
+        const anonHeaders: Record<string, string> = { "Content-Type": "application/json" }
+        if (user?.id?.startsWith("anon_")) {
+          anonHeaders["x-anonymous-user-id"] = user.id
+        }
+
         // 1. Create pending generation in DB immediately
         const pendingResponse = await fetch("/api/generations", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: anonHeaders,
           body: JSON.stringify({
             characterName: character.name,
             characterImageUrl: character.src,
@@ -143,15 +144,15 @@ export function useVideoGeneration({
         // 6. Start actual generation using Workflow SDK (handles long-running tasks)
         const startResponse = await fetch("/api/generate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: anonHeaders,
           body: JSON.stringify({
             generationId,
             videoUrl,
             characterImageUrl: characterBlobResult.url,
-            userId: user.id,
-            userEmail: user.email,
+            userId: user?.id || "anonymous",
+            userEmail: user?.email || "",
             characterName: character.name,
-            sendEmail: sendEmail && user.email ? true : false,
+            sendEmail: sendEmail && user?.email ? true : false,
           }),
         })
 
@@ -172,7 +173,7 @@ export function useVideoGeneration({
           try {
             await fetch(`/api/generations/${generationId}`, {
               method: "PATCH",
-              headers: { "Content-Type": "application/json" },
+              headers: anonHeaders,
               body: JSON.stringify({ status: "failed", errorMessage }),
             })
             window.dispatchEvent(new CustomEvent("refresh-generations"))
@@ -189,7 +190,7 @@ export function useVideoGeneration({
 
     // Return immediately - don't wait for the async work
     onSuccess()
-  }, [user, onLoginRequired, onSuccess, onError])
+  }, [user, onSuccess, onError])
 
   return {
     processVideo,

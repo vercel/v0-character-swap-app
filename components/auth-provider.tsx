@@ -18,6 +18,18 @@ interface AuthContextType {
   logout: () => Promise<void>
 }
 
+const ANON_ID_KEY = "anon_user_id"
+
+function getOrCreateAnonId(): string {
+  if (typeof window === "undefined") return "anon"
+  let id = localStorage.getItem(ANON_ID_KEY)
+  if (!id) {
+    id = `anon_${crypto.randomUUID()}`
+    localStorage.setItem(ANON_ID_KEY, id)
+  }
+  return id
+}
+
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -28,10 +40,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fetch("/api/auth/session")
       .then((res) => res.json())
       .then((data) => {
-        setUser(data.user || null)
+        if (data.user) {
+          setUser(data.user)
+        } else {
+          const anonId = getOrCreateAnonId()
+          setUser({ id: anonId, email: "", name: "guest" })
+        }
         setIsLoading(false)
       })
       .catch(() => {
+        const anonId = getOrCreateAnonId()
+        setUser({ id: anonId, email: "", name: "guest" })
         setIsLoading(false)
       })
   }, [])
@@ -42,7 +61,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" })
-    setUser(null)
+    const anonId = getOrCreateAnonId()
+    setUser({ id: anonId, email: "", name: "guest" })
   }, [])
 
   return (

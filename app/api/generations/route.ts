@@ -1,17 +1,27 @@
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import { getUserGenerations, createPendingGeneration } from "@/lib/db"
 import { verifySession } from "@/lib/auth"
 import { toWorkflowErrorObject } from "@/lib/workflow-errors"
 
-export async function GET() {
+async function resolveUserId(request: NextRequest): Promise<string | null> {
+  // Try authenticated session first
+  const session = await verifySession().catch(() => null)
+  if (session?.user?.id) return session.user.id
+  // Fall back to anonymous user ID from header
+  const anonId = request.headers.get("x-anonymous-user-id")
+  if (anonId && anonId.startsWith("anon_")) return anonId
+  return null
+}
+
+export async function GET(request: NextRequest) {
   try {
-    const session = await verifySession()
+    const userId = await resolveUserId(request)
     
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const generations = await getUserGenerations(session.user.id)
+    const generations = await getUserGenerations(userId)
     const generationsWithStructuredErrors = generations.map((generation) => ({
       ...generation,
       error:
@@ -35,19 +45,19 @@ export async function GET() {
 }
 
 // Create a pending generation (before upload starts)
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const session = await verifySession()
+    const userId = await resolveUserId(request)
     
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const { characterName, characterImageUrl, aspectRatio, sourceVideoAspectRatio } = await request.json()
 
     const generationId = await createPendingGeneration({
-      userId: session.user.id,
-      userEmail: session.user.email,
+      userId,
+      userEmail: undefined,
       characterName,
       characterImageUrl,
       aspectRatio: aspectRatio || "fill",
