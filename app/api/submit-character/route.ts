@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
-import { neon } from "@neondatabase/serverless"
-
-const sql = neon(process.env.DATABASE_URL!)
+import { getDb } from "@/lib/db"
 
 export async function POST(request: Request) {
   try {
@@ -11,6 +9,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Image URL required" }, { status: 400 })
     }
 
+    const sql = getDb()
     await sql`
       INSERT INTO character_submissions (image_url, suggested_name, suggested_category, user_id)
       VALUES (${imageUrl}, ${name || null}, ${category || null}, ${userId || null})

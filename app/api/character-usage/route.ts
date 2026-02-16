@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
-import { neon } from "@neondatabase/serverless"
-
-const sql = neon(process.env.DATABASE_URL!)
+import { getDb } from "@/lib/db"
 
 export async function POST(request: Request) {
   try {
@@ -11,6 +9,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "characterId is required" }, { status: 400 })
     }
 
+    const sql = getDb()
     // Upsert: insert or update usage count
     await sql`
       INSERT INTO character_usage (character_id, usage_count, last_used_at)
@@ -30,6 +29,7 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
+    const sql = getDb()
     const usage = await sql`
       SELECT character_id, usage_count 
       FROM character_usage 
