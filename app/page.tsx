@@ -16,6 +16,16 @@ import { STORAGE_KEYS } from "@/lib/constants"
 import { cn, detectImageAspectRatio } from "@/lib/utils"
 import { useCloudinaryPrewarm } from "@/hooks/use-cloudinary-prewarm"
 
+// Convert a Vercel Blob video URL to MP4 via Cloudinary (for cross-browser playback)
+function toMp4Url(url: string | null): string | null {
+  if (!url) return null
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  if (!cloudName) return url
+  // Only convert Vercel Blob URLs, skip blob: URLs and already-converted URLs
+  if (!url.includes(".public.blob.vercel-storage.com")) return url
+  return `https://res.cloudinary.com/${cloudName}/video/fetch/f_mp4,vc_h264,ac_aac/${encodeURIComponent(url)}`
+}
+
 // Helper to get character aspect ratio for generated video
 async function getCharacterAspectRatio(src: string): Promise<"9:16" | "16:9" | "fill"> {
   const ratio = await detectImageAspectRatio(src)
@@ -386,7 +396,7 @@ export default function Home() {
                 )}>
                   <video
                     ref={pipVideoRef}
-                    src={sourceVideoUrl || recordedVideoUrl || ""}
+                    src={toMp4Url(sourceVideoUrl) || recordedVideoUrl || ""}
                     muted
                     loop
                     playsInline
