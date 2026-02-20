@@ -47,6 +47,8 @@ interface CompositeVideoOptions {
   pipVideoUrl: string | null
   /** Whether to add PiP overlay */
   showPip: boolean
+  /** Aspect ratio of the PiP video */
+  pipAspectRatio?: "9:16" | "16:9" | "fill"
   /** Watermark text (defaults to site URL) */
   watermark?: string
   /** Cloudinary cloud name */
@@ -62,6 +64,7 @@ export function buildCompositeVideoUrl({
   mainVideoUrl,
   pipVideoUrl,
   showPip,
+  pipAspectRatio = "fill",
   watermark = WATERMARK_TEXT,
   cloudName,
 }: CompositeVideoOptions): string {
@@ -70,11 +73,13 @@ export function buildCompositeVideoUrl({
   const transformations: string[] = []
 
   // PiP video overlay using fetch source (base64-encoded URL)
+  // Use smaller size for portrait (9:16) PiP to avoid it being too large
   if (showPip && pipVideoUrl) {
     validateBlobUrl(pipVideoUrl)
     const b64Url = base64UrlEncode(pipVideoUrl)
+    const pipSize = pipAspectRatio === "9:16" ? "w_0.12" : "w_0.2"
     transformations.push(
-      `l_video:fetch:${b64Url},w_0.2,fl_relative,ac_none,r_12,g_south_east,x_20,y_20`
+      `l_video:fetch:${b64Url},${pipSize},fl_relative,ac_none,r_12,g_south_east,x_20,y_20`
     )
   }
 
