@@ -341,7 +341,7 @@ export function CharacterGrid({
                     src={char.src || "/placeholder.svg"}
                     alt={char.name}
                     className="h-full w-full object-cover object-top"
-                    loading="lazy"
+                    loading="eager"
                     draggable={false}
                   />
                 </button>

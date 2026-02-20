@@ -1,8 +1,16 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import type { Character, User, ReferenceImage, CharacterCategory } from "@/lib/types"
 import { STORAGE_KEYS, CUSTOM_CHARACTER_ID_OFFSET, DEFAULT_CHARACTERS } from "@/lib/constants"
+
+// Preload images into browser cache so they render instantly when the grid appears
+function preloadImages(urls: string[]) {
+  urls.forEach(url => {
+    const img = new window.Image()
+    img.src = url
+  })
+}
 
 interface UseCharactersOptions {
   user: User | null
@@ -38,6 +46,15 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
   const [usageLoaded, setUsageLoaded] = useState(false)
   const [customLoaded, setCustomLoaded] = useState(false)
 
+  // Preload default character images immediately
+  const preloadedDefaults = useRef(false)
+  useEffect(() => {
+    if (!preloadedDefaults.current) {
+      preloadedDefaults.current = true
+      preloadImages(DEFAULT_CHARACTERS.map(c => c.src))
+    }
+  }, [])
+
   // Load hidden default characters from localStorage
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEYS.HIDDEN_CHARACTERS)
@@ -71,6 +88,7 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
             category: c.suggested_category as CharacterCategory,
           }))
           setApprovedCharacters(approved)
+          preloadImages(approved.map((c: Character) => c.src))
         }
       })
       .catch(console.error)
@@ -95,6 +113,7 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
               category: img.category as CharacterCategory | undefined,
             }))
             setCustomCharacters(loadedCharacters)
+            preloadImages(loadedCharacters.map(c => c.src))
           }
         })
         .catch(console.error)
