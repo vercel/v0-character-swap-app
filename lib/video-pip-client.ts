@@ -100,8 +100,20 @@ export async function createPipVideoClient({
   const watermarkText = "created with faceswapvid.vercel.app"
   const fontSize = Math.max(14, Math.round(canvas.height * 0.025))
 
-  // Use MediaRecorder to capture the canvas as video
+  // Use MediaRecorder to capture the canvas as video + audio from main video
   const stream = canvas.captureStream(30)
+
+  // Capture audio from the main video element
+  try {
+    const audioCtx = new AudioContext()
+    const source = audioCtx.createMediaElementSource(mainVideo)
+    const dest = audioCtx.createMediaStreamDestination()
+    source.connect(dest)
+    source.connect(audioCtx.destination) // keep audio playing
+    dest.stream.getAudioTracks().forEach(track => stream.addTrack(track))
+  } catch {
+    // No audio available or already captured — continue without
+  }
 
   // Try MP4 first (Safari), then WebM (Chrome/Firefox)
   const codecs = [
@@ -173,7 +185,9 @@ export async function createPipVideoClient({
       // Draw watermark
       if (addWatermark) {
         ctx.save()
-        ctx.font = `${fontSize}px monospace`
+        ctx.imageSmoothingEnabled = true
+        ctx.imageSmoothingQuality = "high"
+        ctx.font = `500 ${fontSize}px "Geist Mono", ui-monospace, SFMono-Regular, monospace`
         ctx.fillStyle = "rgba(255,255,255,0.7)"
         ctx.shadowColor = "rgba(0,0,0,0.5)"
         ctx.shadowBlur = 4

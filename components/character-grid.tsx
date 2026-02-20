@@ -75,6 +75,8 @@ export function CharacterGrid({
   const displayCharacters = externalFilteredCharacters || allCharacters
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [likenessConsent, setLikenessConsent] = useState(false)
   const [showUploadTooltip, setShowUploadTooltip] = useState(false)
   const [recentlyUploadedUrl, setRecentlyUploadedUrl] = useState<string | null>(null)
   const [recentlyUploadedId, setRecentlyUploadedId] = useState<number | null>(null)
@@ -146,21 +148,40 @@ export function CharacterGrid({
     setIsDragOver(false)
   }
 
+  const promptConsent = (file: File) => {
+    setPendingFile(file)
+    setLikenessConsent(false)
+    setUploadError(null)
+  }
+
+  const confirmConsent = () => {
+    if (pendingFile && likenessConsent) {
+      processFile(pendingFile)
+      setPendingFile(null)
+      setLikenessConsent(false)
+    }
+  }
+
+  const cancelConsent = () => {
+    setPendingFile(null)
+    setLikenessConsent(false)
+  }
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(false)
     if (disabled) return
-    
+
     const file = e.dataTransfer.files?.[0]
     if (file?.type.startsWith("image/")) {
-      processFile(file)
+      promptConsent(file)
     }
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      processFile(file)
+      promptConsent(file)
       e.target.value = ""
     }
   }
@@ -525,6 +546,49 @@ export function CharacterGrid({
           </div>
         )}
         
+        {/* Likeness consent prompt */}
+        {pendingFile && (
+          <div className="mt-3 rounded-lg bg-neutral-900 p-3 ring-1 ring-neutral-800">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="h-10 w-10 overflow-hidden rounded-lg bg-neutral-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={URL.createObjectURL(pendingFile)}
+                  alt=""
+                  className="h-full w-full object-cover object-top"
+                />
+              </div>
+              <p className="font-mono text-[11px] text-neutral-300">{pendingFile.name}</p>
+            </div>
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={likenessConsent}
+                onChange={(e) => setLikenessConsent(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 appearance-none rounded border border-neutral-600 bg-neutral-800 checked:border-white checked:bg-white"
+              />
+              <span className="font-mono text-[10px] leading-relaxed text-neutral-400">
+                I confirm I&apos;m authorized to generate content using this person&apos;s likeness
+              </span>
+            </label>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={confirmConsent}
+                disabled={!likenessConsent}
+                className="rounded-full bg-white px-4 py-1.5 font-mono text-[11px] font-medium text-black transition-all hover:bg-neutral-200 active:scale-95 disabled:opacity-30"
+              >
+                upload
+              </button>
+              <button
+                onClick={cancelConsent}
+                className="rounded-full bg-neutral-800 px-4 py-1.5 font-mono text-[11px] text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white active:scale-95"
+              >
+                cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Upload error message */}
         {uploadError && (
           <div className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-[11px] text-red-400">
