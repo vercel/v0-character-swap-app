@@ -1,12 +1,28 @@
 import { sql } from "@/lib/db"
 import { NextResponse } from "next/server"
+import { verifySession } from "@/lib/auth"
+
+const ADMIN_EMAILS = process.env.ADMIN_EMAILS?.split(",") ?? []
+
+async function requireAdmin() {
+  const session = await verifySession()
+  if (!session?.user?.id) return null
+  if (ADMIN_EMAILS.length > 0 && !ADMIN_EMAILS.includes(session.user.email)) return null
+  return session
+}
 
 // Get all submissions
 export async function GET() {
   try {
+    const session = await requireAdmin()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const submissions = await sql`
-      SELECT * FROM character_submissions 
+      SELECT * FROM character_submissions
       ORDER BY created_at DESC
+      LIMIT 200
     `
     return NextResponse.json({ submissions })
   } catch (error) {
@@ -18,6 +34,11 @@ export async function GET() {
 // Update submission status (approve/reject)
 export async function PATCH(request: Request) {
   try {
+    const session = await requireAdmin()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { id, status, name, category } = await request.json()
 
     if (!id || !status) {
@@ -29,8 +50,8 @@ export async function PATCH(request: Request) {
     }
 
     await sql`
-      UPDATE character_submissions 
-      SET status = ${status}, 
+      UPDATE character_submissions
+      SET status = ${status},
           suggested_name = COALESCE(${name || null}, suggested_name),
           suggested_category = COALESCE(${category || null}, suggested_category)
       WHERE id = ${id}
@@ -46,6 +67,11 @@ export async function PATCH(request: Request) {
 // Delete submission
 export async function DELETE(request: Request) {
   try {
+    const session = await requireAdmin()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { id } = await request.json()
 
     if (!id) {

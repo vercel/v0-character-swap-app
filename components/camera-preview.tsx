@@ -269,11 +269,11 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     }, 1000)
   }, [beginRecording])
 
-  // Minimum recording duration required by fal.ai (2 seconds of continuous motion)
+  // Minimum recording duration required by Kling AI (2 seconds of continuous motion)
   const MIN_RECORDING_SECONDS = 3
   
   const stopRecording = useCallback(() => {
-    // Prevent stopping too early - fal.ai requires at least 2s of continuous motion
+    // Prevent stopping too early - Kling AI requires at least 2s of continuous motion
     if (recordingTime < MIN_RECORDING_SECONDS) {
       return // Don't stop, need more recording time
     }

@@ -12,16 +12,16 @@ async function requestNotificationPermission(): Promise<boolean> {
   if (!("Notification" in window)) {
     return false
   }
-  
+
   if (Notification.permission === "granted") {
     return true
   }
-  
+
   if (Notification.permission !== "denied") {
     const permission = await Notification.requestPermission()
     return permission === "granted"
   }
-  
+
   return false
 }
 
@@ -30,18 +30,18 @@ function showVideoReadyNotification(characterName: string | null) {
   if (!("Notification" in window) || Notification.permission !== "granted") {
     return
   }
-  
+
   const notification = new Notification("Video Ready!", {
-    body: characterName 
+    body: characterName
       ? `Your ${characterName} video is ready to view`
       : "Your video generation is complete",
     icon: "/favicon.ico",
     tag: "video-ready", // Prevents duplicate notifications
   })
-  
+
   // Auto-close after 5 seconds
   setTimeout(() => notification.close(), 5000)
-  
+
   // Focus window when clicked
   notification.onclick = () => {
     window.focus()
@@ -83,7 +83,7 @@ export function GenerationsPanel({ onSelectVideo, className = "", variant = "def
   const { user } = useAuth()
   const prevGenerationsRef = useRef<Generation[]>([])
   const hasRequestedPermission = useRef(false)
-  
+
   const { data, isLoading, mutate } = useSWR(
     user?.id ? "/api/generations" : null,
     fetcher,
@@ -92,7 +92,7 @@ export function GenerationsPanel({ onSelectVideo, className = "", variant = "def
       dedupingInterval: 2000,
     }
   )
-  
+
   const generations: Generation[] = data?.generations || []
   const hasPending = generations.some(g => g.status === "uploading" || g.status === "pending" || g.status === "processing")
 
@@ -107,7 +107,7 @@ export function GenerationsPanel({ onSelectVideo, className = "", variant = "def
   // Detect when a generation completes and show notification
   useEffect(() => {
     const prevGenerations = prevGenerationsRef.current
-    
+
     // Check if any generation just completed
     for (const gen of generations) {
       if (gen.status === "completed") {
@@ -118,7 +118,7 @@ export function GenerationsPanel({ onSelectVideo, className = "", variant = "def
         }
       }
     }
-    
+
     // Update ref for next comparison - make a copy to avoid reference issues
     prevGenerationsRef.current = [...generations]
   }, [generations])
@@ -140,18 +140,23 @@ export function GenerationsPanel({ onSelectVideo, className = "", variant = "def
     return () => window.removeEventListener("refresh-generations", handleRefresh)
   }, [mutate])
 
-  // Delete/Cancel a generation
+  // Delete/Cancel a generation (optimistic update)
   const handleDelete = async (generationId: number, e?: React.MouseEvent) => {
     e?.stopPropagation()
+    // Remove from UI immediately
+    mutate(
+      (current: { generations: Generation[] } | undefined) => {
+        if (!current) return current
+        return { generations: current.generations.filter(g => g.id !== generationId) }
+      },
+      { revalidate: false }
+    )
     try {
-      const response = await fetch(`/api/generations/${generationId}`, {
-        method: "DELETE",
-      })
-      if (response.ok) {
-        mutate()
-      }
+      await fetch(`/api/generations/${generationId}`, { method: "DELETE" })
     } catch (error) {
       console.error("Failed to delete generation:", error)
+      // Revert on failure
+      mutate()
     }
   }
 
@@ -209,25 +214,12 @@ export function GenerationsPanel({ onSelectVideo, className = "", variant = "def
   // Filter generations based on variant
   // Compact: show completed and processing videos (not cancelled/failed)
   // Default: show all except cancelled
-  const displayGenerations = variant === "compact" 
+  const displayGenerations = variant === "compact"
     ? generations.filter(g => (g.status === "completed" && g.video_url) || g.status === "processing" || g.status === "pending")
     : generations.filter(g => g.status !== "cancelled")
 
   if (variant === "compact" && displayGenerations.length === 0) {
     return null
-  }
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    
-    if (diffMins < 1) return "Just now"
-    if (diffMins < 60) return `${diffMins}m ago`
-    const diffHours = Math.floor(diffMins / 60)
-    if (diffHours < 24) return `${diffHours}h ago`
-    return date.toLocaleDateString()
   }
 
   return (
@@ -237,23 +229,25 @@ export function GenerationsPanel({ onSelectVideo, className = "", variant = "def
           my videos
         </p>
       )}
-      
-      <div className={variant === "compact" ? "-mx-1 flex gap-1 overflow-x-auto px-1 pb-1" : "-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-2 pt-2"}>
+
+      <div className={variant === "compact" ? "-mx-1 flex gap-1 overflow-x-auto px-1 pb-1" : "-mx-2 flex gap-2.5 overflow-x-auto px-2 pb-2 pt-3"}>
         {displayGenerations.map((gen) => {
           // Determine thumbnail width based on aspect ratio
           const isLandscape = gen.aspect_ratio === "16:9"
           const thumbnailClass = variant === "compact"
             ? isLandscape ? "h-12 w-16" : "h-12 w-9"
-            : isLandscape 
+            : isLandscape
               ? "h-16 w-[85px] md:h-20 md:w-[107px]" // 16:9 ratio
               : "h-16 w-11 md:h-20 md:w-14" // portrait/fill
-          
+
+          const showDeleteButton = gen.status === "completed" || gen.status === "failed"
+
           return (
           <div
             key={gen.id}
             className={`group relative shrink-0 ${thumbnailClass}`}
           >
-            {/* Container with overflow hidden for video */}
+            {/* Content container with overflow hidden */}
             <div className="h-full w-full overflow-hidden rounded-lg bg-neutral-900 ring-1 ring-neutral-800">
             {/* Thumbnail or status indicator */}
             {gen.status === "completed" && gen.video_url ? (
@@ -281,10 +275,7 @@ export function GenerationsPanel({ onSelectVideo, className = "", variant = "def
                 </div>
               </button>
             ) : gen.status === "failed" || gen.status === "cancelled" ? (
-              <FailedGeneration 
-                gen={gen} 
-                onDelete={(e) => handleDelete(gen.id, e)} 
-              />
+              <FailedGeneration gen={gen} />
             ) : (
               // Processing/Pending state with progress indicator
               <GenerationProgress
@@ -294,14 +285,13 @@ export function GenerationsPanel({ onSelectVideo, className = "", variant = "def
                 onCancel={(e) => handleDelete(gen.id, e)}
               />
             )}
-            
-
             </div>
-            {/* Delete button - outside overflow container so it's not clipped */}
-            {gen.status === "completed" && (
+
+            {/* Delete button - OUTSIDE overflow container so it's never clipped */}
+            {showDeleteButton && (
               <button
                 onClick={(e) => handleDelete(gen.id, e)}
-                className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-800 text-neutral-400 opacity-0 shadow-md ring-1 ring-neutral-700 transition-all hover:bg-neutral-700 hover:text-white group-hover:opacity-100"
+                className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-800 text-neutral-400 opacity-0 shadow-md ring-1 ring-neutral-700 transition-all hover:bg-neutral-700 hover:text-white group-hover:opacity-100"
                 title="Delete video"
               >
                 <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

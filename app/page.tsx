@@ -24,7 +24,7 @@ async function getCharacterAspectRatio(src: string): Promise<"9:16" | "16:9" | "
 }
 
 export default function Home() {
-  const { user, login, logout } = useAuth()
+  const { user, isLoading: authLoading, login, logout } = useAuth()
   const isMobile = useIsMobile()
   
   // State
@@ -69,7 +69,8 @@ export default function Home() {
     setSelectedCategory,
     filteredCharacters,
     updateCustomCharacterCategory,
-  } = useCharacters({ user })
+    isReady: charactersReady,
+  } = useCharacters({ user, authLoading })
 
   const {
     recordedVideo,
@@ -228,11 +229,11 @@ export default function Home() {
 
   // Render helpers
   const renderAuthSection = (size: "desktop" | "mobile") => {
-    if (!mounted) return null
-    
-    const avatarSize = size === "desktop" ? "h-5 w-5" : "h-6 w-6"
-    const textSize = size === "desktop" ? "text-[12px]" : "text-[13px]"
-    
+    // Invisible placeholder while auth resolves — same height, no flash
+    if (!mounted || authLoading) {
+      return <div className="mb-4 h-[17px]" />
+    }
+
     if (user) {
       return (
         <div className="mb-4 flex items-center justify-between">
@@ -246,7 +247,7 @@ export default function Home() {
         </div>
       )
     }
-    
+
     return (
       <button
         onClick={login}
@@ -279,14 +280,15 @@ export default function Home() {
               generatedVideoAspectRatio === "16:9" && "aspect-video w-full max-w-[95%] rounded-lg md:max-w-[90%]",
               generatedVideoAspectRatio === "fill" && "h-full w-full"
             )}>
-              <video 
+              <video
                 ref={mainVideoRef}
-                src={resultUrl} 
-                controls 
-                autoPlay 
+                src={resultUrl}
+                controls
+                autoPlay
                 muted
-                loop 
+                loop
                 playsInline
+                poster={allCharacters.find(c => c.id === selectedCharacter)?.src || undefined}
                 className="h-full w-full object-cover"
                 onLoadedData={(e) => {
                   const video = e.currentTarget
@@ -468,7 +470,7 @@ export default function Home() {
                   onGenerate={handleProcess}
                   selectedCategory={selectedCategory}
                   onCategoryChange={setSelectedCategory}
-                  filteredCharacters={filteredCharacters}
+                  filteredCharacters={charactersReady ? filteredCharacters : []}
                   onUpdateCharacterCategory={updateCustomCharacterCategory}
                 >
                 <GenerationsPanel
@@ -580,7 +582,7 @@ export default function Home() {
                     onGenerate={handleProcess}
                     selectedCategory={selectedCategory}
                     onCategoryChange={setSelectedCategory}
-                    filteredCharacters={filteredCharacters}
+                    filteredCharacters={charactersReady ? filteredCharacters : []}
                     onUpdateCharacterCategory={updateCustomCharacterCategory}
                   />
                 </>
@@ -601,7 +603,7 @@ export default function Home() {
                   onGenerate={handleProcess}
                   selectedCategory={selectedCategory}
                   onCategoryChange={setSelectedCategory}
-                  filteredCharacters={filteredCharacters}
+                  filteredCharacters={charactersReady ? filteredCharacters : []}
                   onUpdateCharacterCategory={updateCustomCharacterCategory}
                 >
                   <GenerationsPanel

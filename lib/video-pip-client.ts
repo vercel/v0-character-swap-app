@@ -1,26 +1,5 @@
 "use client"
 
-import { FFmpeg } from "@ffmpeg/ffmpeg"
-import { fetchFile, toBlobURL } from "@ffmpeg/util"
-
-let ffmpeg: FFmpeg | null = null
-
-async function getFFmpeg(): Promise<FFmpeg> {
-  if (ffmpeg) return ffmpeg
-  
-  ffmpeg = new FFmpeg()
-  
-  // Load ffmpeg with CORS-enabled URLs
-  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm"
-  
-  await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-  })
-  
-  return ffmpeg
-}
-
 export interface PipOptions {
   mainVideoUrl: string
   pipVideoUrl?: string | null
@@ -31,175 +10,195 @@ export interface PipOptions {
   addWatermark?: boolean
 }
 
+function loadVideo(url: string): Promise<HTMLVideoElement> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video")
+    video.crossOrigin = "anonymous"
+    video.muted = true
+    video.playsInline = true
+    video.preload = "auto"
+    video.onloadeddata = () => resolve(video)
+    video.onerror = () => reject(new Error(`Failed to load video: ${url}`))
+    video.src = url
+  })
+}
+
+function drawRoundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+  ctx.lineTo(x + r, y + h)
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+  ctx.lineTo(x, y + r)
+  ctx.quadraticCurveTo(x, y, x + r, y)
+  ctx.closePath()
+}
+
+export interface PipResult {
+  blob: Blob
+  extension: string
+}
+
 export async function createPipVideoClient({
   mainVideoUrl,
   pipVideoUrl,
   pipPosition = "bottom-right",
-  pipScale = 0.2,
-  pipAspectRatio = "9:16",
+  pipScale = 0.25,
   onProgress,
   addWatermark = true,
-}: PipOptions): Promise<Blob> {
-  const ff = await getFFmpeg()
-  
-  // Set up progress listener for ffmpeg processing
-  const progressHandler = ({ progress: p }: { progress: number }) => {
-    // Map ffmpeg progress (0-1) to 40-90% of total progress
-    const percent = 0.4 + p * 0.5
-    onProgress?.(percent)
-  }
-  ff.on("progress", progressHandler)
-  
+}: PipOptions): Promise<PipResult> {
   onProgress?.(0.05)
-  
-  // Fetch main video (and pip video if provided)
-  onProgress?.(0.1)
-  const mainData = await fetchFile(mainVideoUrl)
+
+  // Load videos
+  const mainVideo = await loadVideo(mainVideoUrl)
   onProgress?.(0.2)
-  const pipData = pipVideoUrl ? await fetchFile(pipVideoUrl) : null
-  
-  // Fetch font for watermark
-  let fontData: Uint8Array | null = null
-  if (addWatermark) {
-    try {
-      const fontUrl = "https://cdn.jsdelivr.net/fontsource/fonts/geist-mono@latest/latin-400-normal.ttf"
-      fontData = await fetchFile(fontUrl)
-    } catch (e) {
-      console.warn("Failed to load font for watermark:", e)
+
+  const pipVideo = pipVideoUrl ? await loadVideo(pipVideoUrl) : null
+  onProgress?.(0.3)
+
+  // Set up canvas at the main video's native resolution
+  const canvas = document.createElement("canvas")
+  canvas.width = mainVideo.videoWidth
+  canvas.height = mainVideo.videoHeight
+  const ctx = canvas.getContext("2d")!
+
+  // Calculate PiP dimensions and position
+  const padding = 20
+  const cornerRadius = 12
+  let pipW = 0
+  let pipH = 0
+  let pipX = 0
+  let pipY = 0
+
+  if (pipVideo) {
+    // PiP height is pipScale of main video height
+    pipH = Math.round(canvas.height * pipScale)
+    pipW = Math.round(pipH * (pipVideo.videoWidth / pipVideo.videoHeight))
+
+    const positions = {
+      "bottom-right": { x: canvas.width - pipW - padding, y: canvas.height - pipH - padding },
+      "bottom-left": { x: padding, y: canvas.height - pipH - padding },
+      "top-right": { x: canvas.width - pipW - padding, y: padding },
+      "top-left": { x: padding, y: padding },
     }
+    const pos = positions[pipPosition]
+    pipX = pos.x
+    pipY = pos.y
   }
-  
-  onProgress?.(0.35)
-  
-  // Write files to ffmpeg virtual filesystem
-  await ff.writeFile("main.mp4", mainData)
-  if (pipData) {
-    await ff.writeFile("pip.webm", pipData)
-  }
-  if (fontData) {
-    await ff.writeFile("font.ttf", fontData)
-  }
-  
-  onProgress?.(0.4)
-  
-  // Calculate overlay position based on pipPosition
-  // overlay_w and overlay_h refer to the PiP video dimensions after scaling
-  // W and H refer to the main video dimensions
-  const positionMap = {
-    "bottom-right": `W-overlay_w-20:H-overlay_h-20`,
-    "bottom-left": `20:H-overlay_h-20`,
-    "top-right": `W-overlay_w-20:20`,
-    "top-left": `20:20`,
-  }
-  
-  const overlayPosition = positionMap[pipPosition]
-  
-  // Watermark text - positioned at bottom left with some padding
+
+  // Watermark config
   const watermarkText = "created with faceswapvid.vercel.app"
-  // Escape special characters for ffmpeg drawtext
-  const escapedText = watermarkText.replace(/:/g, "\\:")
-  
-  // Build watermark filter if font is available
-  const watermarkFilter = fontData 
-    ? `drawtext=text='${escapedText}':fontfile=font.ttf:fontsize=18:fontcolor=white@0.8:x=20:y=h-40:shadowcolor=black@0.5:shadowx=1:shadowy=1`
-    : ""
-  
-  // Build filter complex based on options
-  let filterComplex = ""
-  
-  if (pipData) {
-    // Calculate PiP dimensions based on aspect ratio
-    // For 9:16, we want height-based scaling; for 16:9, width-based
-    // Using main video height (H) as reference, PiP height = H * pipScale
-    let pipScaleFilter: string
-    const cornerRadius = 12 // rounded corners radius in pixels
-    
-    if (pipAspectRatio === "9:16") {
-      // Height is the reference, width = height * 9/16
-      // Scale to a fixed height based on pipScale, maintain 9:16 ratio
-      pipScaleFilter = `scale=-1:ih*${pipScale}:force_original_aspect_ratio=decrease,crop=trunc(ih*9/16/2)*2:ih`
-    } else if (pipAspectRatio === "16:9") {
-      // Width is the reference
-      pipScaleFilter = `scale=iw*${pipScale}:-1:force_original_aspect_ratio=decrease,crop=iw:trunc(iw*9/16/2)*2`
-    } else {
-      // Fill - maintain original aspect ratio
-      pipScaleFilter = `scale=iw*${pipScale}:ih*${pipScale}`
-    }
-    
-    // Add rounded corners using format and geq filter for alpha masking
-    // Create rounded rectangle mask effect with drawbox and overlay
-    const roundedFilter = `format=yuva420p,geq=lum='lum(X,Y)':cb='cb(X,Y)':cr='cr(X,Y)':a='if(gt(abs(W/2-X),W/2-${cornerRadius})*gt(abs(H/2-Y),H/2-${cornerRadius}),(1-ceil(hypot(abs(W/2-X)-(W/2-${cornerRadius}),abs(H/2-Y)-(H/2-${cornerRadius}))-${cornerRadius}))*255,255)'`
-    
-    // With PiP overlay and rounded corners
-    filterComplex = `[1:v]${pipScaleFilter},${roundedFilter}[pip];[0:v][pip]overlay=${overlayPosition}:shortest=1`
-    if (addWatermark && watermarkFilter) {
-      filterComplex += `[vid];[vid]${watermarkFilter}`
-    }
-  } else {
-    // No PiP, just watermark
-    if (addWatermark && watermarkFilter) {
-      filterComplex = watermarkFilter
-    }
+  const fontSize = Math.max(14, Math.round(canvas.height * 0.025))
+
+  // Use MediaRecorder to capture the canvas as video
+  const stream = canvas.captureStream(30)
+
+  // Try MP4 first (Safari), then WebM (Chrome/Firefox)
+  const codecs = [
+    "video/mp4;codecs=avc1",
+    "video/mp4",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+  ]
+  const mimeType = codecs.find((c) => MediaRecorder.isTypeSupported(c)) || "video/webm"
+
+  const recorder = new MediaRecorder(stream, {
+    mimeType,
+    videoBitsPerSecond: 8_000_000,
+  })
+
+  const chunks: Blob[] = []
+  recorder.ondataavailable = (e) => {
+    if (e.data.size > 0) chunks.push(e.data)
   }
-  
-  // If no filters needed, just return the original video
-  if (!filterComplex) {
-    // Clean up
-    ff.off("progress", progressHandler)
-    await ff.deleteFile("main.mp4")
-    if (pipData) {
-      await ff.deleteFile("pip.webm")
+
+  const recordingDone = new Promise<Blob>((resolve) => {
+    recorder.onstop = () => {
+      resolve(new Blob(chunks, { type: mimeType }))
     }
-    if (fontData) {
-      await ff.deleteFile("font.ttf")
+  })
+
+  // Start recording and play videos
+  recorder.start()
+  mainVideo.currentTime = 0
+  if (pipVideo) pipVideo.currentTime = 0
+
+  const playPromises: Promise<void>[] = [mainVideo.play()]
+  if (pipVideo) playPromises.push(pipVideo.play())
+  await Promise.all(playPromises)
+
+  onProgress?.(0.4)
+
+  // Draw frames until main video ends
+  const duration = mainVideo.duration
+  await new Promise<void>((resolve) => {
+    function drawFrame() {
+      if (mainVideo.ended || mainVideo.paused) {
+        recorder.stop()
+        resolve()
+        return
+      }
+
+      // Draw main video
+      ctx.drawImage(mainVideo, 0, 0, canvas.width, canvas.height)
+
+      // Draw PiP with rounded corners
+      if (pipVideo && !pipVideo.ended) {
+        ctx.save()
+        drawRoundedRect(ctx, pipX, pipY, pipW, pipH, cornerRadius)
+        ctx.clip()
+        ctx.drawImage(pipVideo, pipX, pipY, pipW, pipH)
+        ctx.restore()
+
+        // Draw subtle border around PiP
+        ctx.save()
+        drawRoundedRect(ctx, pipX, pipY, pipW, pipH, cornerRadius)
+        ctx.strokeStyle = "rgba(255,255,255,0.3)"
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+        ctx.restore()
+      }
+
+      // Draw watermark
+      if (addWatermark) {
+        ctx.save()
+        ctx.font = `${fontSize}px monospace`
+        ctx.fillStyle = "rgba(255,255,255,0.7)"
+        ctx.shadowColor = "rgba(0,0,0,0.5)"
+        ctx.shadowBlur = 4
+        ctx.shadowOffsetX = 1
+        ctx.shadowOffsetY = 1
+        ctx.fillText(watermarkText, 20, canvas.height - 20)
+        ctx.restore()
+      }
+
+      // Report progress
+      if (duration > 0) {
+        const p = 0.4 + (mainVideo.currentTime / duration) * 0.5
+        onProgress?.(Math.min(p, 0.9))
+      }
+
+      requestAnimationFrame(drawFrame)
     }
-    onProgress?.(1.0)
-    // Fetch original and return
-    const response = await fetch(mainVideoUrl)
-    return await response.blob()
-  }
-  
-  // Build ffmpeg command
-  const ffmpegArgs = ["-i", "main.mp4"]
-  
-  if (pipData) {
-    ffmpegArgs.push("-i", "pip.webm")
-  }
-  
-  ffmpegArgs.push("-filter_complex", filterComplex)
-  
-  ffmpegArgs.push(
-    "-c:v", "libx264",
-    "-preset", "fast",
-    "-c:a", "aac",
-    "-shortest",
-    "output.mp4"
-  )
-  
-  await ff.exec(ffmpegArgs)
-  
-  // Remove progress listener
-  ff.off("progress", progressHandler)
-  
-  onProgress?.(0.92)
-  
-  // Read the output file
-  const outputData = await ff.readFile("output.mp4")
-  
-  // Clean up
-  await ff.deleteFile("main.mp4")
-  if (pipData) {
-    await ff.deleteFile("pip.webm")
-  }
-  if (fontData) {
-    await ff.deleteFile("font.ttf")
-  }
-  await ff.deleteFile("output.mp4")
-  
+    requestAnimationFrame(drawFrame)
+  })
+
+  onProgress?.(0.95)
+  const blob = await recordingDone
   onProgress?.(1.0)
-  
-  // Convert to Blob
-  return new Blob([outputData], { type: "video/mp4" })
+  const extension = mimeType.includes("mp4") ? "mp4" : "webm"
+  return { blob, extension }
 }
 
 export function downloadBlob(blob: Blob, filename: string) {

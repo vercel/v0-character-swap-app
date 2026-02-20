@@ -31,7 +31,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(data.user || null)
         setIsLoading(false)
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("Failed to fetch session:", err)
+        setUser(null)
         setIsLoading(false)
       })
   }, [])

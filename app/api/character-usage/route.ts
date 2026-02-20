@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server"
-import { neon } from "@neondatabase/serverless"
-
-const sql = neon(process.env.DATABASE_URL!)
+import { sql } from "@/lib/db"
 
 export async function POST(request: Request) {
   try {
     const { characterId } = await request.json()
-    
+
     if (!characterId) {
       return NextResponse.json({ error: "characterId is required" }, { status: 400 })
     }
@@ -15,8 +13,8 @@ export async function POST(request: Request) {
     await sql`
       INSERT INTO character_usage (character_id, usage_count, last_used_at)
       VALUES (${String(characterId)}, 1, NOW())
-      ON CONFLICT (character_id) 
-      DO UPDATE SET 
+      ON CONFLICT (character_id)
+      DO UPDATE SET
         usage_count = character_usage.usage_count + 1,
         last_used_at = NOW()
     `
@@ -31,8 +29,8 @@ export async function POST(request: Request) {
 export async function GET() {
   try {
     const usage = await sql`
-      SELECT character_id, usage_count 
-      FROM character_usage 
+      SELECT character_id, usage_count
+      FROM character_usage
       ORDER BY usage_count DESC
     `
 
@@ -42,7 +40,11 @@ export async function GET() {
       usageMap[row.character_id] = row.usage_count
     }
 
-    return NextResponse.json({ usage: usageMap })
+    return NextResponse.json({ usage: usageMap }, {
+      headers: {
+        'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600',
+      }
+    })
   } catch (error) {
     console.error("Error fetching character usage:", error)
     return NextResponse.json({ error: "Failed to fetch usage" }, { status: 500 })

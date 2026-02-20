@@ -1,8 +1,7 @@
 "use client"
 
 import React, { useRef, useState, useEffect } from "react"
-import Image from "next/image"
-import { cn, detectImageAspectRatio } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import { upload } from "@vercel/blob/client"
 import type { Character, CharacterCategory } from "@/lib/types"
 import { DEFAULT_CHARACTERS, CHARACTER_CATEGORIES } from "@/lib/constants"
@@ -67,20 +66,6 @@ export function CharacterGrid({
   
   // Use external filtered characters if provided, otherwise use all
   const displayCharacters = externalFilteredCharacters || allCharacters
-  
-  // Track detected aspect ratios for each character image
-  const [aspectRatios, setAspectRatios] = useState<Record<number, string>>({})
-  
-  // Detect aspect ratios for all display characters (includes approved from community)
-  useEffect(() => {
-    displayCharacters.forEach(async (char) => {
-      if (!aspectRatios[char.id] && char.src) {
-        const ar = await detectImageAspectRatio(char.src)
-        setAspectRatios(prev => ({ ...prev, [char.id]: ar }))
-      }
-    })
-  }, [displayCharacters]) // eslint-disable-line react-hooks/exhaustive-deps
-
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [showUploadTooltip, setShowUploadTooltip] = useState(false)
@@ -94,7 +79,7 @@ export function CharacterGrid({
   const [characterName, setCharacterName] = useState("")
   const [showNameInput, setShowNameInput] = useState(false)
 
-  // Validate image dimensions (min 340x340 for fal.ai)
+  // Validate image dimensions (min 340x340 for Kling AI)
   const validateImageDimensions = (file: File): Promise<{ width: number; height: number }> => {
     return new Promise((resolve, reject) => {
       const img = new window.Image()
@@ -225,6 +210,7 @@ export function CharacterGrid({
     } catch (error) {
       console.error("Failed to generate:", error)
       clearInterval(progressInterval)
+      setUploadError("Failed to generate character. Please try again.")
     } finally {
       setTimeout(() => {
         setIsGenerating(false)
@@ -326,24 +312,18 @@ export function CharacterGrid({
         {/* Grid container - flex wrap with fixed height */}
         <div className="py-1">
           <div className="flex flex-wrap gap-1.5 md:gap-2">
+          {displayCharacters.length === 0 && (
+            // Skeleton placeholders while loading
+            Array.from({ length: 8 }).map((_, i) => (
+              <div key={`skel-${i}`} className="h-[50px] w-[50px] animate-pulse rounded-lg bg-neutral-800 md:h-[56px] md:w-[56px]" />
+            ))
+          )}
           {displayCharacters.map((char) => {
             const isCustom = customCharacters.some(c => c.id === char.id)
             const isDefault = visibleDefaultCharacters.some(c => c.id === char.id)
             const canDelete = (isCustom && onDeleteCustom) || (isDefault && onHideDefault)
-            const ar = aspectRatios[char.id] || "1:1" // Default to square while loading
-            // Calculate width based on aspect ratio (height is fixed at 50px mobile, 56px desktop)
-            const isLandscape = ar === "16:9" || ar === "4:3"
-            const isSquare = ar === "1:1"
-            const isPortrait = ar === "9:16" || ar === "3:4"
             const isSelected = selectedId === char.id
-            
-            // Width classes based on aspect ratio
-            const widthClass = isLandscape 
-              ? "w-[89px] md:w-[100px]" 
-              : isSquare 
-              ? "w-[50px] md:w-[56px]" 
-              : "w-[38px] md:w-[42px]"
-            
+
             return (
               <div key={char.id} className="group relative">
                 <button
@@ -354,18 +334,15 @@ export function CharacterGrid({
                   }}
                   disabled={disabled}
                   data-selected={isSelected}
-                  className={`relative h-[50px] overflow-hidden rounded-lg border border-neutral-800 transition-all hover:border-neutral-600 data-[selected=true]:border-[2px] data-[selected=true]:border-white disabled:cursor-not-allowed disabled:opacity-50 md:h-[56px] ${widthClass}`}
+                  className="relative h-[50px] w-[50px] overflow-hidden rounded-lg border border-neutral-800 transition-all hover:border-neutral-600 data-[selected=true]:border-[2px] data-[selected=true]:border-white disabled:cursor-not-allowed disabled:opacity-50 md:h-[56px] md:w-[56px]"
                 >
-                  <Image
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
                     src={char.src || "/placeholder.svg"}
                     alt={char.name}
-                    fill
-                    className={`object-cover ${isPortrait ? "object-top" : "object-center"}`}
-                    sizes="(max-width: 768px) 133px, 160px"
-                    quality={60}
+                    className="h-full w-full object-cover object-top"
                     loading="lazy"
-                    placeholder="blur"
-                    blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUH/8QAIhAAAgEDAwUBAAAAAAAAAAAAAQIDAAQRBRIhBhMiMUFR/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAZEQACAwEAAAAAAAAAAAAAAAABAgADESH/2gAMAwEAAhEDEEA/AKek6hY2+mWkM8qJMkKrIpbBDAYIOKVd"
+                    draggable={false}
                   />
                 </button>
                 
@@ -415,7 +392,7 @@ export function CharacterGrid({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || isUploading}
-              className="h-[50px] w-[70px] rounded-lg border border-dashed border-neutral-700 transition-colors hover:border-neutral-500 disabled:cursor-not-allowed disabled:opacity-50 md:h-[56px] md:w-[80px]"
+              className="h-[50px] w-[50px] rounded-lg border border-dashed border-neutral-700 transition-colors hover:border-neutral-500 disabled:cursor-not-allowed disabled:opacity-50 md:h-[56px] md:w-[56px]"
             >
               <div className="flex h-full flex-col items-center justify-center gap-1 text-neutral-500">
                 {isUploading ? (
@@ -466,7 +443,7 @@ export function CharacterGrid({
               onClick={() => setShowAiPrompt(!showAiPrompt)}
               disabled={disabled || isGenerating}
               className={cn(
-                "h-[50px] w-[70px] rounded-lg border border-dashed transition-colors disabled:cursor-not-allowed disabled:opacity-50 md:h-[56px] md:w-[80px]",
+                "h-[50px] w-[50px] rounded-lg border border-dashed transition-colors disabled:cursor-not-allowed disabled:opacity-50 md:h-[56px] md:w-[56px]",
                 showAiPrompt ? "border-white" : "border-neutral-700 hover:border-neutral-500"
               )}
             >
@@ -644,9 +621,10 @@ export function CharacterGrid({
           </div>
         )}
         
-        {/* Children slot for My Videos panel */}
-        {children}
       </div>
+
+      {/* Children slot for My Videos panel - outside scroll area */}
+      {children && <div className="shrink-0">{children}</div>}
       
       {/* Generate Video CTA - Always visible at bottom */}
       {onGenerate && (
@@ -754,7 +732,7 @@ export function CharacterGrid({
                   <p>
                     <a href="https://vercel.com/docs/workflow" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">workflow</a>
                     <span className="text-neutral-500"> — </span>
-                    durable function execution that survives timeouts. orchestrates the generation pipeline: receives request → calls fal api → waits for webhook → updates database.
+                    durable function execution that survives timeouts. orchestrates the generation pipeline: receives request → calls AI Gateway → waits for completion → updates database.
                   </p>
                   <p>
                     <a href="https://vercel.com/docs/storage/vercel-blob" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">blob</a>

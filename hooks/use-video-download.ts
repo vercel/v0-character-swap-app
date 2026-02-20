@@ -34,7 +34,7 @@ export function useVideoDownload({
         setIsDownloading(true)
         setDownloadProgress(0)
 
-        const pipBlob = await createPipVideoClient({
+        const { blob, extension } = await createPipVideoClient({
           mainVideoUrl: resultUrl,
           pipVideoUrl: pipVideoUrl,
           pipPosition: "bottom-right",
@@ -44,7 +44,7 @@ export function useVideoDownload({
           onProgress: setDownloadProgress,
         })
 
-        downloadBlob(pipBlob, "generated-video-with-pip.mp4")
+        downloadBlob(blob, `generated-video-with-pip.${extension}`)
       } catch (error) {
         console.error("PiP download failed:", error)
         // Fallback to regular download
@@ -61,14 +61,14 @@ export function useVideoDownload({
         setIsDownloading(true)
         setDownloadProgress(0)
 
-        const videoBlob = await createPipVideoClient({
+        const { blob, extension } = await createPipVideoClient({
           mainVideoUrl: resultUrl,
           pipVideoUrl: null,
           addWatermark: true,
           onProgress: setDownloadProgress,
         })
 
-        downloadBlob(videoBlob, "generated-video.mp4")
+        downloadBlob(blob, `generated-video.${extension}`)
       } catch (error) {
         console.error("Watermark failed, downloading original:", error)
         // Fallback to regular download

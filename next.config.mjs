@@ -4,9 +4,10 @@ const { withWorkflow } = pkg;
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
+    // TODO: fix TS errors in workflow SDK types, ffmpeg worker, and Vercel Blob types
     ignoreBuildErrors: true,
   },
-  // Required for ffmpeg.wasm (SharedArrayBuffer needs COOP/COEP headers)
+  // Required for SharedArrayBuffer (video processing worker needs COOP/COEP headers)
   async headers() {
     return [
       {
@@ -14,6 +15,10 @@ const nextConfig = {
         headers: [
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
           { key: "Cross-Origin-Embedder-Policy", value: "credentialless" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
         ],
       },
     ]
@@ -23,10 +28,6 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "*.public.blob.vercel-storage.com",
-      },
-      {
-        protocol: "https", 
-        hostname: "fal.media",
       },
       {
         protocol: "https",
@@ -40,6 +41,7 @@ const nextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 160, 256],
     qualities: [60, 75],
   },
+  poweredByHeader: false,
 }
 
 export default withWorkflow(nextConfig)

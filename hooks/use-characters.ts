@@ -6,6 +6,7 @@ import { STORAGE_KEYS, CUSTOM_CHARACTER_ID_OFFSET, DEFAULT_CHARACTERS } from "@/
 
 interface UseCharactersOptions {
   user: User | null
+  authLoading?: boolean
 }
 
 interface UseCharactersReturn {
@@ -23,15 +24,19 @@ interface UseCharactersReturn {
   setSelectedCategory: (category: CharacterCategory | "all") => void
   filteredCharacters: Character[]
   updateCustomCharacterCategory: (characterId: number, category: CharacterCategory) => void
+  isReady: boolean
 }
 
-export function useCharacters({ user }: UseCharactersOptions): UseCharactersReturn {
+export function useCharacters({ user, authLoading = false }: UseCharactersOptions): UseCharactersReturn {
   const [customCharacters, setCustomCharacters] = useState<Character[]>([])
   const [hiddenDefaultIds, setHiddenDefaultIds] = useState<number[]>([])
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null)
   const [usageMap, setUsageMap] = useState<Record<string, number>>({})
   const [selectedCategory, setSelectedCategory] = useState<CharacterCategory | "all">("popular")
   const [approvedCharacters, setApprovedCharacters] = useState<Character[]>([])
+  const [approvedLoaded, setApprovedLoaded] = useState(false)
+  const [usageLoaded, setUsageLoaded] = useState(false)
+  const [customLoaded, setCustomLoaded] = useState(false)
 
   // Load hidden default characters from localStorage
   useEffect(() => {
@@ -45,27 +50,22 @@ export function useCharacters({ user }: UseCharactersOptions): UseCharactersRetu
     }
   }, [])
 
-  // Fetch character usage stats
+  // Fetch character usage stats and approved characters in parallel
   useEffect(() => {
     fetch("/api/character-usage")
       .then(res => res.json())
       .then(data => {
-        if (data.usage) {
-          setUsageMap(data.usage)
-        }
+        if (data.usage) setUsageMap(data.usage)
       })
       .catch(console.error)
-  }, [])
+      .finally(() => setUsageLoaded(true))
 
-  // Fetch approved characters (community-submitted and admin-approved)
-  useEffect(() => {
     fetch("/api/approved-characters")
       .then(res => res.json())
       .then(data => {
         if (data.characters) {
-          // Convert DB format to Character format with high IDs to avoid conflicts
           const approved = data.characters.map((c: { id: number; image_url: string; suggested_name: string | null; suggested_category: string | null }, i: number) => ({
-            id: 5000 + c.id, // Use high IDs to avoid conflicts with defaults and customs
+            id: 5000 + c.id,
             src: c.image_url,
             name: c.suggested_name || `Community ${i + 1}`,
             category: c.suggested_category as CharacterCategory,
@@ -74,11 +74,15 @@ export function useCharacters({ user }: UseCharactersOptions): UseCharactersRetu
         }
       })
       .catch(console.error)
+      .finally(() => setApprovedLoaded(true))
   }, [])
 
   // Load user's reference images from database
+  // Wait for auth to resolve before marking custom as loaded
   useEffect(() => {
+    if (authLoading) return
     if (user) {
+      setCustomLoaded(false)
       fetch("/api/reference-images", { credentials: "include" })
         .then(res => res.json())
         .then(data => {
@@ -94,10 +98,12 @@ export function useCharacters({ user }: UseCharactersOptions): UseCharactersRetu
           }
         })
         .catch(console.error)
+        .finally(() => setCustomLoaded(true))
     } else {
       setCustomCharacters([])
+      setCustomLoaded(true)
     }
-  }, [user])
+  }, [user, authLoading])
 
   const addCustomCharacter = useCallback(async (character: Character) => {
     if (user) {
@@ -234,6 +240,8 @@ export function useCharacters({ user }: UseCharactersOptions): UseCharactersRetu
     ? allCharacters
     : allCharacters.filter(c => c.category === selectedCategory || customCharacterIds.has(c.id))
 
+  const isReady = approvedLoaded && usageLoaded && customLoaded
+
   return {
     customCharacters,
     hiddenDefaultIds,
@@ -249,5 +257,6 @@ export function useCharacters({ user }: UseCharactersOptions): UseCharactersRetu
     setSelectedCategory,
     filteredCharacters,
     updateCustomCharacterCategory,
+    isReady,
   }
 }
