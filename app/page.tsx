@@ -14,6 +14,7 @@ import { useVideoRecording } from "@/hooks/use-video-recording"
 import { useVideoDownload } from "@/hooks/use-video-download"
 import { STORAGE_KEYS } from "@/lib/constants"
 import { cn, detectImageAspectRatio } from "@/lib/utils"
+import { useCloudinaryPrewarm } from "@/hooks/use-cloudinary-prewarm"
 
 // Helper to get character aspect ratio for generated video
 async function getCharacterAspectRatio(src: string): Promise<"9:16" | "16:9" | "fill"> {
@@ -102,6 +103,13 @@ export default function Home() {
     showPip,
     pipAspectRatio,
     characterName: selectedCharacterName,
+  })
+
+  // Pre-warm Cloudinary URL when viewing a result (triggers server-side processing before download)
+  useCloudinaryPrewarm({
+    resultUrl,
+    pipVideoUrl: sourceVideoUrl || recordedVideoUrl,
+    showPip,
   })
 
   const [errorToast, setErrorToast] = useState<string | null>(null)

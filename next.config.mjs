@@ -33,6 +33,10 @@ const nextConfig = {
         protocol: "https",
         hostname: "hebbkx1anhila5yf.public.blob.vercel-storage.com",
       },
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+      },
     ],
     // Enable Next.js image optimization for faster loading
     // Images will be resized and compressed for the UI
