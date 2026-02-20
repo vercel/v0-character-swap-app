@@ -3,9 +3,9 @@
 import React, { useEffect, useRef, useCallback } from "react"
 import useSWR from "swr"
 
-// Use Next.js image optimization for tiny thumbnails (128px, q60)
+// Use Next.js image optimization for thumbnails
 function thumbUrl(src: string): string {
-  return `/_next/image?url=${encodeURIComponent(src)}&w=128&q=60`
+  return `/_next/image?url=${encodeURIComponent(src)}&w=256&q=75`
 }
 import { FailedGeneration } from "@/components/failed-generation"
 import { GenerationProgress } from "@/components/generation-progress"

@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import type { Character, User, ReferenceImage, CharacterCategory } from "@/lib/types"
 import { STORAGE_KEYS, CUSTOM_CHARACTER_ID_OFFSET, DEFAULT_CHARACTERS } from "@/lib/constants"
 
-// Preload images into browser cache so they render instantly when the grid appears
+// Preload optimized grid thumbnails into browser cache
 function preloadImages(urls: string[]) {
   urls.forEach(url => {
     const img = new window.Image()
-    img.src = url
+    // Local images don't need optimization, remote ones go through Next.js
+    img.src = url.startsWith("/") ? url : `/_next/image?url=${encodeURIComponent(url)}&w=128&q=75`
   })
 }
 

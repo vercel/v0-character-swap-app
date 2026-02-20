@@ -9,6 +9,13 @@ import { DEFAULT_CHARACTERS, CHARACTER_CATEGORIES } from "@/lib/constants"
 export { DEFAULT_CHARACTERS }
 export type { Character }
 
+// Optimize images via Next.js image API for grid thumbnails
+function gridThumbUrl(src: string): string {
+  // Local images (e.g. /characters/...) don't need optimization prefix
+  if (src.startsWith("/")) return src
+  return `/_next/image?url=${encodeURIComponent(src)}&w=128&q=75`
+}
+
 interface CharacterGridProps {
   selectedId: number | null
   onSelect: (id: number) => void
@@ -338,7 +345,7 @@ export function CharacterGrid({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={char.src || "/placeholder.svg"}
+                    src={char.src ? gridThumbUrl(char.src) : "/placeholder.svg"}
                     alt={char.name}
                     className="h-full w-full object-cover object-top"
                     loading="eager"
