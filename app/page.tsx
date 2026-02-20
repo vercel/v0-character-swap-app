@@ -216,7 +216,10 @@ export default function Home() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (resultUrl || recordedVideoUrl) {
+        if (selectedError) {
+          e.preventDefault()
+          setSelectedError(null)
+        } else if (resultUrl || recordedVideoUrl) {
           e.preventDefault()
           handleReset()
         }

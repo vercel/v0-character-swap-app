@@ -1,8 +1,12 @@
 "use client"
 
 import React, { useEffect, useRef, useCallback } from "react"
-import Image from "next/image"
 import useSWR from "swr"
+
+// Use Next.js image optimization for tiny thumbnails (128px, q60)
+function thumbUrl(src: string): string {
+  return `/_next/image?url=${encodeURIComponent(src)}&w=128&q=60`
+}
 import { FailedGeneration } from "@/components/failed-generation"
 import { GenerationProgress } from "@/components/generation-progress"
 import { useAuth } from "@/components/auth-provider"
@@ -97,14 +101,14 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
   const generations: Generation[] = data?.generations || []
   const hasPending = generations.some(g => g.status === "uploading" || g.status === "pending" || g.status === "processing")
 
-  // Preload poster images so they appear instantly
+  // Preload optimized poster thumbnails so they appear instantly
   const preloadedRef = useRef(new Set<string>())
   useEffect(() => {
     generations.forEach(gen => {
       if (gen.character_image_url && !preloadedRef.current.has(gen.character_image_url)) {
         preloadedRef.current.add(gen.character_image_url)
         const img = new window.Image()
-        img.src = gen.character_image_url
+        img.src = thumbUrl(gen.character_image_url)
       }
     })
   }, [generations])
@@ -273,11 +277,11 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
                   if (gen.source_video_url) fetch(gen.source_video_url, { mode: "cors" }).catch(() => {})
                 }}
               >
-                {/* Poster image underneath video */}
+                {/* Optimized poster image underneath video */}
                 {gen.character_image_url && (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
-                    src={gen.character_image_url}
+                    src={thumbUrl(gen.character_image_url)}
                     alt=""
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="eager"
