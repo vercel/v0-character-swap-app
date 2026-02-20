@@ -138,10 +138,35 @@ async function generateAndSaveVideoDirect(
     const { experimental_generateVideo: generateVideo, createGateway } = await import("ai")
     const { Agent } = await import("undici")
     const { put } = await import("@vercel/blob")
+    const { buildMp4ConversionUrl } = await import("@/lib/cloudinary")
 
     console.log(`[GenerateDirect] [${new Date().toISOString()}] Imports loaded successfully`)
 
     const stepStartTime = Date.now()
+
+    // Convert raw video (webm/mov) to MP4 via Cloudinary fetch transformation
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME
+    let klingVideoUrl = videoUrl
+    if (cloudName) {
+      try {
+        const mp4Url = buildMp4ConversionUrl(videoUrl, cloudName)
+        console.log(`[GenerateDirect] [${new Date().toISOString()}] Pre-warming Cloudinary MP4 URL: ${mp4Url}`)
+        const warmup = await fetch(mp4Url, { method: "HEAD" })
+        if (warmup.ok) {
+          klingVideoUrl = mp4Url
+          const contentType = warmup.headers.get("content-type")
+          const contentLength = warmup.headers.get("content-length")
+          const sizeMB = contentLength ? (parseInt(contentLength) / 1024 / 1024).toFixed(2) : "unknown"
+          console.log(`[GenerateDirect] [${new Date().toISOString()}] Cloudinary MP4 ready: type=${contentType}, size=${sizeMB}MB`)
+        } else {
+          console.warn(`[GenerateDirect] [${new Date().toISOString()}] Cloudinary pre-warm failed (${warmup.status}), falling back to original URL`)
+        }
+      } catch (cloudinaryErr) {
+        console.warn(`[GenerateDirect] [${new Date().toISOString()}] Cloudinary conversion failed, falling back to original URL:`, cloudinaryErr)
+      }
+    } else {
+      console.warn(`[GenerateDirect] [${new Date().toISOString()}] CLOUDINARY_CLOUD_NAME not set, skipping MP4 conversion`)
+    }
 
     // Create a NEW Agent instance on each request (per official Vercel docs)
     // This ensures fresh connections without any stale state
@@ -152,7 +177,6 @@ async function generateAndSaveVideoDirect(
           bodyTimeout: 15 * 60 * 1000, // 15 minutes
         })
         console.log(`[GenerateDirect] [${new Date().toISOString()}] Creating new Agent for request to ${url}`)
-        console.log(`[GenerateDirect] [${new Date().toISOString()}] Agent config: headersTimeout=${15 * 60 * 1000}ms, bodyTimeout=${15 * 60 * 1000}ms`)
 
         return fetch(url, {
           ...init,
@@ -161,18 +185,13 @@ async function generateAndSaveVideoDirect(
       },
     })
 
-    console.log(`[GenerateDirect] [${new Date().toISOString()}] Gateway created with custom fetch wrapper`)
-
     console.log(`[GenerateDirect] [${new Date().toISOString()}] Setup done (+${Date.now() - stepStartTime}ms)`)
-    console.log(`[GenerateDirect] [${new Date().toISOString()}] characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
+    console.log(`[GenerateDirect] [${new Date().toISOString()}] characterImageUrl=${characterImageUrl}, videoUrl=${klingVideoUrl}`)
 
   // Generate video using AI SDK with KlingAI motion control
-  console.log(`[GenerateDirect] [${new Date().toISOString()}] Calling experimental_generateVideo with klingai/kling-v2.6-motion-control...`)
-  console.log(`[GenerateDirect] [${new Date().toISOString()}] Using gateway.video() with custom fetch/dispatcher`)
-  console.log(`[GenerateDirect] [${new Date().toISOString()}] Provider options: pollIntervalMs=5000, pollTimeoutMs=${14 * 60 * 1000}ms`)
+  console.log(`[GenerateDirect] [${new Date().toISOString()}] Calling experimental_generateVideo...`)
 
   const generateStart = Date.now()
-  console.log(`[GenerateDirect] [${new Date().toISOString()}] Starting generateVideo call at ${generateStart}...`)
   const result = await generateVideo({
     model: gateway.video("klingai/kling-v2.6-motion-control"),
     prompt: {
@@ -180,7 +199,7 @@ async function generateAndSaveVideoDirect(
     },
     providerOptions: {
       klingai: {
-        videoUrl: videoUrl,
+        videoUrl: klingVideoUrl,
         characterOrientation: "video" as const,
         mode: "std" as const,
         pollIntervalMs: 5_000,

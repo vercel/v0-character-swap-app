@@ -142,8 +142,33 @@ async function generateAndSaveVideo(
   const { Agent } = await import("undici")
   const { put } = await import("@vercel/blob")
   const { updateGenerationRunId } = await import("@/lib/db")
+  const { buildMp4ConversionUrl } = await import("@/lib/cloudinary")
 
   console.log(`[Workflow Step] [${new Date().toISOString()}] Imports loaded, creating gateway...`)
+
+  // Convert raw video (webm/mov) to MP4 via Cloudinary fetch transformation
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME
+  let klingVideoUrl = videoUrl
+  if (cloudName) {
+    try {
+      const mp4Url = buildMp4ConversionUrl(videoUrl, cloudName)
+      console.log(`[Workflow Step] [${new Date().toISOString()}] Pre-warming Cloudinary MP4 URL: ${mp4Url}`)
+      const warmup = await fetch(mp4Url, { method: "HEAD" })
+      if (warmup.ok) {
+        klingVideoUrl = mp4Url
+        const contentType = warmup.headers.get("content-type")
+        const contentLength = warmup.headers.get("content-length")
+        const sizeMB = contentLength ? (parseInt(contentLength) / 1024 / 1024).toFixed(2) : "unknown"
+        console.log(`[Workflow Step] [${new Date().toISOString()}] Cloudinary MP4 ready: type=${contentType}, size=${sizeMB}MB`)
+      } else {
+        console.warn(`[Workflow Step] [${new Date().toISOString()}] Cloudinary pre-warm failed (${warmup.status}), falling back to original URL`)
+      }
+    } catch (cloudinaryErr) {
+      console.warn(`[Workflow Step] [${new Date().toISOString()}] Cloudinary conversion failed, falling back to original URL:`, cloudinaryErr)
+    }
+  } else {
+    console.warn(`[Workflow Step] [${new Date().toISOString()}] CLOUDINARY_CLOUD_NAME not set, skipping MP4 conversion`)
+  }
 
   // Create a NEW Agent instance on each request (per official Vercel docs)
   // This ensures fresh connections without any stale state
@@ -154,7 +179,6 @@ async function generateAndSaveVideo(
         bodyTimeout: 15 * 60 * 1000, // 15 minutes
       })
       console.log(`[Workflow Step] [${new Date().toISOString()}] Creating new Agent for request to ${url}`)
-      console.log(`[Workflow Step] [${new Date().toISOString()}] Agent config: headersTimeout=${15 * 60 * 1000}ms, bodyTimeout=${15 * 60 * 1000}ms`)
 
       return fetch(url, {
         ...init,
@@ -164,31 +188,13 @@ async function generateAndSaveVideo(
   })
 
   console.log(`[Workflow Step] [${new Date().toISOString()}] Gateway created (+${Date.now() - stepStartTime}ms)`)
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Input: characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
-
-  // Probe video metadata to log what we're sending to Kling
-  try {
-    const videoProbe = await fetch(videoUrl, { method: "HEAD" })
-    const contentType = videoProbe.headers.get("content-type")
-    const contentLength = videoProbe.headers.get("content-length")
-    const sizeMB = contentLength ? (parseInt(contentLength) / 1024 / 1024).toFixed(2) : "unknown"
-    console.log(`[Workflow Step] [${new Date().toISOString()}] Video metadata: type=${contentType}, size=${sizeMB}MB, url=${videoUrl}`)
-
-    const imageProbe = await fetch(characterImageUrl, { method: "HEAD" })
-    const imageType = imageProbe.headers.get("content-type")
-    const imageLength = imageProbe.headers.get("content-length")
-    const imageSizeKB = imageLength ? (parseInt(imageLength) / 1024).toFixed(1) : "unknown"
-    console.log(`[Workflow Step] [${new Date().toISOString()}] Image metadata: type=${imageType}, size=${imageSizeKB}KB, url=${characterImageUrl}`)
-  } catch (probeErr) {
-    console.warn(`[Workflow Step] [${new Date().toISOString()}] Failed to probe input metadata:`, probeErr)
-  }
+  console.log(`[Workflow Step] [${new Date().toISOString()}] Input: characterImageUrl=${characterImageUrl}, videoUrl=${klingVideoUrl}`)
 
   // Update run ID with a placeholder so UI knows it's processing
   await updateGenerationRunId(generationId, `ai-gateway-${generationId}`)
 
   // Generate video using AI SDK with KlingAI motion control
   console.log(`[Workflow Step] [${new Date().toISOString()}] Calling experimental_generateVideo with klingai/kling-v2.6-motion-control...`)
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Provider options: pollIntervalMs=5000, pollTimeoutMs=${14 * 60 * 1000}ms`)
 
   const generateStart = Date.now()
   let result: Awaited<ReturnType<typeof generateVideo>>
@@ -201,7 +207,7 @@ async function generateAndSaveVideo(
       },
       providerOptions: {
         klingai: {
-          videoUrl: videoUrl,
+          videoUrl: klingVideoUrl,
           characterOrientation: "video" as const,
           mode: "std" as const,
           pollIntervalMs: 5_000,

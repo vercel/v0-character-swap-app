@@ -140,8 +140,9 @@ export function useVideoGeneration({
           handleUploadUrl: "/api/upload",
         })
 
-        // 6. Start actual generation using Workflow SDK (handles long-running tasks)
-        const startResponse = await fetch("/api/generate", {
+        // 6. Start generation (use generate-direct on localhost, workflow on prod)
+        const isDev = window.location.hostname === "localhost"
+        const startResponse = await fetch(isDev ? "/api/generate-direct" : "/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

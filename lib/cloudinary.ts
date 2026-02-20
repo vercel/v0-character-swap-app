@@ -30,6 +30,16 @@ function base64UrlEncode(url: string): string {
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
 }
 
+/**
+ * Builds a Cloudinary fetch URL that converts any video (webm, mov, etc.) to MP4.
+ * Used to convert raw user recordings before passing to Kling.
+ */
+export function buildMp4ConversionUrl(blobUrl: string, cloudName: string): string {
+  validateBlobUrl(blobUrl)
+  const encodedUrl = encodeURIComponent(blobUrl)
+  return `https://res.cloudinary.com/${cloudName}/video/fetch/f_mp4/${encodedUrl}`
+}
+
 interface CompositeVideoOptions {
   /** Full Vercel Blob URL of the main (result) video */
   mainVideoUrl: string

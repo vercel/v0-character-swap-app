@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect, useRef } from "react"
 import { upload } from "@vercel/blob/client"
 import { MAX_VIDEO_SIZE, MAX_VIDEO_DURATION, STORAGE_KEYS } from "@/lib/constants"
 import { detectVideoAspectRatio } from "@/lib/utils"
-import { useVideoProcessor } from "./use-video-processor"
 
 interface UseVideoRecordingReturn {
   recordedVideo: Blob | null
@@ -12,15 +11,13 @@ interface UseVideoRecordingReturn {
   uploadedVideoUrl: string | null
   recordedAspectRatio: "9:16" | "16:9" | "fill"
   isUploading: boolean
-  isProcessing: boolean
-  processingProgress: { stage: string; percent: number; message: string } | null
   showPreview: boolean
   setShowPreview: (show: boolean) => void
   handleVideoRecorded: (blob: Blob, aspectRatio: "9:16" | "16:9" | "fill") => void
   clearRecording: () => void
   restoreFromSession: () => Promise<{ shouldAutoSubmit: boolean }>
   saveToSession: (video: Blob, characterId: number | null) => Promise<void>
-  /** Get the video blob ready for upload (processed if ready, original otherwise) */
+  /** Get the raw video blob for upload */
   getVideoForUpload: () => Promise<Blob | null>
 }
 
@@ -31,18 +28,7 @@ export function useVideoRecording(): UseVideoRecordingReturn {
   const [recordedAspectRatio, setRecordedAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
   const [isUploading, setIsUploading] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
-  
-  // Video processor for background transcoding
-  const { 
-    startProcessing, 
-    awaitProcessedVideo, 
-    getProcessedVideo,
-    progress: processingProgress, 
-    isProcessing,
-    isComplete: processingComplete,
-    reset: resetProcessor,
-  } = useVideoProcessor()
-  
+
   const uploadingRef = useRef(false)
 
   // Create object URL when video changes
@@ -56,24 +42,16 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     }
   }, [recordedVideo])
 
-  // Auto-upload when processing completes
-  useEffect(() => {
-    if (processingComplete && !uploadedVideoUrl && !uploadingRef.current) {
-      const processedVideo = getProcessedVideo()
-      if (processedVideo) {
-        uploadVideo(processedVideo)
-      }
-    }
-  }, [processingComplete, uploadedVideoUrl, getProcessedVideo])
-
-  // Upload video to Vercel Blob
+  // Upload raw video to Vercel Blob
   const uploadVideo = useCallback(async (blob: Blob) => {
     if (uploadingRef.current) return
     uploadingRef.current = true
-    
+
     setIsUploading(true)
     try {
-      const videoBlob = await upload(`videos/${Date.now()}-recording.mp4`, blob, {
+      // Use the original extension based on mime type
+      const ext = blob.type.includes("mp4") ? "mp4" : blob.type.includes("quicktime") ? "mov" : "webm"
+      const videoBlob = await upload(`videos/${Date.now()}-recording.${ext}`, blob, {
         access: "public",
         handleUploadUrl: "/api/upload",
       })
@@ -86,21 +64,10 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     }
   }, [])
 
-  // Get video ready for generation (waits for processing if needed)
+  // Get raw video blob for generation
   const getVideoForUpload = useCallback(async (): Promise<Blob | null> => {
-    if (!recordedVideo) return null
-    
-    // Always use awaitProcessedVideo - it handles all the logic:
-    // - Returns processed video if complete
-    // - Waits for processing if in progress
-    // - Falls back to original if processing never started or failed
-    try {
-      return await awaitProcessedVideo()
-    } catch (error) {
-      console.error("[v0] Failed to get processed video:", error)
-      return recordedVideo // Fallback to original
-    }
-  }, [recordedVideo, awaitProcessedVideo])
+    return recordedVideo
+  }, [recordedVideo])
 
   const handleVideoRecorded = useCallback((blob: Blob, _aspectRatio: "9:16" | "16:9" | "fill") => {
     // Validate file size
@@ -112,43 +79,43 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     // Create a video element to check duration and detect actual aspect ratio
     const video = document.createElement("video")
     video.preload = "metadata"
-    
+
     video.onloadedmetadata = () => {
       URL.revokeObjectURL(video.src)
-      
+
       const duration = video.duration
       const hasValidDuration = isFinite(duration) && !isNaN(duration) && duration > 0
-      
+
       if (hasValidDuration && duration > MAX_VIDEO_DURATION + 1) {
         const durationSeconds = Math.round(duration)
         alert(`Video is too long (${durationSeconds}s). Please record up to ${MAX_VIDEO_DURATION} seconds.`)
         return
       }
-      
+
       // Detect actual aspect ratio from video dimensions
       const { videoWidth, videoHeight } = video
       const detectedAspectRatio = detectVideoAspectRatio(videoWidth, videoHeight)
-      
+
       // Set video state immediately so user can see preview
       setRecordedVideo(blob)
       setRecordedAspectRatio(detectedAspectRatio)
       setShowPreview(true)
-      
-      // Start processing in background - doesn't block UI
-      startProcessing(blob)
+
+      // Upload raw blob immediately (Cloudinary will convert to MP4 server-side)
+      uploadVideo(blob)
     }
-    
+
     video.onerror = () => {
       URL.revokeObjectURL(video.src)
       // Still accept the video if we can't validate
       setRecordedVideo(blob)
       setRecordedAspectRatio("fill")
       setShowPreview(true)
-      startProcessing(blob)
+      uploadVideo(blob)
     }
-    
+
     video.src = URL.createObjectURL(blob)
-  }, [startProcessing])
+  }, [uploadVideo])
 
   const clearRecording = useCallback(() => {
     setRecordedVideo(null)
@@ -156,16 +123,15 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     setUploadedVideoUrl(null)
     setRecordedAspectRatio("fill")
     setShowPreview(false)
-    resetProcessor()
     uploadingRef.current = false
-  }, [resetProcessor])
+  }, [])
 
   const saveToSession = useCallback(async (video: Blob, characterId: number | null) => {
     if (characterId) {
       sessionStorage.setItem(STORAGE_KEYS.PENDING_CHARACTER, String(characterId))
     }
     sessionStorage.setItem(STORAGE_KEYS.PENDING_ASPECT_RATIO, recordedAspectRatio)
-    
+
     if (uploadedVideoUrl) {
       sessionStorage.setItem(STORAGE_KEYS.PENDING_VIDEO_URL, uploadedVideoUrl)
       sessionStorage.setItem(STORAGE_KEYS.PENDING_UPLOADED, "true")
@@ -186,7 +152,7 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     const wasUploaded = sessionStorage.getItem(STORAGE_KEYS.PENDING_UPLOADED) === "true"
     const shouldAutoSubmit = sessionStorage.getItem(STORAGE_KEYS.PENDING_AUTO_SUBMIT) === "true"
     const savedAspectRatio = sessionStorage.getItem(STORAGE_KEYS.PENDING_ASPECT_RATIO) as "9:16" | "16:9" | "fill" | null
-    
+
     if (savedVideoUrl) {
       try {
         if (wasUploaded) {
@@ -198,8 +164,8 @@ export function useVideoRecording(): UseVideoRecordingReturn {
           const response = await fetch(savedVideoUrl)
           const blob = await response.blob()
           setRecordedVideo(blob)
-          // Start processing in background
-          startProcessing(blob)
+          // Upload raw blob immediately
+          uploadVideo(blob)
         }
         if (savedAspectRatio) {
           setRecordedAspectRatio(savedAspectRatio)
@@ -218,7 +184,7 @@ export function useVideoRecording(): UseVideoRecordingReturn {
       }
     }
     return { shouldAutoSubmit: false }
-  }, [startProcessing])
+  }, [uploadVideo])
 
   return {
     recordedVideo,
@@ -226,8 +192,6 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     uploadedVideoUrl,
     recordedAspectRatio,
     isUploading,
-    isProcessing,
-    processingProgress,
     showPreview,
     setShowPreview,
     handleVideoRecorded,

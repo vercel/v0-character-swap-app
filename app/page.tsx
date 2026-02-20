@@ -83,8 +83,6 @@ export default function Home() {
     uploadedVideoUrl,
     recordedAspectRatio,
     isUploading,
-    isProcessing: isProcessingVideo,
-    processingProgress,
     showPreview,
     setShowPreview,
     handleVideoRecorded,
@@ -489,7 +487,7 @@ export default function Home() {
               <video
                 ref={previewVideoRef}
                 src={recordedVideoUrl}
-                controls={!isProcessingVideo && !isUploading}
+                controls={!isUploading}
                 autoPlay
                 muted
                 loop
@@ -516,12 +514,12 @@ export default function Home() {
               >
                 New Video
               </button>
-              {/* Processing indicator - subtle, non-blocking */}
-              {(isProcessingVideo || isUploading) && (
+              {/* Upload indicator - subtle, non-blocking */}
+              {isUploading && (
                 <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/70 px-3 py-1.5 backdrop-blur-sm">
                   <div className="h-2 w-2 animate-pulse rounded-full bg-white" />
                   <span className="font-mono text-[11px] text-white/80">
-                    {isProcessingVideo ? "Processing" : "Uploading"}
+                    Uploading
                   </span>
                 </div>
               )}
