@@ -782,63 +782,68 @@ export function CharacterGrid({
             </button>
             
             <h2 className="mb-6 font-mono text-[13px] font-medium text-white">how it works</h2>
-            
+
             <div className="space-y-6 font-mono text-[11px] text-neutral-400">
               <div>
-                <p className="mb-2 text-neutral-500">// ai model</p>
-                <a 
-                  href="https://vercel.com/ai-gateway/models?type=video"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-neutral-300 hover:text-white"
-                >
-                  klingai/kling-v2.6-motion-control via AI Gateway
-                </a>
-                <p className="mt-1">
-                  analyzes facial landmarks, expressions, and head pose frame-by-frame from your recorded video. transfers this motion data onto the target character image while preserving their appearance.
+                <p className="mb-2 text-neutral-500">// the flow</p>
+                <p>
+                  record yourself → your video is uploaded to {" "}
+                  <a href="https://vercel.com/docs/storage/vercel-blob" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">vercel blob</a>
+                  {" "} → pick a character → a {" "}
+                  <a href="https://vercel.com/docs/workflow" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">vercel workflow</a>
+                  {" "} kicks off the generation → download with picture-in-picture and watermark via cloudinary.
                 </p>
               </div>
-              
+
               <div>
-                <p className="mb-2 text-neutral-500">// client processing</p>
-                <p className="text-neutral-300">ffmpeg.wasm in web worker</p>
-                <p className="mt-1">
-                  runs video encoding entirely in your browser using webassembly. handles safari mp4 compatibility (moov atom positioning), and composites the final picture-in-picture overlay with rounded corners and watermark on download.
+                <p className="mb-2 text-neutral-500">// ai generation</p>
+                <p>
+                  <a href="https://vercel.com/docs/ai-gateway" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">ai gateway</a>
+                  {" "} routes the request to klingai/kling-v2.6-motion-control. the model analyzes your facial landmarks, expressions, and head pose frame-by-frame, then transfers that motion onto the character image. the {" "}
+                  <a href="https://sdk.vercel.ai" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">ai sdk</a>
+                  {" "} handles polling until the video is ready.
                 </p>
               </div>
-              
+
               <div>
                 <p className="mb-2 text-neutral-500">// infrastructure</p>
                 <div className="mt-2 space-y-2">
                   <p>
                     <a href="https://vercel.com/docs/workflow" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">workflow</a>
                     <span className="text-neutral-500"> — </span>
-                    durable function execution that survives timeouts. orchestrates the generation pipeline: receives request → calls AI Gateway → waits for completion → updates database.
+                    durable execution that survives serverless timeouts. orchestrates: convert video → call ai gateway → save result → update db → send email.
                   </p>
                   <p>
                     <a href="https://vercel.com/docs/storage/vercel-blob" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">blob</a>
                     <span className="text-neutral-500"> — </span>
-                    stores uploaded videos, character images, and generated results. serves assets via edge cdn.
-                  </p>
-                  <p>
-                    <a href="https://neon.tech" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">neon</a>
-                    <span className="text-neutral-500"> — </span>
-                    serverless postgres. tracks generation state (pending → processing → completed/failed) with user associations.
+                    stores raw recordings, character images, and generated videos. serves everything via edge cdn.
                   </p>
                   <p>
                     <a href="https://vercel.com/docs/ai-gateway" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">ai gateway</a>
                     <span className="text-neutral-500"> — </span>
-                    unified routing layer for ai model requests. handles authentication, rate limiting, and provider abstraction.
+                    unified routing for ai model requests. handles auth, rate limiting, and provider abstraction for klingai.
+                  </p>
+                  <p>
+                    <a href="https://neon.tech" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">neon postgres</a>
+                    <span className="text-neutral-500"> — </span>
+                    tracks generation state (pending → processing → completed/failed), users, and character library.
+                  </p>
+                  <p>
+                    <span className="text-neutral-300">cloudinary</span>
+                    <span className="text-neutral-500"> — </span>
+                    server-side video conversion (webm/mov → mp4 for cross-browser compat) and compositing (pip overlay + watermark) on download.
                   </p>
                 </div>
               </div>
-              
+
               <div>
-                <p className="mb-2 text-neutral-500">// stack</p>
+                <p className="mb-2 text-neutral-500">// built with</p>
                 <p>
                   <a href="https://nextjs.org" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">next.js 16</a>
                   <span className="text-neutral-500"> + </span>
-                  <a href="https://v0.app" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">v0</a>
+                  <a href="https://sdk.vercel.ai" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">ai sdk</a>
+                  <span className="text-neutral-500"> + </span>
+                  <a href="https://v0.dev" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">v0</a>
                   <span className="text-neutral-500"> + </span>
                   <a href="https://vercel.com" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">vercel</a>
                 </p>
