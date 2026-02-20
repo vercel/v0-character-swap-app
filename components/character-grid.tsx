@@ -32,6 +32,7 @@ interface CharacterGridProps {
   hasVideo?: boolean
   hasCharacter?: boolean
   onGenerate?: () => void
+  onRetake?: () => void
   // Category filter props
   selectedCategory?: CharacterCategory | "all"
   onCategoryChange?: (category: CharacterCategory | "all") => void
@@ -54,6 +55,7 @@ export function CharacterGrid({
   hasVideo = false,
   hasCharacter = false,
   onGenerate,
+  onRetake,
   selectedCategory = "popular",
   onCategoryChange,
   filteredCharacters: externalFilteredCharacters,
@@ -728,6 +730,14 @@ export function CharacterGrid({
             >
               Generate video
             </button>
+            {hasVideo && onRetake && (
+              <button
+                onClick={onRetake}
+                className="flex h-9 w-full items-center justify-center rounded-lg font-mono text-[12px] font-medium text-neutral-400 transition-all hover:text-white active:scale-[0.98] md:h-10 md:text-[13px]"
+              >
+                Retake video
+              </button>
+            )}
             <div className="hidden items-center justify-center gap-3 font-mono text-[10px] text-neutral-500 md:flex">
               <a 
                 href="https://vercel.com/templates/next.js/ai-face-swap"

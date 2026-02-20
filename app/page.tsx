@@ -504,16 +504,6 @@ export default function Home() {
                   video.muted = false
                 }}
               />
-              {/* New video button - positioned above mobile bottom sheet */}
-              <button
-                onClick={() => {
-                  setShowPreview(false)
-                  clearRecording()
-                }}
-                className="absolute bottom-28 left-1/2 -translate-x-1/2 rounded-lg bg-white px-5 py-2.5 font-sans text-[13px] font-medium text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-95 md:bottom-6"
-              >
-                New Video
-              </button>
               {/* Upload indicator - subtle, non-blocking */}
               {isUploading && (
                 <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/70 px-3 py-1.5 backdrop-blur-sm">
@@ -551,6 +541,7 @@ export default function Home() {
                   hasVideo={!!recordedVideo}
                   hasCharacter={!!selectedCharacter}
                   onGenerate={handleProcess}
+                  onRetake={() => { setShowPreview(false); clearRecording() }}
                   selectedCategory={selectedCategory}
                   onCategoryChange={setSelectedCategory}
                   filteredCharacters={charactersReady ? filteredCharacters : []}
@@ -682,6 +673,7 @@ export default function Home() {
                     hasVideo={!!recordedVideo}
                     hasCharacter={!!selectedCharacter}
                     onGenerate={handleProcess}
+                    onRetake={() => { setShowPreview(false); clearRecording() }}
                     selectedCategory={selectedCategory}
                     onCategoryChange={setSelectedCategory}
                     filteredCharacters={charactersReady ? filteredCharacters : []}
@@ -703,6 +695,7 @@ export default function Home() {
                   hasVideo={!!recordedVideo}
                   hasCharacter={!!selectedCharacter}
                   onGenerate={handleProcess}
+                  onRetake={() => { setShowPreview(false); clearRecording() }}
                   selectedCategory={selectedCategory}
                   onCategoryChange={setSelectedCategory}
                   filteredCharacters={charactersReady ? filteredCharacters : []}
