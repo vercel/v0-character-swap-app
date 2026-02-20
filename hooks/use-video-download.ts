@@ -61,7 +61,6 @@ export function useVideoDownload({
       if (!apiRes.ok) throw new Error("API returned " + apiRes.status)
 
       const { url: cloudinaryUrl } = await apiRes.json()
-      console.log("[download] Cloudinary URL:", cloudinaryUrl)
       setDownloadProgress(0.2)
 
       // Stream the video from Cloudinary with progress
