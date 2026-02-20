@@ -30,6 +30,8 @@ export default function Home() {
   // State
   const [mounted, setMounted] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(true)
+  const [videoProgress, setVideoProgress] = useState(0)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
 
   const [resultUrl, setResultUrl] = useState<string | null>(null)
@@ -93,11 +95,13 @@ export default function Home() {
 
   // Video download hook
   const pipAspectRatio = sourceVideoUrl ? sourceVideoAspectRatio : recordedAspectRatio
+  const selectedCharacterName = allCharacters.find(c => c.id === selectedCharacter)?.name || null
   const { isDownloading, downloadProgress, handleDownload } = useVideoDownload({
     resultUrl,
     pipVideoUrl: sourceVideoUrl || recordedVideoUrl,
     showPip,
     pipAspectRatio,
+    characterName: selectedCharacterName,
   })
 
   const [errorToast, setErrorToast] = useState<string | null>(null)
@@ -204,6 +208,8 @@ export default function Home() {
     setSourceVideoUrl(null)
     setSelectedCharacter(null)
     setSelectedGeneratedVideo(null)
+    setGeneratedVideoAspectRatio("fill")
+    setSelectedError(null)
   }, [clearRecording, setSelectedCharacter])
 
   // Handle Escape key to close video and go back to camera
@@ -268,12 +274,7 @@ export default function Home() {
   return (
     <main className="relative flex h-[100dvh] flex-row overflow-hidden bg-black">
       {/* Camera/Video Section */}
-      <div className={cn(
-        "flex flex-1 items-center justify-center",
-        isMobile ? "p-0" : (resultUrl || recordedVideoUrl)
-          ? (generatedVideoAspectRatio === "fill" ? "p-0" : "p-1")
-          : "p-0"
-      )}>
+      <div className="flex flex-1 items-center justify-center">
         {selectedError ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-8">
             {selectedError.characterImageUrl && (
@@ -298,40 +299,48 @@ export default function Home() {
             </button>
           </div>
         ) : resultUrl ? (
-          <div className="relative flex h-full w-full flex-col items-center justify-center">
-            <div className={cn(
-              "relative overflow-hidden bg-neutral-900",
-              generatedVideoAspectRatio === "9:16" && "aspect-[9/16] h-full max-h-[calc(100%-56px)] w-auto rounded-lg",
-              generatedVideoAspectRatio === "16:9" && "aspect-video w-full max-w-[95%] rounded-lg md:max-w-[90%]",
-              generatedVideoAspectRatio === "fill" && "h-full w-full"
-            )}>
+          <div className="relative flex h-full w-full flex-col">
+            <div className="relative min-h-0 flex-1 bg-black">
               <video
                 ref={mainVideoRef}
                 src={resultUrl}
-                controls
-                autoPlay
                 muted
                 loop
                 playsInline
+                preload="auto"
                 poster={allCharacters.find(c => c.id === selectedCharacter)?.src || undefined}
-                className="h-full w-full object-cover"
+                className="h-full w-full cursor-pointer object-contain"
+                onClick={(e) => {
+                  const v = e.currentTarget
+                  if (v.paused) v.play(); else v.pause()
+                }}
                 onLoadedData={(e) => {
-                  const video = e.currentTarget
-                  video.muted = false
-                  // Detect aspect ratio of generated video
-                  const ratio = video.videoWidth / video.videoHeight
-                  if (ratio < 0.7) {
-                    setGeneratedVideoAspectRatio("9:16")
-                  } else if (ratio > 1.4) {
-                    setGeneratedVideoAspectRatio("16:9")
-                  } else {
-                    setGeneratedVideoAspectRatio("fill")
+                  e.currentTarget.muted = false
+                  // If no PiP needed, play immediately
+                  const hasPip = !!(sourceVideoUrl || recordedVideoUrl) && showPip
+                  if (!hasPip) {
+                    e.currentTarget.play()
+                    return
+                  }
+                  // If PiP is also ready, start both together
+                  const pip = pipVideoRef.current
+                  if (pip && pip.readyState >= 2) {
+                    pip.currentTime = 0
+                    e.currentTarget.currentTime = 0
+                    e.currentTarget.play()
+                    pip.play()
                   }
                 }}
                 onPlay={() => {
-                  pipVideoRef.current?.play()
+                  setIsPlaying(true)
+                  const pip = pipVideoRef.current
+                  if (pip) {
+                    pip.currentTime = mainVideoRef.current?.currentTime || 0
+                    pip.play()
+                  }
                 }}
                 onPause={() => {
+                  setIsPlaying(false)
                   pipVideoRef.current?.pause()
                 }}
                 onSeeked={() => {
@@ -339,12 +348,14 @@ export default function Home() {
                     pipVideoRef.current.currentTime = mainVideoRef.current.currentTime
                   }
                 }}
-                onTimeUpdate={() => {
-                  // Sync PiP video time with main video (handles loop restart)
-                  if (pipVideoRef.current && mainVideoRef.current) {
-                    const timeDiff = Math.abs(pipVideoRef.current.currentTime - mainVideoRef.current.currentTime)
-                    if (timeDiff > 0.5) {
-                      pipVideoRef.current.currentTime = mainVideoRef.current.currentTime
+                onTimeUpdate={(e) => {
+                  const v = e.currentTarget
+                  if (v.duration) setVideoProgress(v.currentTime / v.duration)
+                  const pip = pipVideoRef.current
+                  if (pip && v) {
+                    const diff = Math.abs(pip.currentTime - v.currentTime)
+                    if (diff > 0.15) {
+                      pip.currentTime = v.currentTime
                     }
                   }
                 }}
@@ -360,59 +371,88 @@ export default function Home() {
                     ref={pipVideoRef}
                     src={sourceVideoUrl || recordedVideoUrl || ""}
                     muted
+                    loop
                     playsInline
+                    preload="auto"
                     className="h-full w-full object-cover"
+                    onLoadedData={() => {
+                      // If main is also ready, start both together
+                      const main = mainVideoRef.current
+                      const pip = pipVideoRef.current
+                      if (main && pip && main.readyState >= 2) {
+                        pip.currentTime = 0
+                        main.currentTime = 0
+                        main.muted = false
+                        main.play()
+                        pip.play()
+                      }
+                    }}
                   />
                 </div>
               )}
+              {/* Bottom fade gradient */}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black to-transparent" />
             </div>
-            {/* Action buttons - below video on all screen sizes */}
-            <div className="flex shrink-0 items-center justify-center gap-3 py-3">
+            {/* Playback controls + action buttons */}
+            <div className="flex shrink-0 flex-col gap-4 pb-28 pt-3 md:pb-4">
+              {/* Progress bar — full width */}
+              <div
+                className="h-1 w-full cursor-pointer bg-neutral-800"
+                onClick={(e) => {
+                  if (!mainVideoRef.current) return
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  const pct = (e.clientX - rect.left) / rect.width
+                  mainVideoRef.current.currentTime = pct * mainVideoRef.current.duration
+                }}
+              >
+                <div
+                  className="h-full bg-white"
+                  style={{ width: `${videoProgress * 100}%` }}
+                />
+              </div>
+              {/* Buttons */}
+              <div className="flex items-center justify-center gap-3">
               <button
                 disabled={isDownloading}
                 onClick={handleDownload}
-                className="flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 font-sans text-[13px] font-medium text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-95 disabled:opacity-70"
+                className="flex items-center gap-2 rounded-full bg-white px-5 py-2 font-mono text-[12px] font-medium text-black transition-all hover:bg-neutral-200 active:scale-95 disabled:opacity-70"
               >
                 {isDownloading ? (
                   <>
-                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
                     {Math.round(downloadProgress * 100)}%
                   </>
                 ) : (
                   <>
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Download
+                    download
                   </>
                 )}
               </button>
               <button
                 onClick={handleReset}
-                className="whitespace-nowrap rounded-lg bg-white/90 px-5 py-2.5 font-sans text-[13px] font-medium text-black shadow-lg transition-all hover:bg-white active:scale-95"
+                className="rounded-full bg-white px-5 py-2 font-mono text-[12px] font-medium text-black transition-all hover:bg-neutral-200 active:scale-95"
               >
-                New Video
+                new video
               </button>
-              {/* PiP toggle button */}
               {(sourceVideoUrl || recordedVideoUrl) && (
                 <button
                   onClick={() => setShowPip(!showPip)}
-                  className={`flex items-center gap-2 rounded-lg px-4 py-2.5 font-sans text-[13px] font-medium shadow-lg transition-all active:scale-95 ${
-                    showPip 
-                      ? "bg-white text-black hover:bg-neutral-100" 
-                      : "bg-white/90 text-black hover:bg-white"
-                  }`}
+                  className="flex items-center gap-2 rounded-full bg-white px-4 py-2 font-mono text-[12px] font-medium text-black transition-all hover:bg-neutral-200 active:scale-95"
                 >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <rect x="2" y="3" width="20" height="14" rx="2" />
                     <rect x="12" y="10" width="8" height="5" rx="1" />
                   </svg>
-                  {showPip ? "PiP on" : "PiP off"}
+                  {showPip ? "pip on" : "pip off"}
                 </button>
               )}
+              </div>
             </div>
           </div>
         ) : recordedVideoUrl ? (
@@ -500,12 +540,13 @@ export default function Home() {
                   onUpdateCharacterCategory={updateCustomCharacterCategory}
                 >
                 <GenerationsPanel
-                  onSelectVideo={(url, sourceUrl, aspectRatio) => {
+                  onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
                     setSelectedError(null)
                     setSelectedGeneratedVideo(url)
                     setResultUrl(url)
                     setSourceVideoUrl(sourceUrl)
-                    setSourceVideoAspectRatio(aspectRatio)
+                    setSourceVideoAspectRatio(sourceAR)
+                    setGeneratedVideoAspectRatio(genAR)
                   }}
                   onSelectError={(error) => {
                     setResultUrl(null)
@@ -534,12 +575,13 @@ export default function Home() {
                     My Videos
                   </p>
                   <GenerationsPanel
-                    onSelectVideo={(url, sourceUrl, aspectRatio) => {
+                    onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
                       setSelectedError(null)
                       setSelectedGeneratedVideo(url)
                       setResultUrl(url)
                       setSourceVideoUrl(sourceUrl)
-                      setSourceVideoAspectRatio(aspectRatio)
+                      setSourceVideoAspectRatio(sourceAR)
+                      setGeneratedVideoAspectRatio(genAR)
                     }}
                     onSelectError={(error) => {
                       setResultUrl(null)
@@ -591,12 +633,13 @@ export default function Home() {
                 /* When viewing a video, show videos first then characters */
                 <>
                   <GenerationsPanel
-                    onSelectVideo={(url, sourceUrl, aspectRatio) => {
+                    onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
                       setSelectedError(null)
                       setSelectedGeneratedVideo(url)
                       setResultUrl(url)
                       setSourceVideoUrl(sourceUrl)
-                      setSourceVideoAspectRatio(aspectRatio)
+                      setSourceVideoAspectRatio(sourceAR)
+                      setGeneratedVideoAspectRatio(genAR)
                       setBottomSheetExpanded(false)
                     }}
                     onSelectError={(error) => {
@@ -649,12 +692,13 @@ export default function Home() {
                   onUpdateCharacterCategory={updateCustomCharacterCategory}
                 >
                   <GenerationsPanel
-                    onSelectVideo={(url, sourceUrl, aspectRatio) => {
+                    onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
                       setSelectedError(null)
                       setSelectedGeneratedVideo(url)
                       setResultUrl(url)
                       setSourceVideoUrl(sourceUrl)
-                      setSourceVideoAspectRatio(aspectRatio)
+                      setSourceVideoAspectRatio(sourceAR)
+                      setGeneratedVideoAspectRatio(genAR)
                       setBottomSheetExpanded(false)
                     }}
                     onSelectError={(error) => {

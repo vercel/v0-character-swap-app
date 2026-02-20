@@ -8,6 +8,7 @@ interface UseVideoDownloadOptions {
   pipVideoUrl: string | null
   showPip: boolean
   pipAspectRatio: "9:16" | "16:9" | "fill"
+  characterName?: string | null
 }
 
 interface UseVideoDownloadReturn {
@@ -16,11 +17,16 @@ interface UseVideoDownloadReturn {
   handleDownload: () => Promise<void>
 }
 
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+}
+
 export function useVideoDownload({
   resultUrl,
   pipVideoUrl,
   showPip,
   pipAspectRatio,
+  characterName,
 }: UseVideoDownloadOptions): UseVideoDownloadReturn {
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
@@ -28,7 +34,9 @@ export function useVideoDownload({
   const handleDownload = useCallback(async () => {
     if (!resultUrl) return
 
-    // If we have a PiP source and PiP is enabled, create video with PiP overlay
+    const slug = characterName ? slugify(characterName) : "video"
+    const pipSuffix = showPip && pipVideoUrl ? "-pip" : ""
+
     if (showPip && pipVideoUrl) {
       try {
         setIsDownloading(true)
@@ -44,19 +52,17 @@ export function useVideoDownload({
           onProgress: setDownloadProgress,
         })
 
-        downloadBlob(blob, `generated-video-with-pip.${extension}`)
+        downloadBlob(blob, `faceswap-${slug}${pipSuffix}.${extension}`)
       } catch (error) {
         console.error("PiP download failed:", error)
-        // Fallback to regular download
         const response = await fetch(resultUrl)
         const blob = await response.blob()
-        downloadBlob(blob, "generated-video.mp4")
+        downloadBlob(blob, `faceswap-${slug}.mp4`)
       } finally {
         setIsDownloading(false)
         setDownloadProgress(0)
       }
     } else {
-      // No PiP, but still add watermark
       try {
         setIsDownloading(true)
         setDownloadProgress(0)
@@ -68,19 +74,18 @@ export function useVideoDownload({
           onProgress: setDownloadProgress,
         })
 
-        downloadBlob(blob, `generated-video.${extension}`)
+        downloadBlob(blob, `faceswap-${slug}.${extension}`)
       } catch (error) {
         console.error("Watermark failed, downloading original:", error)
-        // Fallback to regular download
         const response = await fetch(resultUrl)
         const blob = await response.blob()
-        downloadBlob(blob, "generated-video.mp4")
+        downloadBlob(blob, `faceswap-${slug}.mp4`)
       } finally {
         setIsDownloading(false)
         setDownloadProgress(0)
       }
     }
-  }, [resultUrl, pipVideoUrl, showPip, pipAspectRatio])
+  }, [resultUrl, pipVideoUrl, showPip, pipAspectRatio, characterName])
 
   return {
     isDownloading,

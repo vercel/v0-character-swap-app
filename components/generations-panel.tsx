@@ -72,7 +72,7 @@ interface Generation {
 }
 
 interface GenerationsPanelProps {
-  onSelectVideo?: (videoUrl: string, sourceVideoUrl: string | null, aspectRatio: "9:16" | "16:9" | "fill") => void
+  onSelectVideo?: (videoUrl: string, sourceVideoUrl: string | null, sourceAspectRatio: "9:16" | "16:9" | "fill", generatedAspectRatio: "9:16" | "16:9" | "fill") => void
   onSelectError?: (error: { message: string; characterName: string | null; characterImageUrl: string | null; createdAt: string }) => void
   className?: string
   variant?: "default" | "compact"
@@ -96,6 +96,18 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
 
   const generations: Generation[] = data?.generations || []
   const hasPending = generations.some(g => g.status === "uploading" || g.status === "pending" || g.status === "processing")
+
+  // Preload poster images so they appear instantly
+  const preloadedRef = useRef(new Set<string>())
+  useEffect(() => {
+    generations.forEach(gen => {
+      if (gen.character_image_url && !preloadedRef.current.has(gen.character_image_url)) {
+        preloadedRef.current.add(gen.character_image_url)
+        const img = new window.Image()
+        img.src = gen.character_image_url
+      }
+    })
+  }, [generations])
 
   // Request notification permission when there's a pending generation
   useEffect(() => {
@@ -253,16 +265,31 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
             {/* Thumbnail or status indicator */}
             {gen.status === "completed" && gen.video_url ? (
               <button
-                onClick={() => onSelectVideo?.(gen.video_url!, gen.source_video_url, gen.source_video_aspect_ratio || "fill")}
+                onClick={() => onSelectVideo?.(gen.video_url!, gen.source_video_url, gen.source_video_aspect_ratio || "fill", gen.aspect_ratio || "fill")}
                 className="relative h-full w-full"
+                onMouseEnter={() => {
+                  // Prefetch both videos so they open instantly on click
+                  if (gen.video_url) fetch(gen.video_url, { mode: "cors" }).catch(() => {})
+                  if (gen.source_video_url) fetch(gen.source_video_url, { mode: "cors" }).catch(() => {})
+                }}
               >
+                {/* Poster image underneath video */}
+                {gen.character_image_url && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={gen.character_image_url}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="eager"
+                    draggable={false}
+                  />
+                )}
                 <video
                   src={gen.video_url}
-                  className="h-full w-full object-cover"
+                  className="relative h-full w-full object-cover"
                   muted
                   playsInline
                   preload="none"
-                  poster={gen.character_image_url || undefined}
                   onMouseEnter={(e) => e.currentTarget.play()}
                   onMouseLeave={(e) => {
                     e.currentTarget.pause()
