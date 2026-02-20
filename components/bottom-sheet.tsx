@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState, useRef, useEffect, type ReactNode } from "react"
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react"
 
 interface BottomSheetProps {
   children: ReactNode
@@ -11,80 +11,87 @@ interface BottomSheetProps {
   peekHeight?: number
 }
 
-export function BottomSheet({ 
-  children, 
-  isExpanded, 
+export function BottomSheet({
+  children,
+  isExpanded,
   onExpandedChange,
-  peekHeight = 140 
+  peekHeight = 140
 }: BottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null)
-  const [isDragging, setIsDragging] = useState(false)
-  const [startY, setStartY] = useState(0)
-  const [currentY, setCurrentY] = useState(0)
+  const isDraggingRef = useRef(false)
+  const startYRef = useRef(0)
+  const currentYRef = useRef(0)
+  const [dragTransform, setDragTransform] = useState<string | undefined>(undefined)
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setIsDragging(true)
-    setStartY(e.touches[0].clientY)
-    setCurrentY(0)
-  }
+  const handleTouchStart = useCallback((e: TouchEvent) => {
+    isDraggingRef.current = true
+    startYRef.current = e.touches[0].clientY
+    currentYRef.current = 0
+  }, [])
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging) return
-    const deltaY = e.touches[0].clientY - startY
-    setCurrentY(deltaY)
-  }
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (!isDraggingRef.current) return
+    const deltaY = e.touches[0].clientY - startYRef.current
+    currentYRef.current = deltaY
 
-  const handleTouchEnd = () => {
-    if (!isDragging) return
-    setIsDragging(false)
-    
-    // If dragged more than 50px, toggle state
-    if (Math.abs(currentY) > 50) {
-      if (currentY < 0 && !isExpanded) {
+    if (isExpanded) {
+      setDragTransform(`translateY(${Math.max(0, deltaY)}px)`)
+    } else {
+      setDragTransform(`translateY(${Math.min(0, deltaY)}px)`)
+    }
+  }, [isExpanded])
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isDraggingRef.current) return
+    isDraggingRef.current = false
+
+    if (Math.abs(currentYRef.current) > 50) {
+      if (currentYRef.current < 0 && !isExpanded) {
         onExpandedChange(true)
-      } else if (currentY > 0 && isExpanded) {
+      } else if (currentYRef.current > 0 && isExpanded) {
         onExpandedChange(false)
       }
     }
-    setCurrentY(0)
-  }
+    currentYRef.current = 0
+    setDragTransform(undefined)
+  }, [isExpanded, onExpandedChange])
 
-  // Calculate transform based on drag
-  const getTransform = () => {
-    if (!isDragging) return undefined
-    
-    if (isExpanded) {
-      // When expanded, can only drag down
-      return `translateY(${Math.max(0, currentY)}px)`
-    } else {
-      // When collapsed, can only drag up
-      return `translateY(${Math.min(0, currentY)}px)`
+  // Register passive touch listeners
+  useEffect(() => {
+    const el = sheetRef.current
+    if (!el) return
+
+    el.addEventListener("touchstart", handleTouchStart, { passive: true })
+    el.addEventListener("touchmove", handleTouchMove, { passive: true })
+    el.addEventListener("touchend", handleTouchEnd, { passive: true })
+
+    return () => {
+      el.removeEventListener("touchstart", handleTouchStart)
+      el.removeEventListener("touchmove", handleTouchMove)
+      el.removeEventListener("touchend", handleTouchEnd)
     }
-  }
+  }, [handleTouchStart, handleTouchMove, handleTouchEnd])
 
   return (
     <div
       ref={sheetRef}
       className={`fixed inset-x-0 bottom-0 z-40 flex max-h-[85vh] flex-col rounded-t-3xl bg-neutral-950 transition-all ${
-        isDragging ? "duration-0" : "duration-300 ease-out"
+        dragTransform ? "duration-0" : "duration-300 ease-out"
       }`}
       style={{
         height: isExpanded ? "auto" : `${peekHeight}px`,
         minHeight: isExpanded ? "50vh" : undefined,
-        transform: getTransform(),
+        transform: dragTransform,
       }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
     >
       {/* Handle */}
-      <div 
+      <div
         className="flex shrink-0 cursor-grab items-center justify-center py-2 active:cursor-grabbing"
         onClick={() => onExpandedChange(!isExpanded)}
       >
         <div className="h-1 w-8 rounded-full bg-neutral-700" />
       </div>
-      
+
       {/* Content */}
       <div className={`overscroll-contain px-3 pb-6 ${isExpanded ? "overflow-y-auto" : "overflow-hidden"}`}>
         {children}

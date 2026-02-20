@@ -58,13 +58,13 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
 
   // Load hidden default characters from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEYS.HIDDEN_CHARACTERS)
-    if (stored) {
-      try {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.HIDDEN_CHARACTERS)
+      if (stored) {
         setHiddenDefaultIds(JSON.parse(stored))
-      } catch {
-        // Ignore parse errors
       }
+    } catch {
+      // Gracefully handle incognito/disabled localStorage
     }
   }, [])
 
@@ -177,7 +177,7 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
   const hideDefaultCharacter = useCallback((id: number) => {
     setHiddenDefaultIds(prev => {
       const newHidden = [...prev, id]
-      localStorage.setItem(STORAGE_KEYS.HIDDEN_CHARACTERS, JSON.stringify(newHidden))
+      try { localStorage.setItem(STORAGE_KEYS.HIDDEN_CHARACTERS, JSON.stringify(newHidden)) } catch {}
       return newHidden
     })
     if (selectedCharacter === id) {

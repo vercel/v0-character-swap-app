@@ -212,23 +212,31 @@ export default function Home() {
     setSelectedError(null)
   }, [clearRecording, setSelectedCharacter])
 
-  // Handle Escape key to close video and go back to camera
+  // Handle Escape key — use refs for stable listener (no re-registration)
+  const selectedErrorRef = useRef(selectedError)
+  const resultUrlRef = useRef(resultUrl)
+  const recordedVideoUrlRef = useRef(recordedVideoUrl)
+  const handleResetRef = useRef(handleReset)
+  selectedErrorRef.current = selectedError
+  resultUrlRef.current = resultUrl
+  recordedVideoUrlRef.current = recordedVideoUrl
+  handleResetRef.current = handleReset
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (selectedError) {
+        if (selectedErrorRef.current) {
           e.preventDefault()
           setSelectedError(null)
-        } else if (resultUrl || recordedVideoUrl) {
+        } else if (resultUrlRef.current || recordedVideoUrlRef.current) {
           e.preventDefault()
-          handleReset()
+          handleResetRef.current()
         }
       }
     }
-
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [resultUrl, recordedVideoUrl, handleReset])
+  }, [])
 
   const handleLoginAndContinue = useCallback(async () => {
     setIsLoggingIn(true)

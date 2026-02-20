@@ -19,25 +19,21 @@ export function GenerationProgress({
   status,
   onCancel
 }: GenerationProgressProps) {
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [progress, setProgress] = useState(() => {
+    const elapsed = (Date.now() - new Date(createdAt).getTime()) / 1000
+    return Math.min(99, (elapsed / ESTIMATED_DURATION) * 100)
+  })
 
   useEffect(() => {
     const startTime = new Date(createdAt).getTime()
-
-    const updateElapsed = () => {
-      const now = Date.now()
-      const elapsed = Math.floor((now - startTime) / 1000)
-      setElapsedSeconds(elapsed)
+    const update = () => {
+      const elapsed = (Date.now() - startTime) / 1000
+      setProgress(Math.min(99, (elapsed / ESTIMATED_DURATION) * 100))
     }
-
-    updateElapsed()
-    const interval = setInterval(updateElapsed, 1000)
-
+    update()
+    const interval = setInterval(update, 5000)
     return () => clearInterval(interval)
   }, [createdAt])
-
-  // Cap progress at 99% so it never looks "stuck at 100%"
-  const progress = Math.min(99, (elapsedSeconds / ESTIMATED_DURATION) * 100)
 
   return (
     <div className="group relative flex h-full w-full flex-col overflow-hidden">
