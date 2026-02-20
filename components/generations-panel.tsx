@@ -73,13 +73,14 @@ interface Generation {
 
 interface GenerationsPanelProps {
   onSelectVideo?: (videoUrl: string, sourceVideoUrl: string | null, aspectRatio: "9:16" | "16:9" | "fill") => void
+  onSelectError?: (error: { message: string; characterName: string | null; characterImageUrl: string | null; createdAt: string }) => void
   className?: string
   variant?: "default" | "compact"
 }
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
-export function GenerationsPanel({ onSelectVideo, className = "", variant = "default" }: GenerationsPanelProps) {
+export function GenerationsPanel({ onSelectVideo, onSelectError, className = "", variant = "default" }: GenerationsPanelProps) {
   const { user } = useAuth()
   const prevGenerationsRef = useRef<Generation[]>([])
   const hasRequestedPermission = useRef(false)
@@ -275,7 +276,17 @@ export function GenerationsPanel({ onSelectVideo, className = "", variant = "def
                 </div>
               </button>
             ) : gen.status === "failed" || gen.status === "cancelled" ? (
-              <FailedGeneration gen={gen} />
+              <button
+                className="h-full w-full"
+                onClick={() => onSelectError?.({
+                  message: gen.error?.summary ?? gen.error?.message ?? gen.error_message ?? "Generation failed",
+                  characterName: gen.character_name,
+                  characterImageUrl: gen.character_image_url,
+                  createdAt: gen.created_at,
+                })}
+              >
+                <FailedGeneration gen={gen} />
+              </button>
             ) : (
               // Processing/Pending state with progress indicator
               <GenerationProgress

@@ -166,12 +166,28 @@ async function generateAndSaveVideo(
   console.log(`[Workflow Step] [${new Date().toISOString()}] Gateway created (+${Date.now() - stepStartTime}ms)`)
   console.log(`[Workflow Step] [${new Date().toISOString()}] Input: characterImageUrl=${characterImageUrl}, videoUrl=${videoUrl}`)
 
+  // Probe video metadata to log what we're sending to Kling
+  try {
+    const videoProbe = await fetch(videoUrl, { method: "HEAD" })
+    const contentType = videoProbe.headers.get("content-type")
+    const contentLength = videoProbe.headers.get("content-length")
+    const sizeMB = contentLength ? (parseInt(contentLength) / 1024 / 1024).toFixed(2) : "unknown"
+    console.log(`[Workflow Step] [${new Date().toISOString()}] Video metadata: type=${contentType}, size=${sizeMB}MB, url=${videoUrl}`)
+
+    const imageProbe = await fetch(characterImageUrl, { method: "HEAD" })
+    const imageType = imageProbe.headers.get("content-type")
+    const imageLength = imageProbe.headers.get("content-length")
+    const imageSizeKB = imageLength ? (parseInt(imageLength) / 1024).toFixed(1) : "unknown"
+    console.log(`[Workflow Step] [${new Date().toISOString()}] Image metadata: type=${imageType}, size=${imageSizeKB}KB, url=${characterImageUrl}`)
+  } catch (probeErr) {
+    console.warn(`[Workflow Step] [${new Date().toISOString()}] Failed to probe input metadata:`, probeErr)
+  }
+
   // Update run ID with a placeholder so UI knows it's processing
   await updateGenerationRunId(generationId, `ai-gateway-${generationId}`)
 
   // Generate video using AI SDK with KlingAI motion control
   console.log(`[Workflow Step] [${new Date().toISOString()}] Calling experimental_generateVideo with klingai/kling-v2.6-motion-control...`)
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Using gateway.video() with custom fetch/dispatcher`)
   console.log(`[Workflow Step] [${new Date().toISOString()}] Provider options: pollIntervalMs=5000, pollTimeoutMs=${14 * 60 * 1000}ms`)
 
   const generateStart = Date.now()

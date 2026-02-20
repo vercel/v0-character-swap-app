@@ -37,6 +37,7 @@ export default function Home() {
   // Aspect ratio of the source/PiP video (from DB when viewing generation, or from recording)
   const [sourceVideoAspectRatio, setSourceVideoAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
   const [selectedGeneratedVideo, setSelectedGeneratedVideo] = useState<string | null>(null)
+  const [selectedError, setSelectedError] = useState<{ message: string; characterName: string | null; characterImageUrl: string | null; createdAt: string } | null>(null)
   const [bottomSheetExpanded, setBottomSheetExpanded] = useState(false)
   const [pendingAutoSubmit, setPendingAutoSubmit] = useState(false)
   // Detected aspect ratio of the generated video (from character image)
@@ -188,8 +189,6 @@ export default function Home() {
     if (!recordedVideo || !selectedCharacter) return
     const character = allCharacters.find(c => c.id === selectedCharacter)
     if (character) {
-      // Pause the preview video while generating
-      previewVideoRef.current?.pause()
       // Track character usage for popularity
       trackCharacterUsage(character.id)
       // Use character image aspect ratio for generated video, but also pass recorded video aspect ratio
@@ -271,11 +270,34 @@ export default function Home() {
       {/* Camera/Video Section */}
       <div className={cn(
         "flex flex-1 items-center justify-center",
-        isMobile ? "p-0" : (resultUrl || recordedVideoUrl) 
-          ? (generatedVideoAspectRatio === "fill" ? "p-0" : "p-1") 
+        isMobile ? "p-0" : (resultUrl || recordedVideoUrl)
+          ? (generatedVideoAspectRatio === "fill" ? "p-0" : "p-1")
           : "p-0"
       )}>
-        {resultUrl ? (
+        {selectedError ? (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-8">
+            {selectedError.characterImageUrl && (
+              <div className="h-20 w-20 overflow-hidden rounded-xl bg-neutral-900 ring-1 ring-neutral-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={selectedError.characterImageUrl} alt="" className="h-full w-full object-cover object-top" />
+              </div>
+            )}
+            <div className="max-w-xs text-center">
+              <p className="mb-3 font-mono text-[13px] font-medium text-white">
+                generation failed
+              </p>
+              <p className="font-mono text-[11px] leading-relaxed text-neutral-500">
+                {selectedError.message}
+              </p>
+            </div>
+            <button
+              onClick={() => setSelectedError(null)}
+              className="rounded-lg bg-white px-5 py-2.5 font-mono text-[12px] font-medium text-black transition-colors hover:bg-neutral-200"
+            >
+              try again
+            </button>
+          </div>
+        ) : resultUrl ? (
           <div className="relative flex h-full w-full flex-col items-center justify-center">
             <div className={cn(
               "relative overflow-hidden bg-neutral-900",
@@ -479,10 +501,15 @@ export default function Home() {
                 >
                 <GenerationsPanel
                   onSelectVideo={(url, sourceUrl, aspectRatio) => {
+                    setSelectedError(null)
                     setSelectedGeneratedVideo(url)
                     setResultUrl(url)
                     setSourceVideoUrl(sourceUrl)
                     setSourceVideoAspectRatio(aspectRatio)
+                  }}
+                  onSelectError={(error) => {
+                    setResultUrl(null)
+                    setSelectedError(error)
                   }}
                   className="mt-4"
                 />
@@ -508,10 +535,15 @@ export default function Home() {
                   </p>
                   <GenerationsPanel
                     onSelectVideo={(url, sourceUrl, aspectRatio) => {
+                      setSelectedError(null)
                       setSelectedGeneratedVideo(url)
                       setResultUrl(url)
                       setSourceVideoUrl(sourceUrl)
                       setSourceVideoAspectRatio(aspectRatio)
+                    }}
+                    onSelectError={(error) => {
+                      setResultUrl(null)
+                      setSelectedError(error)
                     }}
                     variant="compact"
                   />
@@ -560,10 +592,16 @@ export default function Home() {
                 <>
                   <GenerationsPanel
                     onSelectVideo={(url, sourceUrl, aspectRatio) => {
+                      setSelectedError(null)
                       setSelectedGeneratedVideo(url)
                       setResultUrl(url)
                       setSourceVideoUrl(sourceUrl)
                       setSourceVideoAspectRatio(aspectRatio)
+                      setBottomSheetExpanded(false)
+                    }}
+                    onSelectError={(error) => {
+                      setResultUrl(null)
+                      setSelectedError(error)
                       setBottomSheetExpanded(false)
                     }}
                     className="mb-6"
@@ -612,10 +650,16 @@ export default function Home() {
                 >
                   <GenerationsPanel
                     onSelectVideo={(url, sourceUrl, aspectRatio) => {
+                      setSelectedError(null)
                       setSelectedGeneratedVideo(url)
                       setResultUrl(url)
                       setSourceVideoUrl(sourceUrl)
                       setSourceVideoAspectRatio(aspectRatio)
+                      setBottomSheetExpanded(false)
+                    }}
+                    onSelectError={(error) => {
+                      setResultUrl(null)
+                      setSelectedError(error)
                       setBottomSheetExpanded(false)
                     }}
                     className="mt-4"

@@ -27,7 +27,7 @@ interface FailedGenerationProps {
 }
 
 // Map technical errors to user-friendly messages
-function getUserFriendlyError(errorMessage: string | null, structuredError?: Generation["error"]): string {
+export function getUserFriendlyError(errorMessage: string | null, structuredError?: Generation["error"]): string {
   const message = structuredError?.summary ?? structuredError?.message ?? errorMessage
   if (structuredError?.kind === "provider_error" && message) {
     return message
