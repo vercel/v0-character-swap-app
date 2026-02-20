@@ -4,17 +4,17 @@ export interface PipOptions {
   mainVideoUrl: string
   pipVideoUrl?: string | null
   pipPosition?: "bottom-right" | "bottom-left" | "top-right" | "top-left"
-  pipScale?: number // 0.0 to 1.0, default 0.25
-  pipAspectRatio?: "9:16" | "16:9" | "fill" // aspect ratio of pip video
+  pipScale?: number
+  pipAspectRatio?: "9:16" | "16:9" | "fill"
   onProgress?: (progress: number) => void
   addWatermark?: boolean
 }
 
-function loadVideo(url: string): Promise<HTMLVideoElement> {
+function loadVideo(url: string, muted: boolean): Promise<HTMLVideoElement> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video")
     video.crossOrigin = "anonymous"
-    video.muted = true
+    video.muted = muted
     video.playsInline = true
     video.preload = "auto"
     video.onloadeddata = () => resolve(video)
@@ -25,11 +25,7 @@ function loadVideo(url: string): Promise<HTMLVideoElement> {
 
 function drawRoundedRect(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
+  x: number, y: number, w: number, h: number, r: number,
 ) {
   ctx.beginPath()
   ctx.moveTo(x + r, y)
@@ -59,32 +55,27 @@ export async function createPipVideoClient({
 }: PipOptions): Promise<PipResult> {
   onProgress?.(0.05)
 
-  // Load videos
-  const mainVideo = await loadVideo(mainVideoUrl)
+  // Load main video UN-muted so captureStream() includes audio tracks
+  const mainVideo = await loadVideo(mainVideoUrl, false)
   onProgress?.(0.2)
 
-  const pipVideo = pipVideoUrl ? await loadVideo(pipVideoUrl) : null
+  const pipVideo = pipVideoUrl ? await loadVideo(pipVideoUrl, true) : null
   onProgress?.(0.3)
 
-  // Set up canvas at the main video's native resolution
+  // Canvas for compositing at native resolution
   const canvas = document.createElement("canvas")
   canvas.width = mainVideo.videoWidth
   canvas.height = mainVideo.videoHeight
   const ctx = canvas.getContext("2d")!
 
-  // Calculate PiP dimensions and position
+  // PiP dimensions
   const padding = 20
   const cornerRadius = 12
-  let pipW = 0
-  let pipH = 0
-  let pipX = 0
-  let pipY = 0
+  let pipW = 0, pipH = 0, pipX = 0, pipY = 0
 
   if (pipVideo) {
-    // PiP height is pipScale of main video height
     pipH = Math.round(canvas.height * pipScale)
     pipW = Math.round(pipH * (pipVideo.videoWidth / pipVideo.videoHeight))
-
     const positions = {
       "bottom-right": { x: canvas.width - pipW - padding, y: canvas.height - pipH - padding },
       "bottom-left": { x: padding, y: canvas.height - pipH - padding },
@@ -96,36 +87,37 @@ export async function createPipVideoClient({
     pipY = pos.y
   }
 
-  // Watermark config
   const watermarkText = "created with faceswapvid.vercel.app"
   const fontSize = Math.max(14, Math.round(canvas.height * 0.025))
 
-  // Use MediaRecorder to capture the canvas as video + audio from main video
-  const stream = canvas.captureStream(30)
+  // Build combined stream: canvas video track + main video audio tracks
+  const canvasStream = canvas.captureStream(30)
+  const combinedStream = new MediaStream()
 
-  // Capture audio from the main video element
+  // Add canvas video track (composited frames)
+  canvasStream.getVideoTracks().forEach(t => combinedStream.addTrack(t))
+
+  // Add audio tracks from the main video via captureStream()
+  // This captures decoded audio directly from the video element
   try {
-    const audioCtx = new AudioContext()
-    const source = audioCtx.createMediaElementSource(mainVideo)
-    const dest = audioCtx.createMediaStreamDestination()
-    source.connect(dest)
-    source.connect(audioCtx.destination) // keep audio playing
-    dest.stream.getAudioTracks().forEach(track => stream.addTrack(track))
+    const mainStream = (mainVideo as any).captureStream() as MediaStream
+    mainStream.getAudioTracks().forEach(t => combinedStream.addTrack(t))
   } catch {
-    // No audio available or already captured — continue without
+    // captureStream not available or no audio — continue without
   }
 
-  // Try MP4 first (Safari), then WebM (Chrome/Firefox)
+  // Pick best codec
   const codecs = [
     "video/mp4;codecs=avc1",
     "video/mp4",
+    "video/webm;codecs=vp9,opus",
     "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8",
+    "video/webm;codecs=vp8,opus",
     "video/webm",
   ]
-  const mimeType = codecs.find((c) => MediaRecorder.isTypeSupported(c)) || "video/webm"
+  const mimeType = codecs.find(c => MediaRecorder.isTypeSupported(c)) || "video/webm"
 
-  const recorder = new MediaRecorder(stream, {
+  const recorder = new MediaRecorder(combinedStream, {
     mimeType,
     videoBitsPerSecond: 8_000_000,
   })
@@ -136,23 +128,22 @@ export async function createPipVideoClient({
   }
 
   const recordingDone = new Promise<Blob>((resolve) => {
-    recorder.onstop = () => {
-      resolve(new Blob(chunks, { type: mimeType }))
-    }
+    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }))
   })
 
-  // Start recording and play videos
+  // Start recording, then play videos from beginning
   recorder.start()
   mainVideo.currentTime = 0
   if (pipVideo) pipVideo.currentTime = 0
 
+  // Must play main video for captureStream audio to flow
+  mainVideo.volume = 0.01 // near-silent so user doesn't hear double audio
   const playPromises: Promise<void>[] = [mainVideo.play()]
   if (pipVideo) playPromises.push(pipVideo.play())
   await Promise.all(playPromises)
 
   onProgress?.(0.4)
 
-  // Draw frames until main video ends
   const duration = mainVideo.duration
   await new Promise<void>((resolve) => {
     function drawFrame() {
@@ -162,10 +153,8 @@ export async function createPipVideoClient({
         return
       }
 
-      // Draw main video
       ctx.drawImage(mainVideo, 0, 0, canvas.width, canvas.height)
 
-      // Draw PiP with rounded corners
       if (pipVideo && !pipVideo.ended) {
         ctx.save()
         drawRoundedRect(ctx, pipX, pipY, pipW, pipH, cornerRadius)
@@ -173,7 +162,6 @@ export async function createPipVideoClient({
         ctx.drawImage(pipVideo, pipX, pipY, pipW, pipH)
         ctx.restore()
 
-        // Draw subtle border around PiP
         ctx.save()
         drawRoundedRect(ctx, pipX, pipY, pipW, pipH, cornerRadius)
         ctx.strokeStyle = "rgba(255,255,255,0.3)"
@@ -182,7 +170,6 @@ export async function createPipVideoClient({
         ctx.restore()
       }
 
-      // Draw watermark
       if (addWatermark) {
         ctx.save()
         ctx.imageSmoothingEnabled = true
@@ -197,7 +184,6 @@ export async function createPipVideoClient({
         ctx.restore()
       }
 
-      // Report progress
       if (duration > 0) {
         const p = 0.4 + (mainVideo.currentTime / duration) * 0.5
         onProgress?.(Math.min(p, 0.9))

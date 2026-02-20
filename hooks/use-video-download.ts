@@ -37,53 +37,30 @@ export function useVideoDownload({
     const slug = characterName ? slugify(characterName) : "video"
     const pipSuffix = showPip && pipVideoUrl ? "-pip" : ""
 
-    if (showPip && pipVideoUrl) {
-      try {
-        setIsDownloading(true)
-        setDownloadProgress(0)
+    try {
+      setIsDownloading(true)
+      setDownloadProgress(0)
 
-        const { blob, extension } = await createPipVideoClient({
-          mainVideoUrl: resultUrl,
-          pipVideoUrl: pipVideoUrl,
-          pipPosition: "bottom-right",
-          pipScale: 0.25,
-          pipAspectRatio,
-          addWatermark: true,
-          onProgress: setDownloadProgress,
-        })
+      const { blob, extension } = await createPipVideoClient({
+        mainVideoUrl: resultUrl,
+        pipVideoUrl: showPip ? pipVideoUrl : null,
+        pipPosition: "bottom-right",
+        pipScale: 0.25,
+        pipAspectRatio,
+        addWatermark: true,
+        onProgress: setDownloadProgress,
+      })
 
-        downloadBlob(blob, `faceswap-${slug}${pipSuffix}.${extension}`)
-      } catch (error) {
-        console.error("PiP download failed:", error)
-        const response = await fetch(resultUrl)
-        const blob = await response.blob()
-        downloadBlob(blob, `faceswap-${slug}.mp4`)
-      } finally {
-        setIsDownloading(false)
-        setDownloadProgress(0)
-      }
-    } else {
-      try {
-        setIsDownloading(true)
-        setDownloadProgress(0)
-
-        const { blob, extension } = await createPipVideoClient({
-          mainVideoUrl: resultUrl,
-          pipVideoUrl: null,
-          addWatermark: true,
-          onProgress: setDownloadProgress,
-        })
-
-        downloadBlob(blob, `faceswap-${slug}.${extension}`)
-      } catch (error) {
-        console.error("Watermark failed, downloading original:", error)
-        const response = await fetch(resultUrl)
-        const blob = await response.blob()
-        downloadBlob(blob, `faceswap-${slug}.mp4`)
-      } finally {
-        setIsDownloading(false)
-        setDownloadProgress(0)
-      }
+      downloadBlob(blob, `faceswap-${slug}${pipSuffix}.${extension}`)
+    } catch (error) {
+      console.error("Download failed, fetching original:", error)
+      // Fallback: download original video directly (has audio, no PiP/watermark)
+      const response = await fetch(resultUrl)
+      const blob = await response.blob()
+      downloadBlob(blob, `faceswap-${slug}.mp4`)
+    } finally {
+      setIsDownloading(false)
+      setDownloadProgress(0)
     }
   }, [resultUrl, pipVideoUrl, showPip, pipAspectRatio, characterName])
 
