@@ -74,7 +74,7 @@ export function buildCompositeVideoUrl({
     validateBlobUrl(pipVideoUrl)
     const b64Url = base64UrlEncode(pipVideoUrl)
     transformations.push(
-      `l_video:fetch:${b64Url},w_0.2,fl_relative.no_audio,r_12,g_south_east,x_20,y_20`
+      `l_video:fetch:${b64Url},w_0.2,fl_relative,ac_none,r_12,g_south_east,x_20,y_20`
     )
   }
 
