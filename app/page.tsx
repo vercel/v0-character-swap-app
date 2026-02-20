@@ -52,6 +52,7 @@ export default function Home() {
   // Video refs for sync
   const mainVideoRef = useRef<HTMLVideoElement>(null)
   const pipVideoRef = useRef<HTMLVideoElement>(null)
+  const previewVideoRef = useRef<HTMLVideoElement>(null)
 
   // Custom hooks
   const {
@@ -187,6 +188,8 @@ export default function Home() {
     if (!recordedVideo || !selectedCharacter) return
     const character = allCharacters.find(c => c.id === selectedCharacter)
     if (character) {
+      // Pause the preview video while generating
+      previewVideoRef.current?.pause()
       // Track character usage for popularity
       trackCharacterUsage(character.id)
       // Use character image aspect ratio for generated video, but also pass recorded video aspect ratio
@@ -402,12 +405,13 @@ export default function Home() {
             }}
           >
             <div className="relative h-full w-full overflow-hidden">
-              <video 
-                src={recordedVideoUrl} 
+              <video
+                ref={previewVideoRef}
+                src={recordedVideoUrl}
                 controls={!isProcessingVideo && !isUploading}
-                autoPlay 
+                autoPlay
                 muted
-                loop 
+                loop
                 playsInline
                 preload="auto"
                 className="h-full w-full object-cover"

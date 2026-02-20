@@ -1,11 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+import * as PopoverPrimitive from "@radix-ui/react-popover"
 
 interface Generation {
   id: number
@@ -75,8 +71,8 @@ export function FailedGeneration({ gen }: FailedGenerationProps) {
     : "Failed"
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
+    <PopoverPrimitive.Root open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverPrimitive.Trigger asChild>
         <button className="flex h-full w-full flex-col items-center justify-center gap-1 p-1">
           <svg className="h-4 w-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -85,11 +81,14 @@ export function FailedGeneration({ gen }: FailedGenerationProps) {
             {shortMessage}
           </span>
         </button>
-      </PopoverTrigger>
-      <PopoverContent
+      </PopoverPrimitive.Trigger>
+      <PopoverPrimitive.Content
         side="top"
         align="center"
-        className="w-72 border-neutral-800 bg-neutral-900 p-0"
+        sideOffset={4}
+        collisionPadding={16}
+        className="z-[60] w-72 rounded-md border border-neutral-800 bg-neutral-900 p-0 shadow-lg"
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="p-3">
           <div className="mb-2 flex items-center gap-2">
@@ -104,7 +103,7 @@ export function FailedGeneration({ gen }: FailedGenerationProps) {
             {friendlyError}
           </p>
         </div>
-      </PopoverContent>
-    </Popover>
+      </PopoverPrimitive.Content>
+    </PopoverPrimitive.Root>
   )
 }

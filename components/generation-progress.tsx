@@ -12,21 +12,18 @@ interface GenerationProgressProps {
 
 // Estimated time in seconds (~7 min based on real usage data)
 const ESTIMATED_DURATION = 7 * 60
-// Max display time - after this, something might be wrong
-const MAX_DISPLAY_TIME = 12 * 60
 
-export function GenerationProgress({ 
-  characterImageUrl, 
-  createdAt, 
+export function GenerationProgress({
+  characterImageUrl,
+  createdAt,
   status,
-  onCancel 
+  onCancel
 }: GenerationProgressProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
   useEffect(() => {
     const startTime = new Date(createdAt).getTime()
-    
+
     const updateElapsed = () => {
       const now = Date.now()
       const elapsed = Math.floor((now - startTime) / 1000)
@@ -35,33 +32,12 @@ export function GenerationProgress({
 
     updateElapsed()
     const interval = setInterval(updateElapsed, 1000)
-    
+
     return () => clearInterval(interval)
   }, [createdAt])
 
-  const progress = Math.min(100, (elapsedSeconds / ESTIMATED_DURATION) * 100)
-  
-  // Format time as MM:SS
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
-
-  // Status-specific messages (adjusted for ~7 min total duration)
-  const getStatusMessage = () => {
-    if (status === "uploading") return "Uploading video..."
-    if (status === "pending") return "In queue..."
-    if (elapsedSeconds < 30) return "Starting AI model..."
-    if (elapsedSeconds < 120) return "Analyzing motion..."
-    if (elapsedSeconds < 240) return "Processing frames..."
-    if (elapsedSeconds < 360) return "Generating video..."
-    if (elapsedSeconds < 420) return "Rendering final..."
-    if (elapsedSeconds < MAX_DISPLAY_TIME) return "Almost done..."
-    return "Taking longer than usual..."
-  }
-
-  const remainingSeconds = Math.max(0, ESTIMATED_DURATION - elapsedSeconds)
+  // Cap progress at 99% so it never looks "stuck at 100%"
+  const progress = Math.min(99, (elapsedSeconds / ESTIMATED_DURATION) * 100)
 
   return (
     <div className="group relative flex h-full w-full flex-col overflow-hidden">
@@ -75,93 +51,63 @@ export function GenerationProgress({
           sizes="56px"
         />
       )}
-      
-      {/* Clickable area to show cancel confirmation */}
-      <button
-        onClick={() => setShowCancelConfirm(true)}
-        className="relative z-10 flex h-full w-full flex-col items-center justify-center p-0.5"
-      >
-        {/* Circular progress indicator - smaller on mobile */}
-        <div className="relative h-8 w-8 md:h-10 md:w-10">
-          <svg className="h-8 w-8 -rotate-90 md:h-10 md:w-10" viewBox="0 0 36 36">
-            {/* Background circle */}
+
+      {/* Progress indicator */}
+      <div className="relative z-10 flex h-full w-full flex-col items-center justify-center">
+        {/* Circular progress */}
+        <div className="relative h-8 w-8 md:h-9 md:w-9">
+          <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
             <circle
-              cx="18"
-              cy="18"
-              r="15"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
+              cx="18" cy="18" r="15"
+              fill="none" stroke="currentColor" strokeWidth="2.5"
               className="text-neutral-800"
             />
-            {/* Progress circle */}
             <circle
-              cx="18"
-              cy="18"
-              r="15"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
+              cx="18" cy="18" r="15"
+              fill="none" stroke="currentColor" strokeWidth="2.5"
               strokeLinecap="round"
               strokeDasharray={`${progress * 0.94} 94`}
               className="text-white transition-all duration-1000"
             />
           </svg>
-          {/* Percentage in center */}
-          <span className="absolute inset-0 flex items-center justify-center font-mono text-[8px] font-semibold text-white md:text-[9px]">
+          <span className="absolute inset-0 flex items-center justify-center font-mono text-[8px] font-semibold tabular-nums text-white">
             {Math.round(progress)}%
           </span>
         </div>
-      </button>
+      </div>
 
-      {/* Cancel confirmation overlay */}
-      {showCancelConfirm && onCancel && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/90 p-2">
-          <p className="text-center font-mono text-[8px] text-neutral-400">
-            {getStatusMessage()}
-          </p>
-          <p className="font-mono text-[10px] text-white">
-            ~{formatTime(remainingSeconds)} left
-          </p>
-          <div className="mt-1 flex gap-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowCancelConfirm(false)
-              }}
-              className="rounded bg-neutral-700 px-2 py-0.5 font-mono text-[8px] text-white transition-colors hover:bg-neutral-600"
-            >
-              Back
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onCancel(e)
-              }}
-              className="rounded bg-neutral-600 px-2 py-0.5 font-mono text-[8px] text-white transition-colors hover:bg-neutral-500"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+      {/* Cancel button — appears on hover, positioned outside via parent */}
+      {onCancel && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onCancel(e)
+          }}
+          className="absolute inset-0 z-20 flex items-center justify-center bg-black/70 opacity-0 transition-opacity group-hover:opacity-100"
+          title="Cancel generation"
+        >
+          <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       )}
     </div>
   )
 }
 
 // Expanded version for larger displays
-export function GenerationProgressExpanded({ 
-  characterImageUrl, 
+export function GenerationProgressExpanded({
+  characterImageUrl,
   characterName,
-  createdAt, 
+  createdAt,
   status,
-  onCancel 
+  onCancel
 }: GenerationProgressProps & { characterName?: string | null }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
   useEffect(() => {
     const startTime = new Date(createdAt).getTime()
-    
+
     const updateElapsed = () => {
       const now = Date.now()
       const elapsed = Math.floor((now - startTime) / 1000)
@@ -170,13 +116,13 @@ export function GenerationProgressExpanded({
 
     updateElapsed()
     const interval = setInterval(updateElapsed, 1000)
-    
+
     return () => clearInterval(interval)
   }, [createdAt])
 
   const remainingSeconds = Math.max(0, ESTIMATED_DURATION - elapsedSeconds)
-  const progress = Math.min(100, (elapsedSeconds / ESTIMATED_DURATION) * 100)
-  
+  const progress = Math.min(99, (elapsedSeconds / ESTIMATED_DURATION) * 100)
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
@@ -209,21 +155,21 @@ export function GenerationProgressExpanded({
             />
           </div>
         )}
-        
+
         <div className="flex-1">
           {/* Status message */}
           <p className="mb-2 font-sans text-[13px] font-medium text-white">
             {getStatusMessage()}
           </p>
-          
+
           {/* Progress bar */}
           <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-800">
-            <div 
+            <div
               className="h-full rounded-full bg-white transition-all duration-1000"
               style={{ width: `${progress}%` }}
             />
           </div>
-          
+
           {/* Time info */}
           <div className="flex items-center justify-between">
             <span className="font-mono text-[11px] text-neutral-500">
@@ -235,7 +181,7 @@ export function GenerationProgressExpanded({
           </div>
         </div>
       </div>
-      
+
       {/* Cancel button */}
       {onCancel && (
         <button
