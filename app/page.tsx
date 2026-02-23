@@ -301,7 +301,7 @@ export default function Home() {
   return (
     <main className="relative flex h-[100dvh] flex-row overflow-hidden bg-black">
       {/* Camera/Video Section */}
-      <div className="flex flex-1 items-center justify-center">
+      <div className="flex flex-1 items-center justify-center" onClick={() => { if (isMobile && bottomSheetExpanded) setBottomSheetExpanded(false) }}>
         {selectedError ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-8">
             {selectedError.characterImageUrl && (

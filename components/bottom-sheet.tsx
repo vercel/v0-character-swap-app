@@ -35,9 +35,11 @@ export function BottomSheet({
     currentYRef.current = deltaY
 
     if (isExpanded) {
-      setDragTransform(`translateY(${Math.max(0, deltaY)}px)`)
+      // Dragging down to collapse — clamp so it can't go beyond peek position
+      setDragTransform(`translateY(${Math.max(0, Math.min(deltaY, peekHeight))}px)`)
     } else {
-      setDragTransform(`translateY(${Math.min(0, deltaY)}px)`)
+      // Dragging up to expand — clamp so it can't overshoot the expanded position
+      setDragTransform(`translateY(${Math.max(-peekHeight, Math.min(0, deltaY))}px)`)
     }
   }, [isExpanded])
 
@@ -75,12 +77,11 @@ export function BottomSheet({
   return (
     <div
       ref={sheetRef}
-      className={`fixed inset-x-0 bottom-0 z-40 flex max-h-[85vh] flex-col rounded-t-3xl bg-neutral-950 transition-all ${
+      className={`fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-3xl bg-neutral-950 transition-all ${
         dragTransform ? "duration-0" : "duration-300 ease-out"
       }`}
       style={{
-        height: isExpanded ? "auto" : `${peekHeight}px`,
-        minHeight: isExpanded ? "50vh" : undefined,
+        height: isExpanded ? "85dvh" : `${peekHeight}px`,
         transform: dragTransform,
       }}
     >
@@ -93,7 +94,7 @@ export function BottomSheet({
       </div>
 
       {/* Content */}
-      <div className={`overscroll-contain px-3 pb-6 ${isExpanded ? "overflow-y-auto" : "overflow-hidden"}`}>
+      <div className={`min-h-0 flex-1 overscroll-contain px-3 pb-6 ${isExpanded ? "overflow-y-auto" : "overflow-hidden"}`}>
         {children}
       </div>
     </div>

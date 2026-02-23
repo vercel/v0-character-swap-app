@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 
 interface GenerationProgressProps {
@@ -10,8 +10,40 @@ interface GenerationProgressProps {
   onCancel?: (e?: React.MouseEvent) => void
 }
 
-// Estimated time in seconds (~7 min based on real usage data)
-const ESTIMATED_DURATION = 7 * 60
+const DEFAULT_MEDIAN_SECONDS = 420 // 7 minutes
+
+// Module-level cached median — shared across all component instances
+let _cachedMedian: number = DEFAULT_MEDIAN_SECONDS
+let _medianFetched = false
+
+function fetchMedianDuration(): void {
+  if (_medianFetched) return
+  _medianFetched = true
+  fetch("/api/generation-stats")
+    .then((r) => r.json())
+    .then((data) => {
+      if (data?.medianDurationSeconds && data.medianDurationSeconds > 0) {
+        _cachedMedian = data.medianDurationSeconds
+      }
+    })
+    .catch(() => {}) // fallback already set
+}
+
+/**
+ * Asymptotic progress curve that never gets stuck.
+ *
+ * tau is calibrated so that at the median completion time, progress ≈ 80%.
+ * Formula: progress = 95 * (1 - e^(-elapsed / tau))
+ *   where tau = medianDuration / 1.845
+ *
+ * At 1× median (~7 min): ≈ 80%
+ * At 2× median (~14 min): ≈ 94%
+ * Never reaches 95% — backend completion snaps to 100%.
+ */
+function computeProgress(elapsedSeconds: number, medianDuration: number): number {
+  const tau = medianDuration / 1.845
+  return 95 * (1 - Math.exp(-elapsedSeconds / tau))
+}
 
 export function GenerationProgress({
   characterImageUrl,
@@ -21,14 +53,15 @@ export function GenerationProgress({
 }: GenerationProgressProps) {
   const [progress, setProgress] = useState(() => {
     const elapsed = (Date.now() - new Date(createdAt).getTime()) / 1000
-    return Math.min(99, (elapsed / ESTIMATED_DURATION) * 100)
+    return computeProgress(elapsed, _cachedMedian)
   })
 
   useEffect(() => {
+    fetchMedianDuration()
     const startTime = new Date(createdAt).getTime()
     const update = () => {
       const elapsed = (Date.now() - startTime) / 1000
-      setProgress(Math.min(99, (elapsed / ESTIMATED_DURATION) * 100))
+      setProgress(computeProgress(elapsed, _cachedMedian))
     }
     update()
     const interval = setInterval(update, 5000)
@@ -102,6 +135,7 @@ export function GenerationProgressExpanded({
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
   useEffect(() => {
+    fetchMedianDuration()
     const startTime = new Date(createdAt).getTime()
 
     const updateElapsed = () => {
@@ -116,8 +150,7 @@ export function GenerationProgressExpanded({
     return () => clearInterval(interval)
   }, [createdAt])
 
-  const remainingSeconds = Math.max(0, ESTIMATED_DURATION - elapsedSeconds)
-  const progress = Math.min(99, (elapsedSeconds / ESTIMATED_DURATION) * 100)
+  const progress = computeProgress(elapsedSeconds, _cachedMedian)
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -128,12 +161,11 @@ export function GenerationProgressExpanded({
   const getStatusMessage = () => {
     if (status === "uploading") return "Uploading video..."
     if (status === "pending") return "In queue..."
-    if (elapsedSeconds < 30) return "Starting AI model..."
-    if (elapsedSeconds < 120) return "Analyzing motion..."
-    if (elapsedSeconds < 240) return "Processing frames..."
-    if (elapsedSeconds < 360) return "Generating video..."
-    if (elapsedSeconds < 420) return "Rendering final..."
-    return "Almost done..."
+    if (progress < 10) return "Starting AI model..."
+    if (progress < 30) return "Analyzing motion..."
+    if (progress < 60) return "Processing frames..."
+    if (progress < 85) return "Generating video..."
+    return "Rendering final..."
   }
 
   return (
@@ -172,7 +204,7 @@ export function GenerationProgressExpanded({
               {characterName || "Generating"}
             </span>
             <span className="font-mono text-[11px] tabular-nums text-neutral-400">
-              {remainingSeconds > 0 ? `~${formatTime(remainingSeconds)} remaining` : "Almost done..."}
+              Elapsed: {formatTime(elapsedSeconds)}
             </span>
           </div>
         </div>

@@ -2,6 +2,32 @@ import { neon } from "@neondatabase/serverless"
 
 export const sql = neon(process.env.DATABASE_URL!)
 
+const DEFAULT_MEDIAN_SECONDS = 420 // 7 minutes
+
+/**
+ * Median completion time (seconds) for the last 100 completed video generations.
+ * Falls back to 420s if there's no data.
+ */
+export async function getMedianCompletionTime(): Promise<number> {
+  const rows = await sql`
+    SELECT EXTRACT(EPOCH FROM (completed_at - created_at)) AS duration
+    FROM generations
+    WHERE status = 'completed' AND completed_at IS NOT NULL
+    ORDER BY created_at DESC
+    LIMIT 100
+  `
+  if (rows.length === 0) return DEFAULT_MEDIAN_SECONDS
+  const durations = rows
+    .map((r) => Number(r.duration))
+    .filter((d) => d > 0)
+    .sort((a, b) => a - b)
+  if (durations.length === 0) return DEFAULT_MEDIAN_SECONDS
+  const mid = Math.floor(durations.length / 2)
+  return durations.length % 2 === 0
+    ? (durations[mid - 1] + durations[mid]) / 2
+    : durations[mid]
+}
+
 export interface Generation {
   id: number
   user_id: string

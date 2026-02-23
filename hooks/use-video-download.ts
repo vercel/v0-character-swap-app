@@ -20,6 +20,11 @@ function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
 }
 
+function isIOS(): boolean {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+}
+
 function triggerDownload(url: string, filename: string) {
   const a = document.createElement("a")
   a.href = url
@@ -27,6 +32,9 @@ function triggerDownload(url: string, filename: string) {
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
+  if (url.startsWith("blob:")) {
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  }
 }
 
 export function useVideoDownload({
@@ -41,10 +49,6 @@ export function useVideoDownload({
 
   const handleDownload = useCallback(async () => {
     if (!resultUrl) return
-
-    const slug = characterName ? slugify(characterName) : "video"
-    const pipSuffix = showPip && pipVideoUrl ? "-pip" : ""
-    const filename = `faceswap-${slug}${pipSuffix}.mp4`
 
     try {
       setIsDownloading(true)
@@ -62,9 +66,20 @@ export function useVideoDownload({
       if (!apiRes.ok) throw new Error("API returned " + apiRes.status)
 
       const { url: cloudinaryUrl } = await apiRes.json()
-      setDownloadProgress(0.2)
 
-      // Stream the video from Cloudinary with progress
+      // iOS: open in new tab — avoids the confusing "Files" save dialog.
+      // User can long-press > "Save to Photos" or share from there.
+      if (isIOS()) {
+        window.open(cloudinaryUrl, "_blank")
+        return
+      }
+
+      // Desktop: stream download with progress
+      setDownloadProgress(0.2)
+      const slug = characterName ? slugify(characterName) : "video"
+      const pipSuffix = showPip && pipVideoUrl ? "-pip" : ""
+      const filename = `faceswap-${slug}${pipSuffix}.mp4`
+
       const videoRes = await fetch(cloudinaryUrl)
       if (!videoRes.ok) {
         const errText = videoRes.headers.get("x-cld-error") || videoRes.statusText
@@ -75,16 +90,13 @@ export function useVideoDownload({
       const total = contentLength ? parseInt(contentLength, 10) : 0
 
       if (!videoRes.body || !total) {
-        // No streaming support or unknown size — download directly
         const blob = await videoRes.blob()
         const blobUrl = URL.createObjectURL(blob)
         triggerDownload(blobUrl, filename)
-        URL.revokeObjectURL(blobUrl)
         setDownloadProgress(1)
         return
       }
 
-      // Stream with progress tracking
       const reader = videoRes.body.getReader()
       const chunks: BlobPart[] = []
       let received = 0
@@ -100,20 +112,11 @@ export function useVideoDownload({
       const blob = new Blob(chunks, { type: "video/mp4" })
       const blobUrl = URL.createObjectURL(blob)
       triggerDownload(blobUrl, filename)
-      URL.revokeObjectURL(blobUrl)
       setDownloadProgress(1)
     } catch (error) {
-      console.error("Cloudinary download failed, fetching original:", error)
-      // Fallback: download original video directly (has audio, no PiP/watermark)
-      try {
-        const response = await fetch(resultUrl)
-        const blob = await response.blob()
-        const blobUrl = URL.createObjectURL(blob)
-        triggerDownload(blobUrl, `faceswap-${slug}.mp4`)
-        URL.revokeObjectURL(blobUrl)
-      } catch (fallbackError) {
-        console.error("Fallback download also failed:", fallbackError)
-      }
+      console.error("Download failed, opening original in new tab:", error)
+      // Fallback: open the original video URL directly
+      window.open(resultUrl, "_blank")
     } finally {
       setIsDownloading(false)
       setDownloadProgress(0)
