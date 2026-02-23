@@ -124,9 +124,9 @@ export function BottomSheet({
       <div className={`relative min-h-0 flex-1 px-3 pb-6 ${
         isExpanded && !isDragging ? "overflow-y-auto overscroll-contain" : "overflow-hidden"
       }`}>
-        {/* Peek content — fades out as sheet expands */}
+        {/* Peek content — absolute so it doesn't push expanded content down */}
         <div
-          className="transition-opacity duration-150"
+          className="absolute inset-x-3 top-0 z-10 transition-opacity duration-150"
           style={{
             opacity: Math.max(0, 1 - progress * 2.5),
             pointerEvents: progress > 0.4 ? "none" : "auto",
@@ -135,7 +135,7 @@ export function BottomSheet({
           {peek}
         </div>
 
-        {/* Expanded content — always rendered, revealed by sheet sliding up */}
+        {/* Expanded content — fills full area, revealed by sheet sliding up */}
         <div
           className="transition-opacity duration-150"
           style={{
