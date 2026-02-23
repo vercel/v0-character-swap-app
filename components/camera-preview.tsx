@@ -21,6 +21,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
   const [countdown, setCountdown] = useState<number | null>(null)
   const [showFlash, setShowFlash] = useState(false)
   const [showTips, setShowTips] = useState(true)
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user")
   // Always use fill aspect ratio
   const aspectRatio = "fill" as const
   const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -33,13 +34,12 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
       if (originalStreamRef.current) {
         originalStreamRef.current.getTracks().forEach(track => track.stop())
       }
-      
-      // Always request 16:9 as base (most webcams are 16:9) in fill mode
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: "user", 
-          width: 1280, 
-          height: 720, 
+        video: {
+          facingMode,
+          width: 1280,
+          height: 720,
         },
         audio: true,
       })
@@ -51,7 +51,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     } catch {
       setHasPermission(false)
     }
-  }, [])
+  }, [facingMode])
 
   useEffect(() => {
     startCamera()
@@ -96,14 +96,18 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     canvas.height = video.videoHeight || 720
     const ctx = canvas.getContext("2d")
     
-    // Draw frames to canvas - mirrored for selfie effect
+    // Draw frames to canvas — mirror only for front camera (selfie)
+    const mirror = facingMode === "user"
     const drawFrame = () => {
       if (ctx && video.readyState >= 2) {
-        // Mirror the video horizontally for selfie effect
-        ctx.save()
-        ctx.scale(-1, 1)
-        ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height)
-        ctx.restore()
+        if (mirror) {
+          ctx.save()
+          ctx.scale(-1, 1)
+          ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height)
+          ctx.restore()
+        } else {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        }
       }
       if (mediaRecorderRef.current?.state === "recording") {
         requestAnimationFrame(drawFrame)
@@ -307,7 +311,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
           playsInline
           muted
           className="h-full w-full object-contain md:object-cover"
-          style={{ transform: "scaleX(-1)" }}
+          style={{ transform: facingMode === "user" ? "scaleX(-1)" : undefined }}
         />
         
         {/* Flash effect */}
@@ -353,6 +357,19 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
               </div>
             </div>
           </div>
+        )}
+
+        {/* Flip camera button */}
+        {!isRecording && !showTips && countdown === null && hasPermission && (
+          <button
+            onClick={() => setFacingMode(f => f === "user" ? "environment" : "user")}
+            className="absolute right-3 top-3 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm transition-colors active:bg-black/60 md:right-4 md:top-4"
+            aria-label="Flip camera"
+          >
+            <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+            </svg>
+          </button>
         )}
 
         {/* Countdown overlay */}
