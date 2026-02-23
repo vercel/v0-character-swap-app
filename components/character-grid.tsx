@@ -716,13 +716,19 @@ export function CharacterGrid({
               </p>
             )}
             {userEmail && onSendEmailChange && (
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={sendEmail}
-                  onChange={(e) => onSendEmailChange(e.target.checked)}
-                  className="h-3.5 w-3.5 shrink-0 appearance-none rounded border border-neutral-600 bg-neutral-800 checked:border-white checked:bg-white"
-                />
+              <label className="flex cursor-pointer items-center gap-2" onClick={() => onSendEmailChange(!sendEmail)}>
+                <div className={cn(
+                  "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors",
+                  sendEmail
+                    ? "border-white bg-white"
+                    : "border-neutral-600 bg-neutral-800"
+                )}>
+                  {sendEmail && (
+                    <svg className="h-2.5 w-2.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
                 <span className="font-mono text-[10px] text-neutral-500 md:text-[11px]">
                   email me when ready
                 </span>
