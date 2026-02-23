@@ -306,16 +306,20 @@ async function sendCompletionEmail(email: string, videoUrl: string, characterNam
 
   try {
     const resend = new Resend(process.env.RESEND_API_KEY)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://v0faceswap.app"
     await resend.emails.send({
-      from: "v0 Face Swap <noreply@resend.dev>",
+      from: "v0 Face Swap <noreply@v0faceswap.app>",
       to: email,
-      subject: "Your video is ready!",
+      subject: `Your face swap video is ready${characterName ? ` — ${characterName}` : ""}!`,
       html: `
-        <h1>Your face swap video is ready!</h1>
-        ${characterName ? `<p>Character: ${characterName}</p>` : ""}
-        <p>Click below to view your video:</p>
-        <p><a href="${videoUrl}" style="display:inline-block;padding:12px 24px;background:#000;color:#fff;text-decoration:none;border-radius:6px;">View Video</a></p>
-        <p style="margin-top:20px;color:#666;font-size:14px;">Or copy this link: ${videoUrl}</p>
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:480px;margin:0 auto;padding:40px 20px;background:#000;color:#fff;">
+          <h1 style="font-size:20px;font-weight:600;margin:0 0 8px;">Your video is ready</h1>
+          ${characterName ? `<p style="font-size:14px;color:#a3a3a3;margin:0 0 24px;">Character: ${characterName}</p>` : '<div style="height:24px;"></div>'}
+          <a href="${appUrl}" style="display:inline-block;padding:12px 28px;background:#fff;color:#000;text-decoration:none;border-radius:8px;font-size:14px;font-weight:500;">View Video</a>
+          <p style="margin-top:32px;font-size:12px;color:#525252;">
+            <a href="${appUrl}" style="color:#a3a3a3;text-decoration:none;">v0faceswap.app</a>
+          </p>
+        </div>
       `,
     })
     console.log(`[Workflow Step] Email sent to ${email}`)

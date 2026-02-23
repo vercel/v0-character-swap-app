@@ -57,6 +57,7 @@ export default function Home() {
   const [generatedVideoAspectRatio, setGeneratedVideoAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
   const [showPip, setShowPip] = useState(true)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [sendEmailNotification, setSendEmailNotification] = useState(false)
   const [expandedCharacter, setExpandedCharacter] = useState<{
     imageUrl: string
     id: number
@@ -164,12 +165,12 @@ export default function Home() {
         // Use character image aspect ratio, not recorded video aspect ratio
         getCharacterAspectRatio(character.src).then(characterAspectRatio => {
           setTimeout(() => {
-            processVideo(getVideoForUpload, character, false, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio)
+            processVideo(getVideoForUpload, character, sendEmailNotification, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio)
           }, 100)
         })
       }
     }
-  }, [pendingAutoSubmit, user, recordedVideo, selectedCharacter, allCharacters, processVideo, uploadedVideoUrl, getVideoForUpload, recordedAspectRatio])
+  }, [pendingAutoSubmit, user, recordedVideo, selectedCharacter, allCharacters, processVideo, uploadedVideoUrl, getVideoForUpload, recordedAspectRatio, sendEmailNotification])
 
   // Simulate upload progress over ~20 seconds
   useEffect(() => {
@@ -214,9 +215,9 @@ export default function Home() {
       // Use character image aspect ratio for generated video, but also pass recorded video aspect ratio
       const characterAspectRatio = await getCharacterAspectRatio(character.src)
       // Pass a function that will get the video when needed (allows immediate UI feedback)
-      processVideo(getVideoForUpload, character, false, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio)
+      processVideo(getVideoForUpload, character, sendEmailNotification, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio)
     }
-  }, [recordedVideo, selectedCharacter, allCharacters, processVideo, uploadedVideoUrl, recordedAspectRatio, getVideoForUpload, trackCharacterUsage])
+  }, [recordedVideo, selectedCharacter, allCharacters, processVideo, uploadedVideoUrl, recordedAspectRatio, getVideoForUpload, trackCharacterUsage, sendEmailNotification])
 
   const handleReset = useCallback(() => {
     clearRecording()
@@ -568,6 +569,9 @@ export default function Home() {
                   onCategoryChange={setSelectedCategory}
                   filteredCharacters={charactersReady ? filteredCharacters : []}
                   onUpdateCharacterCategory={updateCustomCharacterCategory}
+                  sendEmail={sendEmailNotification}
+                  onSendEmailChange={setSendEmailNotification}
+                  userEmail={user?.email}
                 >
                 <GenerationsPanel
                   onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
@@ -692,6 +696,9 @@ export default function Home() {
                 onCategoryChange={setSelectedCategory}
                 filteredCharacters={charactersReady ? filteredCharacters : []}
                 onUpdateCharacterCategory={updateCustomCharacterCategory}
+                sendEmail={sendEmailNotification}
+                onSendEmailChange={setSendEmailNotification}
+                userEmail={user?.email}
               />
             </>
           ) : (
@@ -713,6 +720,9 @@ export default function Home() {
               onCategoryChange={setSelectedCategory}
               filteredCharacters={charactersReady ? filteredCharacters : []}
               onUpdateCharacterCategory={updateCustomCharacterCategory}
+              sendEmail={sendEmailNotification}
+              onSendEmailChange={setSendEmailNotification}
+              userEmail={user?.email}
             >
               <GenerationsPanel
                 onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {

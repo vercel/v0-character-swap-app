@@ -33,6 +33,10 @@ interface CharacterGridProps {
   hasCharacter?: boolean
   onGenerate?: () => void
   onRetake?: () => void
+  // Email notification
+  sendEmail?: boolean
+  onSendEmailChange?: (value: boolean) => void
+  userEmail?: string | null
   // Category filter props
   selectedCategory?: CharacterCategory | "all"
   onCategoryChange?: (category: CharacterCategory | "all") => void
@@ -56,6 +60,9 @@ export function CharacterGrid({
   hasCharacter = false,
   onGenerate,
   onRetake,
+  sendEmail = false,
+  onSendEmailChange,
+  userEmail,
   selectedCategory = "popular",
   onCategoryChange,
   filteredCharacters: externalFilteredCharacters,
@@ -707,6 +714,19 @@ export function CharacterGrid({
               <p className="font-mono text-[10px] text-amber-400 md:text-[11px]">
                 {generateError}
               </p>
+            )}
+            {userEmail && onSendEmailChange && (
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={sendEmail}
+                  onChange={(e) => onSendEmailChange(e.target.checked)}
+                  className="h-3.5 w-3.5 shrink-0 appearance-none rounded border border-neutral-600 bg-neutral-800 checked:border-white checked:bg-white"
+                />
+                <span className="font-mono text-[10px] text-neutral-500 md:text-[11px]">
+                  email me when ready
+                </span>
+              </label>
             )}
             <button
               onClick={() => {
