@@ -523,6 +523,18 @@ export default function Home() {
                   </span>
                 </div>
               )}
+              {/* Retake button */}
+              {!isUploading && (
+                <button
+                  onClick={() => { setShowPreview(false); clearRecording() }}
+                  className="absolute left-4 top-4 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 backdrop-blur-sm transition-colors active:bg-black/80"
+                >
+                  <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span className="font-mono text-[11px] text-white">Retake</span>
+                </button>
+              )}
             </div>
           </div>
         ) : (
