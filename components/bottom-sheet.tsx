@@ -23,7 +23,8 @@ export function BottomSheet({
   const startOffsetRef = useRef(0)
   const dragOffsetRef = useRef<number | null>(null)
   const [renderOffset, setRenderOffset] = useState<number | null>(null)
-  const [sheetHeight, setSheetHeight] = useState(0)
+  const [sheetHeight, setSheetHeight] = useState(-1) // -1 = not yet measured
+  const measured = sheetHeight >= 0
 
   const isDragging = renderOffset !== null
 
@@ -107,11 +108,12 @@ export function BottomSheet({
     <div
       ref={sheetRef}
       className={`fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-3xl bg-neutral-950 ${
-        isDragging ? "duration-0" : "transition-transform duration-300 ease-out"
+        !measured ? "duration-0" : isDragging ? "duration-0" : "transition-transform duration-300 ease-out"
       }`}
       style={{
         maxHeight: "85dvh",
         transform,
+        visibility: measured ? "visible" : "hidden",
       }}
     >
       {/* Handle */}
