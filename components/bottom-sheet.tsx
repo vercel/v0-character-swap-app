@@ -9,16 +9,19 @@ interface BottomSheetProps {
   peekHeight?: number
 }
 
+const SHEET_HEIGHT_DVH = 70
+
 /**
  * Mobile bottom sheet with two snap points: collapsed (peek) and expanded.
  *
- * The sheet is ALWAYS 85dvh tall and pinned to `bottom: 0`.
+ * The sheet is ALWAYS ${SHEET_HEIGHT_DVH}dvh tall and pinned to `bottom: 0`.
  * Position is controlled entirely via translateY:
- *   - Expanded:  translateY(0)            → full sheet visible
- *   - Collapsed: translateY(85dvh - peek) → only peek visible
+ *   - Expanded:  translateY(0)                          → full sheet visible
+ *   - Collapsed: translateY(${SHEET_HEIGHT_DVH}dvh - peek) → only peek visible
  *
  * During drag, translateY is interpolated between the two snap points
  * and strictly clamped — the sheet can never float or detach.
+ * Content toggles at 30% drag progress so it appears while dragging.
  */
 export function BottomSheet({
   children,
@@ -36,7 +39,7 @@ export function BottomSheet({
 
   // Max translateY = collapsed position (pushed down so only peek shows)
   const getMaxOffset = useCallback(
-    () => window.innerHeight * 0.85 - peekHeight,
+    () => window.innerHeight * (SHEET_HEIGHT_DVH / 100) - peekHeight,
     [peekHeight],
   )
 
@@ -53,7 +56,15 @@ export function BottomSheet({
     // offset = start position + drag delta, clamped to [0, maxOffset]
     const offset = Math.max(0, Math.min(startOffsetRef.current + deltaY, maxOffset))
     setDragOffset(offset)
-  }, [getMaxOffset])
+
+    // Toggle content mid-drag so it appears while dragging, not after
+    const progress = 1 - offset / maxOffset // 0 = collapsed, 1 = expanded
+    if (progress > 0.3 && !isExpanded) {
+      onExpandedChange(true)
+    } else if (progress < 0.3 && isExpanded) {
+      onExpandedChange(false)
+    }
+  }, [getMaxOffset, isExpanded, onExpandedChange])
 
   const handleTouchEnd = useCallback(() => {
     if (!isDraggingRef.current) return
@@ -97,7 +108,7 @@ export function BottomSheet({
     ? `translateY(${dragOffset}px)`
     : isExpanded
       ? "translateY(0)"
-      : `translateY(calc(85dvh - ${peekHeight}px))`
+      : `translateY(calc(${SHEET_HEIGHT_DVH}dvh - ${peekHeight}px))`
 
   return (
     <div
@@ -106,7 +117,7 @@ export function BottomSheet({
         isDragging ? "duration-0" : "transition-transform duration-300 ease-out"
       }`}
       style={{
-        height: "85dvh",
+        height: `${SHEET_HEIGHT_DVH}dvh`,
         transform,
       }}
     >
