@@ -583,154 +583,143 @@ export default function Home() {
           isExpanded={bottomSheetExpanded}
           onExpandedChange={setBottomSheetExpanded}
           peekHeight={100}
-        >
-          {!bottomSheetExpanded && (
-            <div>
-              {resultUrl ? (
-                /* When viewing a video, show other videos in peek */
-                <>
-                  <p className="mb-1.5 font-sans text-[9px] font-medium uppercase tracking-wider text-neutral-500">
-                    My Videos
-                  </p>
-                  <GenerationsPanel
-                    onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
-                      setSelectedError(null)
-                      setSelectedGeneratedVideo(url)
-                      setResultUrl(url)
-                      setSourceVideoUrl(sourceUrl)
-                      setSourceVideoAspectRatio(sourceAR)
-                      setGeneratedVideoAspectRatio(genAR)
-                    }}
-                    onSelectError={(error) => {
-                      setResultUrl(null)
-                      setSelectedError(error)
-                    }}
-                    variant="compact"
-                  />
-                </>
-              ) : (
-                /* Default: show characters in peek */
-                <>
-                  <p className="mb-1.5 font-sans text-[9px] font-medium uppercase tracking-wider text-neutral-500">
-                    Select Character
-                  </p>
-                  <div className="flex gap-1 overflow-x-auto pb-1">
-                    {[...visibleDefaultCharacters, ...customCharacters].slice(0, 8).map((char) => (
-                      <button
-                        key={char.id}
-                        onClick={() => {
-                          setSelectedCharacter(char.id)
-                          if (recordedVideo) setBottomSheetExpanded(true)
-                        }}
-                        className={cn(
-                          "relative h-12 w-9 shrink-0 overflow-hidden rounded",
-                          selectedCharacter === char.id ? "ring-2 ring-white" : "ring-1 ring-neutral-800"
-                        )}
-                      >
-                        <Image src={char.src || "/placeholder.svg"} alt={char.name} fill className="object-cover" sizes="36px" />
-                      </button>
-                    ))}
+          peek={
+            resultUrl ? (
+              <>
+                <p className="mb-1.5 font-sans text-[9px] font-medium uppercase tracking-wider text-neutral-500">
+                  My Videos
+                </p>
+                <GenerationsPanel
+                  onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
+                    setSelectedError(null)
+                    setSelectedGeneratedVideo(url)
+                    setResultUrl(url)
+                    setSourceVideoUrl(sourceUrl)
+                    setSourceVideoAspectRatio(sourceAR)
+                    setGeneratedVideoAspectRatio(genAR)
+                  }}
+                  onSelectError={(error) => {
+                    setResultUrl(null)
+                    setSelectedError(error)
+                  }}
+                  variant="compact"
+                />
+              </>
+            ) : (
+              <>
+                <p className="mb-1.5 font-sans text-[9px] font-medium uppercase tracking-wider text-neutral-500">
+                  Select Character
+                </p>
+                <div className="flex gap-1 overflow-x-auto pb-1">
+                  {[...visibleDefaultCharacters, ...customCharacters].slice(0, 8).map((char) => (
                     <button
-                      onClick={() => setBottomSheetExpanded(true)}
-                      className="flex h-12 w-9 shrink-0 items-center justify-center rounded border border-dashed border-neutral-700"
+                      key={char.id}
+                      onClick={() => {
+                        setSelectedCharacter(char.id)
+                        if (recordedVideo) setBottomSheetExpanded(true)
+                      }}
+                      className={cn(
+                        "relative h-12 w-9 shrink-0 overflow-hidden rounded",
+                        selectedCharacter === char.id ? "ring-2 ring-white" : "ring-1 ring-neutral-800"
+                      )}
                     >
-                      <svg className="h-3 w-3 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                      </svg>
+                      <Image src={char.src || "/placeholder.svg"} alt={char.name} fill className="object-cover" sizes="36px" />
                     </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {bottomSheetExpanded && (
+                  ))}
+                  <button
+                    onClick={() => setBottomSheetExpanded(true)}
+                    className="flex h-12 w-9 shrink-0 items-center justify-center rounded border border-dashed border-neutral-700"
+                  >
+                    <svg className="h-3 w-3 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                  </button>
+                </div>
+              </>
+            )
+          }
+        >
+          {renderAuthSection("mobile")}
+          {resultUrl ? (
             <>
-              {renderAuthSection("mobile")}
-              {resultUrl ? (
-                /* When viewing a video, show videos first then characters */
-                <>
-                  <GenerationsPanel
-                    onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
-                      setSelectedError(null)
-                      setSelectedGeneratedVideo(url)
-                      setResultUrl(url)
-                      setSourceVideoUrl(sourceUrl)
-                      setSourceVideoAspectRatio(sourceAR)
-                      setGeneratedVideoAspectRatio(genAR)
-                      setBottomSheetExpanded(false)
-                    }}
-                    onSelectError={(error) => {
-                      setResultUrl(null)
-                      setSelectedError(error)
-                      setBottomSheetExpanded(false)
-                    }}
-                    className="mb-6"
-                  />
-                  <p className="mb-3 font-sans text-[11px] font-medium uppercase tracking-wider text-neutral-500">
-                    Create New
-                  </p>
-                  <CharacterGrid
-                    selectedId={selectedCharacter}
-                    onSelect={setSelectedCharacter}
-                    customCharacters={customCharacters}
-                    onAddCustom={addCustomCharacter}
-                    onDeleteCustom={deleteCustomCharacter}
-                    hiddenDefaultIds={hiddenDefaultIds}
-                    onHideDefault={hideDefaultCharacter}
-                    onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
-                    canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
-                    hasVideo={!!recordedVideo}
-                    hasCharacter={!!selectedCharacter}
-                    onGenerate={handleProcess}
-                    onRetake={() => { setShowPreview(false); clearRecording() }}
-                    selectedCategory={selectedCategory}
-                    onCategoryChange={setSelectedCategory}
-                    filteredCharacters={charactersReady ? filteredCharacters : []}
-                    onUpdateCharacterCategory={updateCustomCharacterCategory}
-                  />
-                </>
-              ) : (
-                /* Default: show characters with videos below */
-                <CharacterGrid
-                  selectedId={selectedCharacter}
-                  onSelect={setSelectedCharacter}
-                  customCharacters={customCharacters}
-                  onAddCustom={addCustomCharacter}
-                  onDeleteCustom={deleteCustomCharacter}
-                  hiddenDefaultIds={hiddenDefaultIds}
-                  onHideDefault={hideDefaultCharacter}
-                  onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
-                  canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
-                  hasVideo={!!recordedVideo}
-                  hasCharacter={!!selectedCharacter}
-                  onGenerate={handleProcess}
-                  onRetake={() => { setShowPreview(false); clearRecording() }}
-                  selectedCategory={selectedCategory}
-                  onCategoryChange={setSelectedCategory}
-                  filteredCharacters={charactersReady ? filteredCharacters : []}
-                  onUpdateCharacterCategory={updateCustomCharacterCategory}
-                >
-                  <GenerationsPanel
-                    onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
-                      setSelectedError(null)
-                      setSelectedGeneratedVideo(url)
-                      setResultUrl(url)
-                      setSourceVideoUrl(sourceUrl)
-                      setSourceVideoAspectRatio(sourceAR)
-                      setGeneratedVideoAspectRatio(genAR)
-                      setBottomSheetExpanded(false)
-                    }}
-                    onSelectError={(error) => {
-                      setResultUrl(null)
-                      setSelectedError(error)
-                      setBottomSheetExpanded(false)
-                    }}
-                    className="mt-4"
-                  />
-                </CharacterGrid>
-              )}
+              <GenerationsPanel
+                onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
+                  setSelectedError(null)
+                  setSelectedGeneratedVideo(url)
+                  setResultUrl(url)
+                  setSourceVideoUrl(sourceUrl)
+                  setSourceVideoAspectRatio(sourceAR)
+                  setGeneratedVideoAspectRatio(genAR)
+                  setBottomSheetExpanded(false)
+                }}
+                onSelectError={(error) => {
+                  setResultUrl(null)
+                  setSelectedError(error)
+                  setBottomSheetExpanded(false)
+                }}
+                className="mb-6"
+              />
+              <p className="mb-3 font-sans text-[11px] font-medium uppercase tracking-wider text-neutral-500">
+                Create New
+              </p>
+              <CharacterGrid
+                selectedId={selectedCharacter}
+                onSelect={setSelectedCharacter}
+                customCharacters={customCharacters}
+                onAddCustom={addCustomCharacter}
+                onDeleteCustom={deleteCustomCharacter}
+                hiddenDefaultIds={hiddenDefaultIds}
+                onHideDefault={hideDefaultCharacter}
+                onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
+                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
+                hasVideo={!!recordedVideo}
+                hasCharacter={!!selectedCharacter}
+                onGenerate={handleProcess}
+                onRetake={() => { setShowPreview(false); clearRecording() }}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+                filteredCharacters={charactersReady ? filteredCharacters : []}
+                onUpdateCharacterCategory={updateCustomCharacterCategory}
+              />
             </>
+          ) : (
+            <CharacterGrid
+              selectedId={selectedCharacter}
+              onSelect={setSelectedCharacter}
+              customCharacters={customCharacters}
+              onAddCustom={addCustomCharacter}
+              onDeleteCustom={deleteCustomCharacter}
+              hiddenDefaultIds={hiddenDefaultIds}
+              onHideDefault={hideDefaultCharacter}
+              onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
+              canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
+              hasVideo={!!recordedVideo}
+              hasCharacter={!!selectedCharacter}
+              onGenerate={handleProcess}
+              onRetake={() => { setShowPreview(false); clearRecording() }}
+              selectedCategory={selectedCategory}
+              onCategoryChange={setSelectedCategory}
+              filteredCharacters={charactersReady ? filteredCharacters : []}
+              onUpdateCharacterCategory={updateCustomCharacterCategory}
+            >
+              <GenerationsPanel
+                onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
+                  setSelectedError(null)
+                  setSelectedGeneratedVideo(url)
+                  setResultUrl(url)
+                  setSourceVideoUrl(sourceUrl)
+                  setSourceVideoAspectRatio(sourceAR)
+                  setGeneratedVideoAspectRatio(genAR)
+                  setBottomSheetExpanded(false)
+                }}
+                onSelectError={(error) => {
+                  setResultUrl(null)
+                  setSelectedError(error)
+                  setBottomSheetExpanded(false)
+                }}
+                className="mt-4"
+              />
+            </CharacterGrid>
           )}
         </BottomSheet>
       )}
