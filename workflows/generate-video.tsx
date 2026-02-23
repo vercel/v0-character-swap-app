@@ -244,8 +244,22 @@ async function generateAndSaveVideo(
     const payload = buildProviderErrorPayload(details)
     console.error(`[Workflow Step] Error payload:`, payload)
 
-    // Use FatalError to skip retries - provider errors won't be fixed by retrying
-    throw new FatalError(`${PROVIDER_ERROR_PREFIX}${JSON.stringify(payload)}`)
+    // Determine if this is a transient error (worth retrying) or an input error (not worth retrying)
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    const isInputError =
+      /duration.*less than/i.test(errorMsg) ||
+      /invalid.*image/i.test(errorMsg) ||
+      /invalid.*video/i.test(errorMsg) ||
+      /unsupported.*format/i.test(errorMsg) ||
+      /too (short|small|large|long)/i.test(errorMsg)
+
+    if (isInputError) {
+      // Input errors won't be fixed by retrying — fail immediately
+      throw new FatalError(`${PROVIDER_ERROR_PREFIX}${JSON.stringify(payload)}`)
+    }
+
+    // Transient errors (500, timeout, rate limit) — let the workflow retry
+    throw new Error(`${PROVIDER_ERROR_PREFIX}${JSON.stringify(payload)}`)
   }
 
   const generateTime = Date.now() - generateStart
