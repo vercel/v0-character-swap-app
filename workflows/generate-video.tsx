@@ -308,7 +308,7 @@ async function sendCompletionEmail(email: string, videoUrl: string, characterNam
     const resend = new Resend(process.env.RESEND_API_KEY)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://v0faceswap.app"
     await resend.emails.send({
-      from: "v0 Face Swap <noreply@v0faceswap.app>",
+      from: "v0 Face Swap <hello@v0faceswap.app>",
       to: email,
       subject: `Your face swap video is ready${characterName ? ` — ${characterName}` : ""}!`,
       html: `
