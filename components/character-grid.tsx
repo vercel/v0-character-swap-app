@@ -740,7 +740,7 @@ export function CharacterGrid({
             )}
             <div className="hidden items-center justify-center gap-3 font-mono text-[10px] text-neutral-500 md:flex">
               <a 
-                href="https://vercel.com/templates/next.js/ai-face-swap"
+                href="https://v0.app/templates/1Nu0E0eAo9q"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="transition-colors hover:text-white"
