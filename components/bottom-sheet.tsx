@@ -1,7 +1,5 @@
 "use client"
 
-import React from "react"
-
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react"
 
 interface BottomSheetProps {
@@ -11,54 +9,74 @@ interface BottomSheetProps {
   peekHeight?: number
 }
 
+/**
+ * Mobile bottom sheet with two snap points: collapsed (peek) and expanded.
+ *
+ * The sheet is ALWAYS 85dvh tall and pinned to `bottom: 0`.
+ * Position is controlled entirely via translateY:
+ *   - Expanded:  translateY(0)            → full sheet visible
+ *   - Collapsed: translateY(85dvh - peek) → only peek visible
+ *
+ * During drag, translateY is interpolated between the two snap points
+ * and strictly clamped — the sheet can never float or detach.
+ */
 export function BottomSheet({
   children,
   isExpanded,
   onExpandedChange,
-  peekHeight = 140
+  peekHeight = 100
 }: BottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null)
   const isDraggingRef = useRef(false)
   const startYRef = useRef(0)
-  const currentYRef = useRef(0)
-  const [dragTransform, setDragTransform] = useState<string | undefined>(undefined)
+  const startOffsetRef = useRef(0)
+  const [dragOffset, setDragOffset] = useState<number | null>(null)
+
+  const isDragging = dragOffset !== null
+
+  // Max translateY = collapsed position (pushed down so only peek shows)
+  const getMaxOffset = useCallback(
+    () => window.innerHeight * 0.85 - peekHeight,
+    [peekHeight],
+  )
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
     isDraggingRef.current = true
     startYRef.current = e.touches[0].clientY
-    currentYRef.current = 0
-  }, [])
+    startOffsetRef.current = isExpanded ? 0 : getMaxOffset()
+  }, [isExpanded, getMaxOffset])
 
   const handleTouchMove = useCallback((e: TouchEvent) => {
     if (!isDraggingRef.current) return
     const deltaY = e.touches[0].clientY - startYRef.current
-    currentYRef.current = deltaY
-
-    if (isExpanded) {
-      // Dragging down to collapse — clamp so it can't go beyond peek position
-      setDragTransform(`translateY(${Math.max(0, Math.min(deltaY, peekHeight))}px)`)
-    } else {
-      // Dragging up to expand — clamp so it can't overshoot the expanded position
-      setDragTransform(`translateY(${Math.max(-peekHeight, Math.min(0, deltaY))}px)`)
-    }
-  }, [isExpanded])
+    const maxOffset = getMaxOffset()
+    // offset = start position + drag delta, clamped to [0, maxOffset]
+    const offset = Math.max(0, Math.min(startOffsetRef.current + deltaY, maxOffset))
+    setDragOffset(offset)
+  }, [getMaxOffset])
 
   const handleTouchEnd = useCallback(() => {
     if (!isDraggingRef.current) return
     isDraggingRef.current = false
+    if (dragOffset === null) return
 
-    if (Math.abs(currentYRef.current) > 50) {
-      if (currentYRef.current < 0 && !isExpanded) {
-        onExpandedChange(true)
-      } else if (currentYRef.current > 0 && isExpanded) {
-        onExpandedChange(false)
-      }
+    const deltaY = dragOffset - startOffsetRef.current
+
+    // If dragged more than 50px, use direction; otherwise snap to nearest
+    let shouldExpand: boolean
+    if (Math.abs(deltaY) > 50) {
+      shouldExpand = deltaY < 0
+    } else {
+      shouldExpand = dragOffset < getMaxOffset() / 2
     }
-    currentYRef.current = 0
-    setDragTransform(undefined)
-  }, [isExpanded, onExpandedChange])
 
-  // Register passive touch listeners
+    setDragOffset(null)
+
+    if (shouldExpand !== isExpanded) {
+      onExpandedChange(shouldExpand)
+    }
+  }, [dragOffset, isExpanded, onExpandedChange, getMaxOffset])
+
   useEffect(() => {
     const el = sheetRef.current
     if (!el) return
@@ -74,15 +92,22 @@ export function BottomSheet({
     }
   }, [handleTouchStart, handleTouchMove, handleTouchEnd])
 
+  // Determine transform
+  const transform = isDragging
+    ? `translateY(${dragOffset}px)`
+    : isExpanded
+      ? "translateY(0)"
+      : `translateY(calc(85dvh - ${peekHeight}px))`
+
   return (
     <div
       ref={sheetRef}
-      className={`fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-3xl bg-neutral-950 transition-all ${
-        dragTransform ? "duration-0" : "duration-300 ease-out"
+      className={`fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-3xl bg-neutral-950 ${
+        isDragging ? "duration-0" : "transition-transform duration-300 ease-out"
       }`}
       style={{
-        height: isExpanded ? "85dvh" : `${peekHeight}px`,
-        transform: dragTransform,
+        height: "85dvh",
+        transform,
       }}
     >
       {/* Handle */}
@@ -94,7 +119,9 @@ export function BottomSheet({
       </div>
 
       {/* Content */}
-      <div className={`min-h-0 flex-1 overscroll-contain px-3 pb-6 ${isExpanded ? "overflow-y-auto" : "overflow-hidden"}`}>
+      <div className={`min-h-0 flex-1 overscroll-contain px-3 pb-6 ${
+        isExpanded && !isDragging ? "overflow-y-auto" : "overflow-hidden"
+      }`}>
         {children}
       </div>
     </div>
