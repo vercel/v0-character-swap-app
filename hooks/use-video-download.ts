@@ -50,11 +50,9 @@ export function useVideoDownload({
   const handleDownload = useCallback(async () => {
     if (!resultUrl) return
 
-    // Mobile: open window immediately (before any await) to satisfy
-    // Safari's popup blocker — it only allows window.open in the
-    // synchronous call stack of a user gesture.
-    const mobile = isMobile()
-    const newTab = mobile ? window.open("about:blank", "_blank") : null
+    const slug = characterName ? slugify(characterName) : "video"
+    const pipSuffix = showPip && pipVideoUrl ? "-pip" : ""
+    const filename = `faceswap-${slug}${pipSuffix}.mp4`
 
     try {
       setIsDownloading(true)
@@ -66,7 +64,6 @@ export function useVideoDownload({
         ...(pipVideoUrl ? { pip: pipVideoUrl } : {}),
         showPip: String(showPip),
         pipAspectRatio,
-        ...(mobile ? { attachment: "true" } : {}),
       })
       const apiRes = await fetch(`/api/download?${params}`)
 
@@ -74,16 +71,31 @@ export function useVideoDownload({
 
       const { url: cloudinaryUrl } = await apiRes.json()
 
-      if (mobile && newTab) {
-        newTab.location.href = cloudinaryUrl
+      // Mobile: use Web Share API — opens native share sheet
+      // where user can "Save Video" to photos, share, etc.
+      if (isMobile()) {
+        setDownloadProgress(0.3)
+        const videoRes = await fetch(cloudinaryUrl)
+        if (!videoRes.ok) throw new Error("Failed to fetch video")
+
+        const blob = await videoRes.blob()
+        const file = new File([blob], filename, { type: "video/mp4" })
+
+        if (navigator.canShare?.({ files: [file] })) {
+          setDownloadProgress(1)
+          await navigator.share({ files: [file] })
+          return
+        }
+
+        // Fallback: trigger download with blob URL
+        const blobUrl = URL.createObjectURL(blob)
+        triggerDownload(blobUrl, filename)
+        setDownloadProgress(1)
         return
       }
 
       // Desktop: stream download with progress
       setDownloadProgress(0.2)
-      const slug = characterName ? slugify(characterName) : "video"
-      const pipSuffix = showPip && pipVideoUrl ? "-pip" : ""
-      const filename = `faceswap-${slug}${pipSuffix}.mp4`
 
       const videoRes = await fetch(cloudinaryUrl)
       if (!videoRes.ok) {
@@ -119,12 +131,7 @@ export function useVideoDownload({
       triggerDownload(blobUrl, filename)
       setDownloadProgress(1)
     } catch (error) {
-      console.error("Download failed, opening original in new tab:", error)
-      if (newTab) {
-        newTab.location.href = resultUrl
-      } else {
-        window.open(resultUrl, "_blank")
-      }
+      console.error("Download failed:", error)
     } finally {
       setIsDownloading(false)
       setDownloadProgress(0)
