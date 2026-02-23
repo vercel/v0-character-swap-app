@@ -66,6 +66,7 @@ export function useVideoDownload({
         ...(pipVideoUrl ? { pip: pipVideoUrl } : {}),
         showPip: String(showPip),
         pipAspectRatio,
+        ...(mobile ? { attachment: "true" } : {}),
       })
       const apiRes = await fetch(`/api/download?${params}`)
 

@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
   const pipVideoUrl = searchParams.get("pip")
   const showPip = searchParams.get("showPip") === "true"
   const pipAspectRatio = (searchParams.get("pipAspectRatio") || "fill") as "9:16" | "16:9" | "fill"
+  const attachment = searchParams.get("attachment") === "true"
 
   if (!mainVideoUrl || !isBlobUrl(mainVideoUrl)) {
     return NextResponse.json(
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
       showPip,
       pipAspectRatio,
       cloudName: CLOUD_NAME,
+      attachment,
     })
 
     return NextResponse.json({ url })

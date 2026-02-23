@@ -53,6 +53,8 @@ interface CompositeVideoOptions {
   watermark?: string
   /** Cloudinary cloud name */
   cloudName: string
+  /** Force browser download instead of inline playback */
+  attachment?: boolean
 }
 
 /**
@@ -67,6 +69,7 @@ export function buildCompositeVideoUrl({
   pipAspectRatio = "fill",
   watermark = WATERMARK_TEXT,
   cloudName,
+  attachment = false,
 }: CompositeVideoOptions): string {
   validateBlobUrl(mainVideoUrl)
 
@@ -89,6 +92,10 @@ export function buildCompositeVideoUrl({
     transformations.push(
       `l_text:courier_18:${encodedText},co_rgb:FFFFFFB3,g_south_west,x_20,y_20`
     )
+  }
+
+  if (attachment) {
+    transformations.push("fl_attachment")
   }
 
   const transformStr = transformations.length > 0
