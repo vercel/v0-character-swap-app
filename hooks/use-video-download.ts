@@ -50,6 +50,12 @@ export function useVideoDownload({
   const handleDownload = useCallback(async () => {
     if (!resultUrl) return
 
+    // Mobile: open window immediately (before any await) to satisfy
+    // Safari's popup blocker — it only allows window.open in the
+    // synchronous call stack of a user gesture.
+    const mobile = isMobile()
+    const newTab = mobile ? window.open("about:blank", "_blank") : null
+
     try {
       setIsDownloading(true)
       setDownloadProgress(0.1)
@@ -67,9 +73,8 @@ export function useVideoDownload({
 
       const { url: cloudinaryUrl } = await apiRes.json()
 
-      // Mobile: open in new tab — avoids iOS "Files" dialog and Android quirks
-      if (isMobile()) {
-        window.open(cloudinaryUrl, "_blank")
+      if (mobile && newTab) {
+        newTab.location.href = cloudinaryUrl
         return
       }
 
@@ -114,7 +119,11 @@ export function useVideoDownload({
       setDownloadProgress(1)
     } catch (error) {
       console.error("Download failed, opening original in new tab:", error)
-      window.open(resultUrl, "_blank")
+      if (newTab) {
+        newTab.location.href = resultUrl
+      } else {
+        window.open(resultUrl, "_blank")
+      }
     } finally {
       setIsDownloading(false)
       setDownloadProgress(0)
