@@ -3,7 +3,7 @@
 import { useCallback, useRef } from "react"
 import { upload } from "@vercel/blob/client"
 import type { Character, User } from "@/lib/types"
-import { MIN_IMAGE_DIMENSION } from "@/lib/constants"
+import { MIN_IMAGE_DIMENSION, MIN_VIDEO_DURATION } from "@/lib/constants"
 
 interface UseVideoGenerationOptions {
   user: User | null
@@ -36,6 +36,24 @@ function getApiErrorMessage(error: unknown): string {
   }
 
   return "Failed to start generation"
+}
+
+// Helper to validate video duration from a Blob
+async function validateVideoDuration(blob: Blob): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob)
+    const video = document.createElement("video")
+    video.preload = "metadata"
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(url)
+      resolve(video.duration)
+    }
+    video.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error("Failed to read video metadata"))
+    }
+    video.src = url
+  })
 }
 
 // Helper to validate image dimensions
@@ -119,6 +137,22 @@ export function useVideoGeneration({
         const video = await getVideo()
         if (!video) {
           throw new Error("No video available")
+        }
+
+        // 3b. Validate video duration — KlingAI requires at least 3s
+        try {
+          const duration = await validateVideoDuration(video)
+          if (duration < MIN_VIDEO_DURATION) {
+            throw new Error(
+              `Video is too short (${Math.round(duration * 10) / 10}s). ` +
+              `Please record at least ${MIN_VIDEO_DURATION} seconds.`
+            )
+          }
+        } catch (durError) {
+          if (durError instanceof Error && durError.message.includes("too short")) {
+            throw durError
+          }
+          // If metadata read fails, proceed anyway — server will validate
         }
 
         // 4. Upload video (skip if already uploaded)
