@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from "react"
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react"
 
 interface BottomSheetProps {
   peek: ReactNode
@@ -10,6 +10,13 @@ interface BottomSheetProps {
   peekHeight?: number
 }
 
+/**
+ * Mobile bottom sheet with two snap points.
+ *
+ * Uses a fixed pixel height computed once from the viewport on mount.
+ * Content overflow is handled by the scroll container, not by resizing
+ * the sheet — this eliminates all jump/flash issues from dynamic sizing.
+ */
 export function BottomSheet({
   peek,
   children,
@@ -23,40 +30,17 @@ export function BottomSheet({
   const startOffsetRef = useRef(0)
   const dragOffsetRef = useRef<number | null>(null)
   const [renderOffset, setRenderOffset] = useState<number | null>(null)
-  const [sheetHeight, setSheetHeight] = useState(0)
-  const settledRef = useRef(false)
-  const [settled, setSettled] = useState(false)
+
+  // Fixed height computed once — never changes, no ResizeObserver needed
+  const [expandedHeight] = useState(() =>
+    typeof window !== "undefined" ? Math.round(window.innerHeight * 0.6) : 500
+  )
 
   const isDragging = renderOffset !== null
-
-  // Measure before first paint to avoid flash
-  useLayoutEffect(() => {
-    if (sheetRef.current) setSheetHeight(sheetRef.current.offsetHeight)
-  }, [])
-
-  // Track content resizes after mount.
-  // Suppress transitions until the sheet stabilizes (~500ms) so
-  // images/data loading don't cause visible jumps.
-  useEffect(() => {
-    const el = sheetRef.current
-    if (!el) return
-    const observer = new ResizeObserver(() => setSheetHeight(el.offsetHeight))
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      settledRef.current = true
-      setSettled(true)
-    }, 600)
-    return () => clearTimeout(timer)
-  }, [])
-
-  const maxOffset = Math.max(0, sheetHeight - peekHeight)
+  const maxOffset = expandedHeight - peekHeight
 
   const progress = isDragging
-    ? 1 - (renderOffset ?? 0) / (maxOffset || 1)
+    ? 1 - (renderOffset ?? 0) / maxOffset
     : isExpanded ? 1 : 0
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
@@ -122,10 +106,10 @@ export function BottomSheet({
     <div
       ref={sheetRef}
       className={`fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-3xl bg-neutral-950 ${
-        !settled || isDragging ? "duration-0" : "transition-transform duration-300 ease-out"
+        isDragging ? "duration-0" : "transition-transform duration-300 ease-out"
       }`}
       style={{
-        maxHeight: "85dvh",
+        height: `${expandedHeight}px`,
         transform,
       }}
     >
@@ -152,7 +136,7 @@ export function BottomSheet({
           {peek}
         </div>
 
-        {/* Expanded content — sized to content, revealed by sheet sliding up */}
+        {/* Expanded content — scrollable when expanded */}
         <div
           className="transition-opacity duration-150"
           style={{
