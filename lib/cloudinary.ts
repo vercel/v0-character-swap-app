@@ -10,7 +10,7 @@
  * 2. Env var: CLOUDINARY_CLOUD_NAME
  */
 
-const WATERMARK_TEXT = "created with faceswapvid.vercel.app"
+const WATERMARK_TEXT = "created with v0faceswap.app"
 
 function validateBlobUrl(url: string): void {
   const parsed = new URL(url)
