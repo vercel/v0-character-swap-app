@@ -363,7 +363,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         {!isRecording && !showTips && countdown === null && hasPermission && (
           <button
             onClick={() => setFacingMode(f => f === "user" ? "environment" : "user")}
-            className="absolute right-3 top-3 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm transition-colors active:bg-black/60 md:right-4 md:top-4"
+            className="absolute right-3 top-3 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm transition-colors active:bg-black/60 md:hidden"
             aria-label="Flip camera"
           >
             <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
