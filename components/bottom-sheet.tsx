@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback, type ReactNode } from "react"
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from "react"
 
 interface BottomSheetProps {
   peek: ReactNode
@@ -23,18 +23,20 @@ export function BottomSheet({
   const startOffsetRef = useRef(0)
   const dragOffsetRef = useRef<number | null>(null)
   const [renderOffset, setRenderOffset] = useState<number | null>(null)
-  const [sheetHeight, setSheetHeight] = useState(-1) // -1 = not yet measured
-  const measured = sheetHeight >= 0
+  const [sheetHeight, setSheetHeight] = useState(0)
 
   const isDragging = renderOffset !== null
 
-  // Track actual sheet height so translateY adapts to content
+  // Measure before first paint to avoid flash
+  useLayoutEffect(() => {
+    if (sheetRef.current) setSheetHeight(sheetRef.current.offsetHeight)
+  }, [])
+
+  // Track content resizes after mount
   useEffect(() => {
     const el = sheetRef.current
     if (!el) return
-    const measure = () => setSheetHeight(el.offsetHeight)
-    measure()
-    const observer = new ResizeObserver(measure)
+    const observer = new ResizeObserver(() => setSheetHeight(el.offsetHeight))
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
@@ -108,12 +110,11 @@ export function BottomSheet({
     <div
       ref={sheetRef}
       className={`fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-3xl bg-neutral-950 ${
-        !measured ? "duration-0" : isDragging ? "duration-0" : "transition-transform duration-300 ease-out"
+        isDragging ? "duration-0" : "transition-transform duration-300 ease-out"
       }`}
       style={{
         maxHeight: "85dvh",
         transform,
-        visibility: measured ? "visible" : "hidden",
       }}
     >
       {/* Handle */}
