@@ -33,7 +33,7 @@ export function BottomSheet({
 
   // Fixed height computed once — never changes, no ResizeObserver needed
   const [expandedHeight] = useState(() =>
-    typeof window !== "undefined" ? Math.round(window.innerHeight * 0.6) : 500
+    typeof window !== "undefined" ? Math.round(window.innerHeight * 0.5) : 400
   )
 
   const isDragging = renderOffset !== null
