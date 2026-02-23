@@ -3,9 +3,7 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react"
 
 interface BottomSheetProps {
-  /** Content always visible in the peek area (top ~100px) */
   peek: ReactNode
-  /** Content visible when expanded (rendered always, revealed by drag) */
   children: ReactNode
   isExpanded: boolean
   onExpandedChange: (expanded: boolean) => void
@@ -14,18 +12,6 @@ interface BottomSheetProps {
 
 const SHEET_HEIGHT_DVH = 60
 
-/**
- * Mobile bottom sheet with two snap points: collapsed (peek) and expanded.
- *
- * The sheet is ALWAYS 60dvh tall, pinned to bottom: 0.
- * Position is controlled via translateY:
- *   - Expanded:  translateY(0)
- *   - Collapsed: translateY(60dvh - peekHeight)
- *
- * Both peek and expanded content are always rendered.
- * Peek fades out as the sheet opens; expanded content is naturally
- * revealed by the sheet sliding up (no conditional rendering).
- */
 export function BottomSheet({
   peek,
   children,
@@ -37,18 +23,19 @@ export function BottomSheet({
   const isDraggingRef = useRef(false)
   const startYRef = useRef(0)
   const startOffsetRef = useRef(0)
-  const [dragOffset, setDragOffset] = useState<number | null>(null)
+  const dragOffsetRef = useRef<number | null>(null)
+  // State only for triggering re-renders during drag
+  const [renderOffset, setRenderOffset] = useState<number | null>(null)
 
-  const isDragging = dragOffset !== null
+  const isDragging = renderOffset !== null
 
   const getMaxOffset = useCallback(
     () => window.innerHeight * (SHEET_HEIGHT_DVH / 100) - peekHeight,
     [peekHeight],
   )
 
-  // Progress: 0 = collapsed, 1 = expanded
   const progress = isDragging
-    ? 1 - (dragOffset ?? 0) / (getMaxOffset() || 1)
+    ? 1 - (renderOffset ?? 0) / (getMaxOffset() || 1)
     : isExpanded ? 1 : 0
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
@@ -62,29 +49,36 @@ export function BottomSheet({
     const deltaY = e.touches[0].clientY - startYRef.current
     const maxOffset = getMaxOffset()
     const offset = Math.max(0, Math.min(startOffsetRef.current + deltaY, maxOffset))
-    setDragOffset(offset)
+    // Ref for immediate read in touchEnd; state for rendering
+    dragOffsetRef.current = offset
+    setRenderOffset(offset)
   }, [getMaxOffset])
 
   const handleTouchEnd = useCallback(() => {
     if (!isDraggingRef.current) return
     isDraggingRef.current = false
-    if (dragOffset === null) return
 
-    const deltaY = dragOffset - startOffsetRef.current
+    // Read from ref — always has the latest value, no stale closure
+    const finalOffset = dragOffsetRef.current
+    dragOffsetRef.current = null
+    setRenderOffset(null)
+
+    if (finalOffset === null) return
+
+    const maxOffset = getMaxOffset()
+    const deltaY = finalOffset - startOffsetRef.current
 
     let shouldExpand: boolean
     if (Math.abs(deltaY) > 50) {
       shouldExpand = deltaY < 0
     } else {
-      shouldExpand = dragOffset < getMaxOffset() / 2
+      shouldExpand = finalOffset < maxOffset / 2
     }
-
-    setDragOffset(null)
 
     if (shouldExpand !== isExpanded) {
       onExpandedChange(shouldExpand)
     }
-  }, [dragOffset, isExpanded, onExpandedChange, getMaxOffset])
+  }, [isExpanded, onExpandedChange, getMaxOffset])
 
   useEffect(() => {
     const el = sheetRef.current
@@ -102,7 +96,7 @@ export function BottomSheet({
   }, [handleTouchStart, handleTouchMove, handleTouchEnd])
 
   const transform = isDragging
-    ? `translateY(${dragOffset}px)`
+    ? `translateY(${renderOffset}px)`
     : isExpanded
       ? "translateY(0)"
       : `translateY(calc(${SHEET_HEIGHT_DVH}dvh - ${peekHeight}px))`
@@ -132,7 +126,7 @@ export function BottomSheet({
       }`}>
         {/* Peek content — fades out as sheet expands */}
         <div
-          className="transition-opacity duration-200"
+          className="transition-opacity duration-150"
           style={{
             opacity: Math.max(0, 1 - progress * 2.5),
             pointerEvents: progress > 0.4 ? "none" : "auto",
@@ -143,7 +137,7 @@ export function BottomSheet({
 
         {/* Expanded content — always rendered, revealed by sheet sliding up */}
         <div
-          className="transition-opacity duration-200"
+          className="transition-opacity duration-150"
           style={{
             opacity: Math.min(1, progress * 2),
             pointerEvents: progress < 0.4 ? "none" : "auto",
