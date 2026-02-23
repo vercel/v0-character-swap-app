@@ -90,7 +90,7 @@ export function buildCompositeVideoUrl({
   if (watermark) {
     const encodedText = watermark.replace(/ /g, "%20")
     transformations.push(
-      `l_text:courier_18:${encodedText},co_rgb:FFFFFFB3,g_south_west,x_20,y_20`
+      `l_text:GeistMono-Regular.ttf_18:${encodedText},co_rgb:FFFFFFB3,g_south_west,x_20,y_20`
     )
   }
 
