@@ -24,6 +24,8 @@ export function BottomSheet({
   const dragOffsetRef = useRef<number | null>(null)
   const [renderOffset, setRenderOffset] = useState<number | null>(null)
   const [sheetHeight, setSheetHeight] = useState(0)
+  const settledRef = useRef(false)
+  const [settled, setSettled] = useState(false)
 
   const isDragging = renderOffset !== null
 
@@ -32,13 +34,23 @@ export function BottomSheet({
     if (sheetRef.current) setSheetHeight(sheetRef.current.offsetHeight)
   }, [])
 
-  // Track content resizes after mount
+  // Track content resizes after mount.
+  // Suppress transitions until the sheet stabilizes (~500ms) so
+  // images/data loading don't cause visible jumps.
   useEffect(() => {
     const el = sheetRef.current
     if (!el) return
     const observer = new ResizeObserver(() => setSheetHeight(el.offsetHeight))
     observer.observe(el)
     return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      settledRef.current = true
+      setSettled(true)
+    }, 600)
+    return () => clearTimeout(timer)
   }, [])
 
   const maxOffset = Math.max(0, sheetHeight - peekHeight)
@@ -110,7 +122,7 @@ export function BottomSheet({
     <div
       ref={sheetRef}
       className={`fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-3xl bg-neutral-950 ${
-        isDragging ? "duration-0" : "transition-transform duration-300 ease-out"
+        !settled || isDragging ? "duration-0" : "transition-transform duration-300 ease-out"
       }`}
       style={{
         maxHeight: "85dvh",
