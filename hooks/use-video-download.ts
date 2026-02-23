@@ -37,6 +37,47 @@ function triggerDownload(url: string, filename: string) {
   }
 }
 
+/**
+ * Stream-fetch a video with progress tracking.
+ * Returns the video as a Blob. Falls back to .blob() if streaming
+ * isn't available or content-length is unknown.
+ */
+async function fetchWithProgress(
+  url: string,
+  onProgress: (progress: number) => void,
+): Promise<Blob> {
+  const res = await fetch(url)
+  if (!res.ok) {
+    const errText = res.headers.get("x-cld-error") || res.statusText
+    throw new Error(`Download failed: ${res.status} ${errText}`)
+  }
+
+  const contentLength = res.headers.get("content-length")
+  const total = contentLength ? parseInt(contentLength, 10) : 0
+
+  if (!res.body || !total) {
+    // Can't stream — download all at once
+    onProgress(0.5)
+    const blob = await res.blob()
+    onProgress(1)
+    return blob
+  }
+
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let received = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+    received += value.length
+    onProgress(received / total)
+  }
+
+  return new Blob(chunks, { type: "video/mp4" })
+}
+
 export function useVideoDownload({
   resultUrl,
   pipVideoUrl,
@@ -53,12 +94,13 @@ export function useVideoDownload({
     const slug = characterName ? slugify(characterName) : "video"
     const pipSuffix = showPip && pipVideoUrl ? "-pip" : ""
     const filename = `faceswap-${slug}${pipSuffix}.mp4`
+    const mobile = isMobile()
 
     try {
       setIsDownloading(true)
-      setDownloadProgress(0.1)
+      setDownloadProgress(0.05)
 
-      // Ask server for Cloudinary composite URL
+      // Phase 1 (0-10%): get Cloudinary composite URL from API
       const params = new URLSearchParams({
         main: resultUrl,
         ...(pipVideoUrl ? { pip: pipVideoUrl } : {}),
@@ -66,67 +108,27 @@ export function useVideoDownload({
         pipAspectRatio,
       })
       const apiRes = await fetch(`/api/download?${params}`)
-
       if (!apiRes.ok) throw new Error("API returned " + apiRes.status)
 
       const { url: cloudinaryUrl } = await apiRes.json()
+      setDownloadProgress(0.1)
 
-      // Mobile: use Web Share API — opens native share sheet
-      // where user can "Save Video" to photos, share, etc.
-      if (isMobile()) {
-        setDownloadProgress(0.3)
-        const videoRes = await fetch(cloudinaryUrl)
-        if (!videoRes.ok) throw new Error("Failed to fetch video")
+      // Phase 2 (10-95%): stream the video with progress
+      const blob = await fetchWithProgress(cloudinaryUrl, (p) => {
+        setDownloadProgress(0.1 + p * 0.85)
+      })
+      setDownloadProgress(0.95)
 
-        const blob = await videoRes.blob()
+      // Phase 3 (95-100%): deliver to user
+      if (mobile) {
         const file = new File([blob], filename, { type: "video/mp4" })
-
         if (navigator.canShare?.({ files: [file] })) {
           setDownloadProgress(1)
           await navigator.share({ files: [file] })
           return
         }
-
-        // Fallback: trigger download with blob URL
-        const blobUrl = URL.createObjectURL(blob)
-        triggerDownload(blobUrl, filename)
-        setDownloadProgress(1)
-        return
       }
 
-      // Desktop: stream download with progress
-      setDownloadProgress(0.2)
-
-      const videoRes = await fetch(cloudinaryUrl)
-      if (!videoRes.ok) {
-        const errText = videoRes.headers.get("x-cld-error") || videoRes.statusText
-        throw new Error(`Cloudinary returned ${videoRes.status}: ${errText}`)
-      }
-
-      const contentLength = videoRes.headers.get("content-length")
-      const total = contentLength ? parseInt(contentLength, 10) : 0
-
-      if (!videoRes.body || !total) {
-        const blob = await videoRes.blob()
-        const blobUrl = URL.createObjectURL(blob)
-        triggerDownload(blobUrl, filename)
-        setDownloadProgress(1)
-        return
-      }
-
-      const reader = videoRes.body.getReader()
-      const chunks: BlobPart[] = []
-      let received = 0
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        chunks.push(value)
-        received += value.length
-        setDownloadProgress(0.2 + (received / total) * 0.8)
-      }
-
-      const blob = new Blob(chunks, { type: "video/mp4" })
       const blobUrl = URL.createObjectURL(blob)
       triggerDownload(blobUrl, filename)
       setDownloadProgress(1)
