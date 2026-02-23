@@ -20,8 +20,8 @@ function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
 }
 
-function isIOS(): boolean {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+function isMobile(): boolean {
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
 }
 
@@ -67,9 +67,8 @@ export function useVideoDownload({
 
       const { url: cloudinaryUrl } = await apiRes.json()
 
-      // iOS: open in new tab — avoids the confusing "Files" save dialog.
-      // User can long-press > "Save to Photos" or share from there.
-      if (isIOS()) {
+      // Mobile: open in new tab — avoids iOS "Files" dialog and Android quirks
+      if (isMobile()) {
         window.open(cloudinaryUrl, "_blank")
         return
       }
@@ -115,7 +114,6 @@ export function useVideoDownload({
       setDownloadProgress(1)
     } catch (error) {
       console.error("Download failed, opening original in new tab:", error)
-      // Fallback: open the original video URL directly
       window.open(resultUrl, "_blank")
     } finally {
       setIsDownloading(false)
