@@ -159,16 +159,15 @@ export default function Home() {
   // Auto-submit generation after login
   useEffect(() => {
     if (pendingAutoSubmit && user && recordedVideo && selectedCharacter) {
-      setPendingAutoSubmit(false)
       const character = allCharacters.find(c => c.id === selectedCharacter)
-      if (character) {
-        // Use character image aspect ratio, not recorded video aspect ratio
-        getCharacterAspectRatio(character.src).then(characterAspectRatio => {
-          setTimeout(() => {
-            processVideo(getVideoForUpload, character, sendEmailNotification, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio)
-          }, 100)
-        })
-      }
+      if (!character) return // Wait for characters to load (custom chars need auth fetch)
+      setPendingAutoSubmit(false)
+      // Use character image aspect ratio, not recorded video aspect ratio
+      getCharacterAspectRatio(character.src).then(characterAspectRatio => {
+        setTimeout(() => {
+          processVideo(getVideoForUpload, character, sendEmailNotification, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio)
+        }, 100)
+      })
     }
   }, [pendingAutoSubmit, user, recordedVideo, selectedCharacter, allCharacters, processVideo, uploadedVideoUrl, getVideoForUpload, recordedAspectRatio, sendEmailNotification])
 

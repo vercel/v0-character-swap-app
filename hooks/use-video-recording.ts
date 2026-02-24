@@ -30,6 +30,7 @@ export function useVideoRecording(): UseVideoRecordingReturn {
   const [showPreview, setShowPreview] = useState(false)
 
   const uploadingRef = useRef(false)
+  const uploadPromiseRef = useRef<Promise<string | null>>(Promise.resolve(null))
 
   // Create object URL when video changes
   useEffect(() => {
@@ -48,20 +49,26 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     uploadingRef.current = true
 
     setIsUploading(true)
-    try {
-      // Use the original extension based on mime type
-      const ext = blob.type.includes("mp4") ? "mp4" : blob.type.includes("quicktime") ? "mov" : "webm"
-      const videoBlob = await upload(`videos/${Date.now()}-recording.${ext}`, blob, {
-        access: "public",
-        handleUploadUrl: "/api/upload",
-      })
-      setUploadedVideoUrl(videoBlob.url)
-    } catch (error) {
-      console.error("[v0] Failed to upload video:", error)
-    } finally {
-      setIsUploading(false)
-      uploadingRef.current = false
-    }
+    const promise = (async (): Promise<string | null> => {
+      try {
+        // Use the original extension based on mime type
+        const ext = blob.type.includes("mp4") ? "mp4" : blob.type.includes("quicktime") ? "mov" : "webm"
+        const videoBlob = await upload(`videos/${Date.now()}-recording.${ext}`, blob, {
+          access: "public",
+          handleUploadUrl: "/api/upload",
+        })
+        setUploadedVideoUrl(videoBlob.url)
+        return videoBlob.url
+      } catch (error) {
+        console.error("[v0] Failed to upload video:", error)
+        return null
+      } finally {
+        setIsUploading(false)
+        uploadingRef.current = false
+      }
+    })()
+    uploadPromiseRef.current = promise
+    await promise
   }, [])
 
   // Get raw video blob for generation
@@ -132,16 +139,39 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     }
     sessionStorage.setItem(STORAGE_KEYS.PENDING_ASPECT_RATIO, recordedAspectRatio)
 
-    if (uploadedVideoUrl) {
-      sessionStorage.setItem(STORAGE_KEYS.PENDING_VIDEO_URL, uploadedVideoUrl)
+    // Try to get the uploaded URL — wait for in-progress upload if needed
+    let videoUrl = uploadedVideoUrl
+    if (!videoUrl) {
+      try {
+        videoUrl = await uploadPromiseRef.current
+      } catch {
+        // Upload failed or not started
+      }
+    }
+
+    if (videoUrl) {
+      sessionStorage.setItem(STORAGE_KEYS.PENDING_VIDEO_URL, videoUrl)
       sessionStorage.setItem(STORAGE_KEYS.PENDING_UPLOADED, "true")
     } else {
+      // Fallback: upload the video now and wait for it
       try {
-        const dataUrl = await blobToDataUrl(video)
-        sessionStorage.setItem(STORAGE_KEYS.PENDING_VIDEO_URL, dataUrl)
-        sessionStorage.setItem(STORAGE_KEYS.PENDING_UPLOADED, "false")
+        const ext = video.type.includes("mp4") ? "mp4" : video.type.includes("quicktime") ? "mov" : "webm"
+        const videoBlob = await upload(`videos/${Date.now()}-recording.${ext}`, video, {
+          access: "public",
+          handleUploadUrl: "/api/upload",
+        })
+        sessionStorage.setItem(STORAGE_KEYS.PENDING_VIDEO_URL, videoBlob.url)
+        sessionStorage.setItem(STORAGE_KEYS.PENDING_UPLOADED, "true")
       } catch (e) {
-        console.error("[v0] Failed to save video:", e)
+        console.error("[v0] Failed to upload video for session save:", e)
+        // Last resort: try data URL (may fail for large videos)
+        try {
+          const dataUrl = await blobToDataUrl(video)
+          sessionStorage.setItem(STORAGE_KEYS.PENDING_VIDEO_URL, dataUrl)
+          sessionStorage.setItem(STORAGE_KEYS.PENDING_UPLOADED, "false")
+        } catch (e2) {
+          console.error("[v0] Failed to save video as data URL:", e2)
+        }
       }
     }
     sessionStorage.setItem(STORAGE_KEYS.PENDING_AUTO_SUBMIT, "true")

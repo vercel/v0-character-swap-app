@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState, useCallback, useEffect } from "react"
+import { MAX_VIDEO_DURATION } from "@/lib/constants"
 
 interface CameraPreviewProps {
   onVideoRecorded: (videoBlob: Blob, aspectRatio: "9:16" | "16:9" | "fill") => void
@@ -219,7 +220,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
 
     timerRef.current = setInterval(() => {
       setRecordingTime((prev) => {
-        if (prev >= 29) {
+        if (prev >= MAX_VIDEO_DURATION - 1) {
           if (mediaRecorderRef.current?.state === "recording") {
             mediaRecorderRef.current.stop()
           }
@@ -228,7 +229,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
             clearInterval(timerRef.current)
             timerRef.current = null
           }
-          return 30
+          return MAX_VIDEO_DURATION
         }
         return prev + 1
       })
@@ -352,7 +353,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
                   <span className="text-white">2.</span> Good lighting on your face
                 </p>
                 <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
-                  <span className="text-white">3.</span> Record <span className="font-semibold text-white">3-30 seconds</span>
+                  <span className="text-white">3.</span> Record <span className="font-semibold text-white">3-{MAX_VIDEO_DURATION} seconds</span>
                 </p>
               </div>
             </div>
@@ -383,9 +384,9 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
 
         {isRecording && (
           <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/40 px-2.5 py-1.5 backdrop-blur-sm md:left-4 md:top-4">
-            <span className={`h-2 w-2 rounded-full ${recordingTime >= 24 ? "bg-amber-500" : "bg-red-500"} animate-pulse`} />
-            <span className={`font-mono text-[11px] tabular-nums md:text-xs ${recordingTime >= 24 ? "text-amber-400" : "text-white"}`}>
-              {recordingTime}/30s
+            <span className={`h-2 w-2 rounded-full ${recordingTime >= MAX_VIDEO_DURATION - 6 ? "bg-amber-500" : "bg-red-500"} animate-pulse`} />
+            <span className={`font-mono text-[11px] tabular-nums md:text-xs ${recordingTime >= MAX_VIDEO_DURATION - 6 ? "text-amber-400" : "text-white"}`}>
+              {recordingTime}/{MAX_VIDEO_DURATION}s
             </span>
           </div>
         )}
@@ -401,12 +402,12 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
           </div>
         )}
         
-        {/* Warning when approaching max time - show last 5 seconds */}
-        {isRecording && recordingTime >= 24 && (
+        {/* Warning when approaching max time - show last 6 seconds */}
+        {isRecording && recordingTime >= MAX_VIDEO_DURATION - 6 && (
           <div className="absolute inset-x-0 top-14 flex justify-center md:top-16">
             <div className="animate-pulse rounded-lg bg-amber-500 px-4 py-2 shadow-lg">
               <span className="font-mono text-[13px] font-semibold text-black">
-                {Math.max(1, 29 - recordingTime)}s left
+                {Math.max(1, MAX_VIDEO_DURATION - 1 - recordingTime)}s left
               </span>
             </div>
           </div>
