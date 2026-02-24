@@ -52,6 +52,18 @@ async function serializeUnknownError(error: unknown): Promise<string> {
 }
 
 function buildProviderErrorPayload(details: string): ProviderErrorPayload {
+  // User-friendly messages for known input errors
+  if (/duration.*less than/i.test(details)) {
+    return {
+      kind: "provider_error",
+      provider: "kling",
+      model: "klingai/kling-v2.6-motion-control",
+      code: "VIDEO_TOO_SHORT",
+      summary: "Video is too short. Please record at least 4 seconds.",
+      details,
+    }
+  }
+
   if (details.includes("GatewayInternalServerError")) {
     return {
       kind: "provider_error",
@@ -160,7 +172,8 @@ async function generateAndSaveVideo(
         const contentType = warmup.headers.get("content-type")
         const contentLength = warmup.headers.get("content-length")
         const sizeMB = contentLength ? (parseInt(contentLength) / 1024 / 1024).toFixed(2) : "unknown"
-        console.log(`[Workflow Step] [${new Date().toISOString()}] Cloudinary MP4 ready: type=${contentType}, size=${sizeMB}MB`)
+        const duration = warmup.headers.get("x-cld-meta-duration") || warmup.headers.get("duration")
+        console.log(`[Workflow Step] [${new Date().toISOString()}] Cloudinary MP4 ready: type=${contentType}, size=${sizeMB}MB, duration=${duration || "unknown"}`)
       } else {
         console.warn(`[Workflow Step] [${new Date().toISOString()}] Cloudinary pre-warm failed (${warmup.status}), falling back to original URL`)
       }
