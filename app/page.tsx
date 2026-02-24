@@ -197,6 +197,16 @@ export default function Home() {
     }
   }, [isUploading])
 
+  // Warn before closing tab while video is uploading
+  useEffect(() => {
+    if (!isUploading) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+    }
+    window.addEventListener("beforeunload", handler)
+    return () => window.removeEventListener("beforeunload", handler)
+  }, [isUploading])
+
   // Auto-expand bottom sheet when video is recorded
   useEffect(() => {
     if (isMobile && recordedVideo && !resultUrl) {
