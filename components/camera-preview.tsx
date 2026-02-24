@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState, useCallback, useEffect } from "react"
-import { MAX_VIDEO_DURATION } from "@/lib/constants"
+import { MAX_VIDEO_DURATION, MIN_VIDEO_DURATION } from "@/lib/constants"
 
 interface CameraPreviewProps {
   onVideoRecorded: (videoBlob: Blob, aspectRatio: "9:16" | "16:9" | "fill") => void
@@ -274,8 +274,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     }, 1000)
   }, [beginRecording])
 
-  // Minimum recording duration required by Kling AI (2 seconds of continuous motion)
-  const MIN_RECORDING_SECONDS = 3
+  const MIN_RECORDING_SECONDS = MIN_VIDEO_DURATION
   
   const stopRecording = useCallback(() => {
     // Prevent stopping too early - Kling AI requires at least 2s of continuous motion
@@ -392,11 +391,11 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         )}
         
         {/* Minimum duration indicator - show for first 3 seconds */}
-        {isRecording && recordingTime < 3 && (
+        {isRecording && recordingTime < MIN_RECORDING_SECONDS && (
           <div className="absolute inset-x-0 top-14 flex justify-center md:top-16">
             <div className="rounded-lg bg-neutral-800 px-4 py-2 shadow-lg">
               <span className="font-mono text-[13px] text-neutral-300">
-                Min. <span className="font-semibold text-white">{3 - recordingTime}s</span> more
+                Min. <span className="font-semibold text-white">{MIN_RECORDING_SECONDS - recordingTime}s</span> more
               </span>
             </div>
           </div>
@@ -438,15 +437,15 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
           {isRecording && (
             <button
               onClick={stopRecording}
-              disabled={recordingTime < 3}
+              disabled={recordingTime < MIN_RECORDING_SECONDS}
               className={`flex h-16 w-16 items-center justify-center rounded-full border-[3px] transition-all md:h-[72px] md:w-[72px] ${
-                recordingTime < 3 
+                recordingTime < MIN_RECORDING_SECONDS 
                   ? "cursor-not-allowed border-neutral-600 opacity-50" 
                   : "border-white/90 bg-transparent hover:scale-105 active:scale-95"
               }`}
-              aria-label={recordingTime < 3 ? `Recording minimum ${3 - recordingTime}s more` : "Stop recording"}
+              aria-label={recordingTime < MIN_RECORDING_SECONDS ? `Recording minimum ${MIN_RECORDING_SECONDS - recordingTime}s more` : "Stop recording"}
             >
-              <span className={`h-6 w-6 rounded-[4px] md:h-7 md:w-7 ${recordingTime < 3 ? "bg-neutral-500" : "bg-white"}`} />
+              <span className={`h-6 w-6 rounded-[4px] md:h-7 md:w-7 ${recordingTime < MIN_RECORDING_SECONDS ? "bg-neutral-500" : "bg-white"}`} />
             </button>
           )}
 

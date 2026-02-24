@@ -7,7 +7,7 @@ import { toWorkflowErrorObject } from "@/lib/workflow-errors"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { generationId: existingGenerationId, videoUrl, characterImageUrl, userId, userEmail, characterName, sendEmail } = body
+    const { generationId: existingGenerationId, videoUrl, characterImageUrl, userId, userName, userEmail, characterName, sendEmail } = body
 
     if (!videoUrl || !characterImageUrl) {
       return NextResponse.json(
@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
       videoUrl,
       characterImageUrl,
       characterName: characterName || undefined,
+      userName: userName || undefined,
       userEmail: sendEmail ? userEmail : undefined,
     }])
 

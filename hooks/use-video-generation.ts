@@ -184,6 +184,7 @@ export function useVideoGeneration({
             videoUrl,
             characterImageUrl: characterBlobResult.url,
             userId: user.id,
+            userName: user.name,
             userEmail: user.email,
             characterName: character.name,
             sendEmail: sendEmail && user.email ? true : false,

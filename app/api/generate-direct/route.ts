@@ -10,7 +10,7 @@ export const maxDuration = 800
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { generationId: existingGenerationId, videoUrl, characterImageUrl, userId, userEmail, characterName, sendEmail } = body
+    const { generationId: existingGenerationId, videoUrl, characterImageUrl, userId, userName, userEmail, characterName, sendEmail } = body
 
     if (!videoUrl || !characterImageUrl) {
       return NextResponse.json(
@@ -70,16 +70,24 @@ export async function POST(request: NextRequest) {
           try {
             const { Resend } = await import("resend")
             const resend = new Resend(process.env.RESEND_API_KEY)
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://v0faceswap.app"
+            const firstName = userName?.split(" ")[0] || ""
+            const greeting = firstName ? `Hey ${firstName}!` : "Hey!"
             await resend.emails.send({
-              from: "v0 Face Swap <noreply@resend.dev>",
+              from: "v0 Face Swap <hello@v0faceswap.app>",
               to: userEmail,
-              subject: "Your video is ready!",
-              html: `
-                <h1>Your face swap video is ready!</h1>
-                ${characterName ? `<p>Character: ${characterName}</p>` : ""}
-                <p>Click below to view your video:</p>
-                <p><a href="${blobUrl}" style="display:inline-block;padding:12px 24px;background:#000;color:#fff;text-decoration:none;border-radius:6px;">View Video</a></p>
-              `,
+              subject: `Your face swap video is ready${characterName ? ` — ${characterName}` : ""}!`,
+              text: [
+                greeting,
+                "",
+                `Your video generated with v0 Face Swap is ready${characterName ? ` (${characterName})` : ""}.`,
+                "",
+                `Check it out: ${appUrl}`,
+                "",
+                "Want to build your own? Here's the v0 template: https://v0.app/templates/1Nu0E0eAo9q",
+                "",
+                "— v0 Face Swap",
+              ].join("\n"),
             })
             console.log(`[GenerateDirect] Email sent to ${userEmail}`)
           } catch (emailErr) {
