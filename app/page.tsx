@@ -202,6 +202,7 @@ export default function Home() {
     if (!isUploading) return
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault()
+      e.returnValue = "Your video is still uploading. If you leave now, your recording will be lost."
     }
     window.addEventListener("beforeunload", handler)
     return () => window.removeEventListener("beforeunload", handler)
