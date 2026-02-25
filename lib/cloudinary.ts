@@ -201,12 +201,12 @@ export async function prepareCompositeDownload({
   const eager = eagerTransformations.join("|")
   const timestamp = Math.floor(Date.now() / 1000).toString()
 
+  // resource_type goes in the URL path, NOT in signed params
   const params: Record<string, string> = {
     eager,
     eager_async: "true",
     overwrite: "false",
     public_id: publicId,
-    resource_type: "video",
     timestamp,
   }
 
@@ -215,7 +215,7 @@ export async function prepareCompositeDownload({
   const formData = new FormData()
   formData.append("file", mainVideoUrl)
   for (const [k, v] of Object.entries(params)) {
-    if (k !== "resource_type") formData.append(k, v)
+    formData.append(k, v)
   }
   formData.append("api_key", apiKey)
   formData.append("signature", signature)
