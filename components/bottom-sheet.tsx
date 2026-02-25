@@ -155,6 +155,7 @@ export function BottomSheet({
 
     const onTouchMove = (e: TouchEvent) => {
       if (!isDraggingRef.current) return
+      e.preventDefault() // Block Safari bounce / body scroll
 
       const touchY = e.touches[0].clientY
       const now = performance.now()
@@ -203,7 +204,7 @@ export function BottomSheet({
     }
 
     el.addEventListener("touchstart", onTouchStart, { passive: true })
-    el.addEventListener("touchmove", onTouchMove, { passive: true })
+    el.addEventListener("touchmove", onTouchMove, { passive: false })
     el.addEventListener("touchend", onTouchEnd, { passive: true })
 
     return () => {
