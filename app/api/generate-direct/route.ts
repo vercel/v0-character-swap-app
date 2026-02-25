@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
                 "",
                 `Check it out: ${appUrl}`,
                 "",
-                "Want to build your own? Here's the v0 template: https://v0.app/templates/1Nu0E0eAo9q",
+                "Build your own Face Swap app by cloning this v0 template: https://v0.app/templates/1Nu0E0eAo9q",
                 "",
                 "— v0 Face Swap",
               ].join("\n"),
