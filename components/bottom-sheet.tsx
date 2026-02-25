@@ -122,7 +122,7 @@ export function BottomSheet({
       </div>
 
       {/* Content area */}
-      <div className={`relative min-h-0 flex-1 px-3 pb-3 ${
+      <div className={`relative min-h-0 flex-1 px-3 pb-3 pb-[max(12px,env(safe-area-inset-bottom))] ${
         isExpanded && !isDragging ? "overflow-y-auto overscroll-contain" : "overflow-hidden"
       }`}>
         {/* Peek content — absolute so it doesn't affect layout */}
