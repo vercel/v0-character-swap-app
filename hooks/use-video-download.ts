@@ -114,9 +114,19 @@ export function useVideoDownload({
       setDownloadProgress(0.1)
 
       // Phase 2 (10-95%): stream the video with progress
-      const blob = await fetchWithProgress(cloudinaryUrl, (p) => {
-        setDownloadProgress(0.1 + p * 0.85)
-      })
+      let blob: Blob
+      try {
+        blob = await fetchWithProgress(cloudinaryUrl, (p) => {
+          setDownloadProgress(0.1 + p * 0.85)
+        })
+      } catch {
+        // Cloudinary failed (video too large for sync processing) — download raw video
+        console.warn("Cloudinary composite failed, downloading raw video")
+        setDownloadProgress(0.15)
+        blob = await fetchWithProgress(resultUrl, (p) => {
+          setDownloadProgress(0.15 + p * 0.8)
+        })
+      }
       setDownloadProgress(0.95)
 
       // Phase 3 (95-100%): deliver to user
