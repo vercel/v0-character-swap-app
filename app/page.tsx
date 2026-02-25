@@ -57,6 +57,7 @@ export default function Home() {
   const [generatedVideoAspectRatio, setGeneratedVideoAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
   const [showPip, setShowPip] = useState(true)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [showUploadingWarning, setShowUploadingWarning] = useState(false)
   const [sendEmailNotification, setSendEmailNotification] = useState(false)
   const [expandedCharacter, setExpandedCharacter] = useState<{
     imageUrl: string
@@ -203,7 +204,7 @@ export default function Home() {
     if (!isUploading) return
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault()
-      e.returnValue = "Your video is still uploading. If you leave now, your recording will be lost."
+      e.returnValue = "Your video is still uploading — hang tight!"
     }
     window.addEventListener("beforeunload", handler)
     return () => window.removeEventListener("beforeunload", handler)
@@ -244,10 +245,12 @@ export default function Home() {
   const selectedErrorRef = useRef(selectedError)
   const resultUrlRef = useRef(resultUrl)
   const recordedVideoUrlRef = useRef(recordedVideoUrl)
+  const isUploadingRef = useRef(isUploading)
   const handleResetRef = useRef(handleReset)
   selectedErrorRef.current = selectedError
   resultUrlRef.current = resultUrl
   recordedVideoUrlRef.current = recordedVideoUrl
+  isUploadingRef.current = isUploading
   handleResetRef.current = handleReset
 
   useEffect(() => {
@@ -256,6 +259,10 @@ export default function Home() {
         if (selectedErrorRef.current) {
           e.preventDefault()
           setSelectedError(null)
+        } else if (isUploadingRef.current) {
+          e.preventDefault()
+          setShowUploadingWarning(true)
+          setTimeout(() => setShowUploadingWarning(false), 2000)
         } else if (resultUrlRef.current || recordedVideoUrlRef.current) {
           e.preventDefault()
           handleResetRef.current()
@@ -500,6 +507,11 @@ export default function Home() {
             onClick={(e) => {
               // If clicked outside the video container, go back to recording
               if (e.target === e.currentTarget) {
+                if (isUploading) {
+                  setShowUploadingWarning(true)
+                  setTimeout(() => setShowUploadingWarning(false), 2000)
+                  return
+                }
                 setShowPreview(false)
                 clearRecording()
               }
@@ -526,12 +538,21 @@ export default function Home() {
                   video.muted = false
                 }}
               />
-              {/* Upload indicator - subtle, non-blocking */}
+              {/* Upload indicator */}
               {isUploading && (
-                <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/70 px-3 py-1.5 backdrop-blur-sm">
-                  <div className="h-2 w-2 animate-pulse rounded-full bg-white" />
-                  <span className="font-mono text-[11px] text-white/80">
-                    Uploading
+                <div className={cn(
+                  "absolute left-4 top-4 flex items-center gap-2 rounded-full px-3 py-1.5 backdrop-blur-sm transition-all duration-300",
+                  showUploadingWarning ? "bg-white/90" : "bg-black/70"
+                )}>
+                  <div className={cn(
+                    "h-2 w-2 animate-pulse rounded-full",
+                    showUploadingWarning ? "bg-black" : "bg-white"
+                  )} />
+                  <span className={cn(
+                    "font-mono text-[11px]",
+                    showUploadingWarning ? "text-black" : "text-white/80"
+                  )}>
+                    {showUploadingWarning ? "Hold on, uploading your video..." : "Uploading"}
                   </span>
                 </div>
               )}
