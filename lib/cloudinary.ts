@@ -7,8 +7,10 @@
  * Setup (one-time):
  * 1. Cloudinary Dashboard → Settings → Security → Allowed fetch domains:
  *    add 7zjbnnvanyvles15.public.blob.vercel-storage.com
- * 2. Env var: CLOUDINARY_CLOUD_NAME
+ * 2. Env vars: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
  */
+
+import { createHash } from "crypto"
 
 const WATERMARK_TEXT = "created with v0faceswap.app"
 
@@ -58,6 +60,43 @@ interface CompositeVideoOptions {
 }
 
 /**
+ * Builds the transformation string for composite video (PiP + watermark).
+ * Shared between fetch URL builder and eager preparation.
+ */
+function buildCompositeTransformation(options: {
+  pipVideoUrl: string | null
+  showPip: boolean
+  pipAspectRatio?: "9:16" | "16:9" | "fill"
+  watermark?: string
+  attachment?: boolean
+}): string {
+  const { pipVideoUrl, showPip, pipAspectRatio = "fill", watermark = WATERMARK_TEXT, attachment = false } = options
+  const transformations: string[] = []
+
+  if (showPip && pipVideoUrl) {
+    validateBlobUrl(pipVideoUrl)
+    const b64Url = base64UrlEncode(pipVideoUrl)
+    const pipSize = pipAspectRatio === "9:16" ? "w_0.12" : "w_0.2"
+    transformations.push(
+      `l_video:fetch:${b64Url},${pipSize},fl_relative,ac_none,r_12,g_south_east,x_20,y_20`
+    )
+  }
+
+  if (watermark) {
+    const encodedText = watermark.replace(/ /g, "%20")
+    transformations.push(
+      `l_text:GeistMono-Regular.ttf_18:${encodedText},co_rgb:FFFFFFB3,g_south_west,x_20,y_20`
+    )
+  }
+
+  if (attachment) {
+    transformations.push("fl_attachment")
+  }
+
+  return transformations.join("/")
+}
+
+/**
  * Builds a Cloudinary video URL with optional PiP overlay and watermark.
  * Uses "fetch" delivery type — no auto-upload mapping needed.
  * Audio is preserved automatically.
@@ -73,36 +112,89 @@ export function buildCompositeVideoUrl({
 }: CompositeVideoOptions): string {
   validateBlobUrl(mainVideoUrl)
 
-  const transformations: string[] = []
-
-  // PiP video overlay using fetch source (base64-encoded URL)
-  // Use smaller size for portrait (9:16) PiP to avoid it being too large
-  if (showPip && pipVideoUrl) {
-    validateBlobUrl(pipVideoUrl)
-    const b64Url = base64UrlEncode(pipVideoUrl)
-    const pipSize = pipAspectRatio === "9:16" ? "w_0.12" : "w_0.2"
-    transformations.push(
-      `l_video:fetch:${b64Url},${pipSize},fl_relative,ac_none,r_12,g_south_east,x_20,y_20`
-    )
-  }
-
-  // Watermark text overlay
-  if (watermark) {
-    const encodedText = watermark.replace(/ /g, "%20")
-    transformations.push(
-      `l_text:GeistMono-Regular.ttf_18:${encodedText},co_rgb:FFFFFFB3,g_south_west,x_20,y_20`
-    )
-  }
-
-  if (attachment) {
-    transformations.push("fl_attachment")
-  }
-
-  const transformStr = transformations.length > 0
-    ? transformations.join("/") + "/"
-    : ""
-
-  // fetch delivery type: pass the full source URL at the end
+  const transformStr = buildCompositeTransformation({ pipVideoUrl, showPip, pipAspectRatio, watermark, attachment })
+  const prefix = transformStr ? transformStr + "/" : ""
   const encodedMainUrl = encodeURIComponent(mainVideoUrl)
-  return `https://res.cloudinary.com/${cloudName}/video/fetch/${transformStr}${encodedMainUrl}`
+  return `https://res.cloudinary.com/${cloudName}/video/fetch/${prefix}${encodedMainUrl}`
+}
+
+// ============================================
+// Eager preparation via Cloudinary explicit API
+// ============================================
+
+function signCloudinaryParams(params: Record<string, string>, apiSecret: string): string {
+  const sorted = Object.keys(params).sort()
+  const toSign = sorted.map(k => `${k}=${params[k]}`).join("&") + apiSecret
+  return createHash("sha1").update(toSign).digest("hex")
+}
+
+interface PrepareCompositeOptions {
+  mainVideoUrl: string
+  sourceVideoUrl: string | null
+  sourceVideoAspectRatio?: "9:16" | "16:9" | "fill"
+  cloudName: string
+  apiKey: string
+  apiSecret: string
+}
+
+/**
+ * Pre-generates composite video downloads via Cloudinary's explicit API.
+ * Triggers eager_async processing for both with-PiP and without-PiP variants
+ * so the fetch URLs are cached when the user clicks download.
+ */
+export async function prepareCompositeDownload({
+  mainVideoUrl,
+  sourceVideoUrl,
+  sourceVideoAspectRatio = "fill",
+  cloudName,
+  apiKey,
+  apiSecret,
+}: PrepareCompositeOptions): Promise<void> {
+  // Build eager transformations for both variants
+  const eagerTransformations: string[] = []
+
+  // Variant 1: watermark only (no PiP)
+  const watermarkOnly = buildCompositeTransformation({ pipVideoUrl: null, showPip: false })
+  if (watermarkOnly) eagerTransformations.push(watermarkOnly)
+
+  // Variant 2: watermark + PiP (if source video available)
+  if (sourceVideoUrl) {
+    const withPip = buildCompositeTransformation({
+      pipVideoUrl: sourceVideoUrl,
+      showPip: true,
+      pipAspectRatio: sourceVideoAspectRatio,
+    })
+    if (withPip) eagerTransformations.push(withPip)
+  }
+
+  if (eagerTransformations.length === 0) return
+
+  const eager = eagerTransformations.join("|")
+  const timestamp = Math.floor(Date.now() / 1000).toString()
+
+  const params: Record<string, string> = {
+    eager,
+    eager_async: "true",
+    public_id: mainVideoUrl,
+    timestamp,
+    type: "fetch",
+  }
+
+  const signature = signCloudinaryParams(params, apiSecret)
+
+  const body = new URLSearchParams({
+    ...params,
+    api_key: apiKey,
+    signature,
+  })
+
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${cloudName}/video/explicit`,
+    { method: "POST", body },
+  )
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Cloudinary explicit API failed: ${res.status} ${text}`)
+  }
 }

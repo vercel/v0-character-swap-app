@@ -7,7 +7,7 @@ import { toWorkflowErrorObject } from "@/lib/workflow-errors"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { generationId: existingGenerationId, videoUrl, characterImageUrl, userId, userName, userEmail, characterName, sendEmail } = body
+    const { generationId: existingGenerationId, videoUrl, characterImageUrl, userId, userName, userEmail, characterName, sourceVideoAspectRatio, sendEmail } = body
 
     if (!videoUrl || !characterImageUrl) {
       return NextResponse.json(
@@ -54,6 +54,8 @@ export async function POST(request: NextRequest) {
       characterName: characterName || undefined,
       userName: userName || undefined,
       userEmail: sendEmail ? userEmail : undefined,
+      sourceVideoUrl: videoUrl,
+      sourceVideoAspectRatio: sourceVideoAspectRatio || "fill",
     }])
 
     // Store the workflow run ID so the UI can track progress

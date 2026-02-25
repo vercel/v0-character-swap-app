@@ -187,6 +187,7 @@ export function useVideoGeneration({
             userName: user.name,
             userEmail: user.email,
             characterName: character.name,
+            sourceVideoAspectRatio,
             sendEmail: sendEmail && user.email ? true : false,
           }),
         })

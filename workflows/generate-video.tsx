@@ -8,6 +8,8 @@ export interface GenerateVideoInput {
   characterName?: string
   userName?: string
   userEmail?: string
+  sourceVideoUrl?: string
+  sourceVideoAspectRatio?: "9:16" | "16:9" | "fill"
 }
 
 type ProviderErrorPayload = {
@@ -99,7 +101,7 @@ function buildProviderErrorPayload(details: string): ProviderErrorPayload {
 export async function generateVideoWorkflow(input: GenerateVideoInput) {
   "use workflow"
 
-  const { generationId, videoUrl, characterImageUrl, characterName, userName, userEmail } = input
+  const { generationId, videoUrl, characterImageUrl, characterName, userName, userEmail, sourceVideoUrl, sourceVideoAspectRatio } = input
 
   const workflowStartTime = Date.now()
   console.log(`[Workflow] [${new Date().toISOString()}] Starting generation ${generationId} via AI Gateway`)
@@ -129,6 +131,15 @@ export async function generateVideoWorkflow(input: GenerateVideoInput) {
     const emailStartTime = Date.now()
     await sendCompletionEmail(userEmail, blobUrl, characterName, userName)
     console.log(`[Workflow] [${new Date().toISOString()}] sendCompletionEmail took ${Date.now() - emailStartTime}ms`)
+  }
+
+  // Pre-generate composite downloads (watermark + PiP) via Cloudinary eager async
+  // Non-critical: if it fails, the prewarm hook on the client will handle it
+  try {
+    await prepareDownload(blobUrl, sourceVideoUrl || videoUrl, sourceVideoAspectRatio || "fill")
+    console.log(`[Workflow] [${new Date().toISOString()}] prepareDownload completed`)
+  } catch (prepErr) {
+    console.warn(`[Workflow] [${new Date().toISOString()}] prepareDownload failed (non-critical):`, prepErr)
   }
 
   const totalTime = Date.now() - workflowStartTime
@@ -311,6 +322,34 @@ async function markGenerationFailed(generationId: number, error: string): Promis
   const { updateGenerationFailed } = await import("@/lib/db")
   await updateGenerationFailed(generationId, error)
   console.log(`[Workflow Step] Marked generation ${generationId} as failed: ${error}`)
+}
+
+async function prepareDownload(
+  resultVideoUrl: string,
+  sourceVideoUrl: string,
+  sourceVideoAspectRatio: "9:16" | "16:9" | "fill",
+): Promise<void> {
+  "use step"
+
+  const { prepareCompositeDownload } = await import("@/lib/cloudinary")
+
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME
+  const apiKey = process.env.CLOUDINARY_API_KEY
+  const apiSecret = process.env.CLOUDINARY_API_SECRET
+  if (!cloudName || !apiKey || !apiSecret) {
+    console.warn("[Workflow Step] Cloudinary credentials not configured, skipping download preparation")
+    return
+  }
+
+  await prepareCompositeDownload({
+    mainVideoUrl: resultVideoUrl,
+    sourceVideoUrl,
+    sourceVideoAspectRatio,
+    cloudName,
+    apiKey,
+    apiSecret,
+  })
+  console.log(`[Workflow Step] Download preparation triggered for ${resultVideoUrl}`)
 }
 
 async function sendCompletionEmail(email: string, videoUrl: string, characterName?: string, userName?: string): Promise<void> {
