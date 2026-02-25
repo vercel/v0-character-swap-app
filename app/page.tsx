@@ -355,7 +355,7 @@ export default function Home() {
                 playsInline
                 preload="auto"
                 poster={allCharacters.find(c => c.id === selectedCharacter)?.src || undefined}
-                className="h-full w-full cursor-pointer object-contain"
+                className="h-full w-full cursor-pointer object-contain object-top"
                 onClick={(e) => {
                   const v = e.currentTarget
                   if (v.paused) v.play(); else v.pause()
