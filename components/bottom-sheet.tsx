@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useEffect, useCallback, type ReactNode } from "react"
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react"
 
 interface BottomSheetProps {
   peek: ReactNode
@@ -40,10 +40,24 @@ export function BottomSheet({
   const isExpandedRef = useRef(isExpanded)
   const internalChangeRef = useRef(false)
 
-  const expandedHeight = useRef(
-    typeof window !== "undefined" ? Math.round(window.innerHeight * 0.55) : 400,
+  const maxExpandedHeight = useRef(
+    typeof window !== "undefined" ? Math.round(window.innerHeight * 0.85) : 600,
   ).current
+  const [expandedHeight, setExpandedHeight] = useState(maxExpandedHeight)
   const maxOffset = expandedHeight - peekHeight
+
+  // Measure actual content height and size the sheet to fit
+  useEffect(() => {
+    const el = expandedRef.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => {
+      // Content height + handle (~36px) + bottom padding (~34px)
+      const contentH = entry.contentRect.height + 70
+      setExpandedHeight(Math.min(Math.max(contentH, peekHeight + 50), maxExpandedHeight))
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [maxExpandedHeight, peekHeight])
 
   // Apply current offset to DOM — no React involved
   const applyOffset = useCallback(
