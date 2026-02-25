@@ -41,7 +41,7 @@ export function BottomSheet({
   const internalChangeRef = useRef(false)
 
   const expandedHeight = useRef(
-    typeof window !== "undefined" ? Math.round(window.innerHeight * 0.5) : 400,
+    typeof window !== "undefined" ? Math.round(window.innerHeight * 0.7) : 400,
   ).current
   const maxOffset = expandedHeight - peekHeight
 
