@@ -19,6 +19,8 @@ interface UseVideoRecordingReturn {
   saveToSession: (video: Blob, characterId: number | null) => Promise<void>
   /** Get the raw video blob for upload */
   getVideoForUpload: () => Promise<Blob | null>
+  /** Wait for in-progress upload to finish, returns the URL or null */
+  waitForUpload: () => Promise<string | null>
 }
 
 export function useVideoRecording(): UseVideoRecordingReturn {
@@ -75,6 +77,16 @@ export function useVideoRecording(): UseVideoRecordingReturn {
   const getVideoForUpload = useCallback(async (): Promise<Blob | null> => {
     return recordedVideo
   }, [recordedVideo])
+
+  // Wait for in-progress upload to finish
+  const waitForUpload = useCallback(async (): Promise<string | null> => {
+    if (uploadedVideoUrl) return uploadedVideoUrl
+    try {
+      return await uploadPromiseRef.current
+    } catch {
+      return null
+    }
+  }, [uploadedVideoUrl])
 
   const handleVideoRecorded = useCallback((blob: Blob, _aspectRatio: "9:16" | "16:9" | "fill") => {
     // Validate file size
@@ -229,6 +241,7 @@ export function useVideoRecording(): UseVideoRecordingReturn {
     restoreFromSession,
     saveToSession,
     getVideoForUpload,
+    waitForUpload,
   }
 }
 

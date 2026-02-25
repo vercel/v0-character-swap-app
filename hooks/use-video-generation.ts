@@ -14,12 +14,13 @@ interface UseVideoGenerationOptions {
 
 interface UseVideoGenerationReturn {
   processVideo: (
-    getVideo: () => Promise<Blob | null>, 
-    character: Character, 
-    sendEmail: boolean, 
+    getVideo: () => Promise<Blob | null>,
+    character: Character,
+    sendEmail: boolean,
     preUploadedVideoUrl?: string | null,
     aspectRatio?: "9:16" | "16:9" | "fill",
-    sourceVideoAspectRatio?: "9:16" | "16:9" | "fill"
+    sourceVideoAspectRatio?: "9:16" | "16:9" | "fill",
+    waitForUpload?: () => Promise<string | null>
   ) => void
 }
 
@@ -80,7 +81,8 @@ export function useVideoGeneration({
     sendEmail: boolean,
     preUploadedVideoUrl?: string | null,
     aspectRatio: "9:16" | "16:9" | "fill" = "fill",
-    sourceVideoAspectRatio: "9:16" | "16:9" | "fill" = "fill"
+    sourceVideoAspectRatio: "9:16" | "16:9" | "fill" = "fill",
+    waitForUpload?: () => Promise<string | null>
   ) => {
     if (!user) {
       onLoginRequired()
@@ -155,8 +157,11 @@ export function useVideoGeneration({
           // If metadata read fails, proceed anyway — server will validate
         }
 
-        // 4. Upload video (skip if already uploaded)
+        // 4. Upload video (wait for in-progress upload, or upload now)
         let videoUrl = preUploadedVideoUrl
+        if (!videoUrl && waitForUpload) {
+          videoUrl = await waitForUpload()
+        }
         if (!videoUrl) {
           const videoBlob = await upload(`videos/${Date.now()}-recording.webm`, video, {
             access: "public",

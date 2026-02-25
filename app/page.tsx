@@ -101,6 +101,7 @@ export default function Home() {
     restoreFromSession,
     saveToSession,
     getVideoForUpload,
+    waitForUpload,
   } = useVideoRecording()
 
   // Video download hook
@@ -165,7 +166,7 @@ export default function Home() {
       // Use character image aspect ratio, not recorded video aspect ratio
       getCharacterAspectRatio(character.src).then(characterAspectRatio => {
         setTimeout(() => {
-          processVideo(getVideoForUpload, character, sendEmailNotification, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio)
+          processVideo(getVideoForUpload, character, sendEmailNotification, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio, waitForUpload)
         }, 100)
       })
     }
@@ -225,7 +226,7 @@ export default function Home() {
       // Use character image aspect ratio for generated video, but also pass recorded video aspect ratio
       const characterAspectRatio = await getCharacterAspectRatio(character.src)
       // Pass a function that will get the video when needed (allows immediate UI feedback)
-      processVideo(getVideoForUpload, character, sendEmailNotification, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio)
+      processVideo(getVideoForUpload, character, sendEmailNotification, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio, waitForUpload)
     }
   }, [recordedVideo, selectedCharacter, allCharacters, processVideo, uploadedVideoUrl, recordedAspectRatio, getVideoForUpload, trackCharacterUsage, sendEmailNotification])
 
