@@ -119,13 +119,40 @@ export function buildCompositeVideoUrl({
 }
 
 // ============================================
-// Eager preparation via Cloudinary explicit API
+// Eager preparation via Cloudinary Upload API
 // ============================================
 
 function signCloudinaryParams(params: Record<string, string>, apiSecret: string): string {
   const sorted = Object.keys(params).sort()
   const toSign = sorted.map(k => `${k}=${params[k]}`).join("&") + apiSecret
   return createHash("sha1").update(toSign).digest("hex")
+}
+
+/**
+ * Deterministic public_id from a Vercel Blob URL.
+ * Used to check if a video has been uploaded to Cloudinary.
+ */
+export function blobUrlToPublicId(blobUrl: string): string {
+  const hash = createHash("sha256").update(blobUrl).digest("hex").slice(0, 16)
+  return `faceswap/${hash}`
+}
+
+/**
+ * Builds a Cloudinary upload-based delivery URL (vs fetch-based).
+ * Used for videos that have been uploaded via prepareCompositeDownload.
+ */
+export function buildUploadCompositeUrl(options: {
+  publicId: string
+  pipVideoUrl: string | null
+  showPip: boolean
+  pipAspectRatio?: "9:16" | "16:9" | "fill"
+  cloudName: string
+  attachment?: boolean
+}): string {
+  const { publicId, cloudName, attachment = false, ...rest } = options
+  const transformStr = buildCompositeTransformation({ ...rest, attachment })
+  const prefix = transformStr ? transformStr + "/" : ""
+  return `https://res.cloudinary.com/${cloudName}/video/upload/${prefix}${publicId}.mp4`
 }
 
 interface PrepareCompositeOptions {
@@ -138,9 +165,11 @@ interface PrepareCompositeOptions {
 }
 
 /**
- * Pre-generates composite video downloads via Cloudinary's explicit API.
- * Triggers eager_async processing for both with-PiP and without-PiP variants
- * so the fetch URLs are cached when the user clicks download.
+ * Uploads the result video to Cloudinary and triggers eager_async processing
+ * for both download variants (watermark-only and watermark+PiP).
+ *
+ * Upload-based videos don't have the "too large to process synchronously"
+ * limit that fetch-based videos have.
  */
 export async function prepareCompositeDownload({
   mainVideoUrl,
@@ -149,7 +178,9 @@ export async function prepareCompositeDownload({
   cloudName,
   apiKey,
   apiSecret,
-}: PrepareCompositeOptions): Promise<void> {
+}: PrepareCompositeOptions): Promise<string> {
+  const publicId = blobUrlToPublicId(mainVideoUrl)
+
   // Build eager transformations for both variants
   const eagerTransformations: string[] = []
 
@@ -167,34 +198,40 @@ export async function prepareCompositeDownload({
     if (withPip) eagerTransformations.push(withPip)
   }
 
-  if (eagerTransformations.length === 0) return
-
   const eager = eagerTransformations.join("|")
   const timestamp = Math.floor(Date.now() / 1000).toString()
 
   const params: Record<string, string> = {
     eager,
     eager_async: "true",
-    public_id: mainVideoUrl,
+    overwrite: "false",
+    public_id: publicId,
+    resource_type: "video",
     timestamp,
-    type: "fetch",
   }
 
   const signature = signCloudinaryParams(params, apiSecret)
 
-  const body = new URLSearchParams({
-    ...params,
-    api_key: apiKey,
-    signature,
-  })
+  const formData = new FormData()
+  formData.append("file", mainVideoUrl)
+  for (const [k, v] of Object.entries(params)) {
+    if (k !== "resource_type") formData.append(k, v)
+  }
+  formData.append("api_key", apiKey)
+  formData.append("signature", signature)
 
   const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${cloudName}/video/explicit`,
-    { method: "POST", body },
+    `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`,
+    { method: "POST", body: formData },
   )
 
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`Cloudinary explicit API failed: ${res.status} ${text}`)
+    // "already exists" is fine — video was already uploaded
+    if (!text.includes("already exists")) {
+      throw new Error(`Cloudinary upload failed: ${res.status} ${text}`)
+    }
   }
+
+  return publicId
 }

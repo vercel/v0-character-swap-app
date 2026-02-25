@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { buildCompositeVideoUrl } from "@/lib/cloudinary"
+import { buildCompositeVideoUrl, blobUrlToPublicId, buildUploadCompositeUrl } from "@/lib/cloudinary"
 
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME
 
@@ -42,7 +42,24 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const url = buildCompositeVideoUrl({
+    // Try upload-based URL first (pre-processed via eager async, no size limit)
+    const publicId = blobUrlToPublicId(mainVideoUrl)
+    const uploadUrl = buildUploadCompositeUrl({
+      publicId,
+      pipVideoUrl: showPip ? pipVideoUrl : null,
+      showPip,
+      pipAspectRatio,
+      cloudName: CLOUD_NAME,
+    })
+
+    // Check if the video has been uploaded to Cloudinary
+    const check = await fetch(uploadUrl, { method: "HEAD" })
+    if (check.ok) {
+      return NextResponse.json({ url: uploadUrl })
+    }
+
+    // Fallback to fetch-based URL (works for smaller videos)
+    const fetchUrl = buildCompositeVideoUrl({
       mainVideoUrl,
       pipVideoUrl: showPip ? pipVideoUrl : null,
       showPip,
@@ -51,7 +68,7 @@ export async function GET(request: NextRequest) {
       attachment,
     })
 
-    return NextResponse.json({ url })
+    return NextResponse.json({ url: fetchUrl })
   } catch (error) {
     console.error("Failed to build Cloudinary URL:", error)
     return NextResponse.json(
