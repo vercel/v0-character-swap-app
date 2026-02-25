@@ -133,19 +133,31 @@ export function BottomSheet({
   )
 
   // Sync with prop changes (programmatic expand/collapse)
+  const prevExpandedRef = useRef(isExpanded)
   useEffect(() => {
     isExpandedRef.current = isExpanded
 
     // Skip if we triggered this change ourselves (already animating)
     if (internalChangeRef.current) {
       internalChangeRef.current = false
+      prevExpandedRef.current = isExpanded
       return
     }
 
+    const expandedChanged = prevExpandedRef.current !== isExpanded
+    prevExpandedRef.current = isExpanded
+
     if (!isDraggingRef.current) {
-      animateTo(isExpanded ? 0 : maxOffset)
+      if (expandedChanged) {
+        // Actual expand/collapse — animate
+        animateTo(isExpanded ? 0 : maxOffset)
+      } else if (!isExpanded) {
+        // maxOffset changed while collapsed (e.g. content resized) — snap silently
+        offsetRef.current = maxOffset
+        applyOffset(maxOffset)
+      }
     }
-  }, [isExpanded, maxOffset, animateTo])
+  }, [isExpanded, maxOffset, animateTo, applyOffset])
 
   // Touch handlers — registered once, use refs for all state
   useEffect(() => {
