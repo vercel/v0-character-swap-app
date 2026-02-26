@@ -217,7 +217,6 @@ async function generateAndSaveVideo(
     },
   })
 
-  console.log(`[Workflow Step] [${new Date().toISOString()}] Gateway auth: ${gatewayApiKey ? `api-key (${gatewayApiKey.substring(0, 8)}...)` : "oidc (no user key)"}`)
   console.log(`[Workflow Step] [${new Date().toISOString()}] Gateway created (+${Date.now() - stepStartTime}ms)`)
   console.log(`[Workflow Step] [${new Date().toISOString()}] Input: characterImageUrl=${characterImageUrl}, videoUrl=${klingVideoUrl}`)
 
