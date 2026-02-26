@@ -10,6 +10,7 @@ export interface GenerateVideoInput {
   userEmail?: string
   sourceVideoUrl?: string
   sourceVideoAspectRatio?: "9:16" | "16:9" | "fill"
+  gatewayApiKey?: string
 }
 
 type ProviderErrorPayload = {
@@ -101,7 +102,7 @@ function buildProviderErrorPayload(details: string): ProviderErrorPayload {
 export async function generateVideoWorkflow(input: GenerateVideoInput) {
   "use workflow"
 
-  const { generationId, videoUrl, characterImageUrl, characterName, userName, userEmail, sourceVideoUrl, sourceVideoAspectRatio } = input
+  const { generationId, videoUrl, characterImageUrl, characterName, userName, userEmail, sourceVideoUrl, sourceVideoAspectRatio, gatewayApiKey } = input
 
   const workflowStartTime = Date.now()
   console.log(`[Workflow] [${new Date().toISOString()}] Starting generation ${generationId} via AI Gateway`)
@@ -111,7 +112,7 @@ export async function generateVideoWorkflow(input: GenerateVideoInput) {
   let blobUrl: string
   try {
     const generateStartTime = Date.now()
-    blobUrl = await generateAndSaveVideo(generationId, videoUrl, characterImageUrl)
+    blobUrl = await generateAndSaveVideo(generationId, videoUrl, characterImageUrl, gatewayApiKey)
     const generateTime = Date.now() - generateStartTime
     console.log(`[Workflow] [${new Date().toISOString()}] Video generated and saved in ${generateTime}ms (${(generateTime / 1000).toFixed(1)}s)`)
   } catch (genError) {
@@ -156,6 +157,7 @@ async function generateAndSaveVideo(
   generationId: number,
   videoUrl: string,
   characterImageUrl: string,
+  gatewayApiKey?: string,
 ): Promise<string> {
   "use step"
 
@@ -197,7 +199,10 @@ async function generateAndSaveVideo(
 
   // Create a NEW Agent instance on each request (per official Vercel docs)
   // This ensures fresh connections without any stale state
+  // If the user has an AI Gateway API key, use it so credits come from their account.
+  // Otherwise, falls back to OIDC (project-level auth).
   const gateway = createGateway({
+    ...(gatewayApiKey ? { apiKey: gatewayApiKey } : {}),
     fetch: (url, init) => {
       const agent = new Agent({
         headersTimeout: 15 * 60 * 1000, // 15 minutes

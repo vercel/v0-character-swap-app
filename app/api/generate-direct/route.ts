@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { after } from "next/server"
 import { createGeneration, updateGenerationStartProcessing, updateGenerationRunId, updateGenerationComplete, updateGenerationFailed } from "@/lib/db"
+import { getSession } from "@/lib/auth"
 
 // This route runs the video generation DIRECTLY (no workflow).
 // Used to test whether the Workflow SDK step is causing the ~340s timeout.
@@ -49,6 +50,10 @@ export async function POST(request: NextRequest) {
 
     await updateGenerationRunId(generationId, `direct-${generationId}`)
 
+    // Read the user's AI Gateway API key before entering after() (cookies not available there)
+    const session = await getSession()
+    const userApiKey = session?.apiKey || undefined
+
     console.log(`[GenerateDirect] Starting direct generation ${generationId} (no workflow)`)
 
     // Run the generation in the background after sending the response.
@@ -58,7 +63,7 @@ export async function POST(request: NextRequest) {
         const startTime = Date.now()
         console.log(`[GenerateDirect] [${new Date().toISOString()}] Background generation starting for ${generationId}`)
 
-        const blobUrl = await generateAndSaveVideoDirect(generationId, videoUrl, characterImageUrl)
+        const blobUrl = await generateAndSaveVideoDirect(generationId, videoUrl, characterImageUrl, userApiKey)
 
         const elapsed = Date.now() - startTime
         console.log(`[GenerateDirect] [${new Date().toISOString()}] Generation ${generationId} completed in ${elapsed}ms (${(elapsed / 1000).toFixed(1)}s): ${blobUrl}`)
@@ -139,6 +144,7 @@ async function generateAndSaveVideoDirect(
   generationId: number,
   videoUrl: string,
   characterImageUrl: string,
+  gatewayApiKey?: string,
 ): Promise<string> {
   try {
     console.log(`[GenerateDirect] [${new Date().toISOString()}] generateAndSaveVideoDirect starting for generation ${generationId}`)
@@ -178,7 +184,10 @@ async function generateAndSaveVideoDirect(
 
     // Create a NEW Agent instance on each request (per official Vercel docs)
     // This ensures fresh connections without any stale state
+    // If the user has an AI Gateway API key, use it so credits come from their account.
+    // Otherwise, falls back to OIDC (project-level auth).
     const gateway = createGateway({
+      ...(gatewayApiKey ? { apiKey: gatewayApiKey } : {}),
       fetch: (url, init) => {
         const agent = new Agent({
           headersTimeout: 15 * 60 * 1000, // 15 minutes

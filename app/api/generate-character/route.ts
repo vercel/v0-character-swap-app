@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { generateText } from "ai"
+import { generateText, createGateway } from "ai"
+import { getSession } from "@/lib/auth"
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,10 +13,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Use the authenticated user's AI Gateway API key if available.
+    // Falls back to OIDC (project-level auth) for bare string model IDs.
+    const session = await getSession()
+    const userApiKey = session?.apiKey || undefined
+
+    // If user has an API key, create a scoped gateway so credits come from their account.
+    // Otherwise, use the bare string model ID which falls back to OIDC.
+    const model = userApiKey
+      ? createGateway({ apiKey: userApiKey })("google/gemini-3-pro-image")
+      : "google/gemini-3-pro-image"
+
     // Use AI Gateway with Nano Banana Pro (google/gemini-3-pro-image)
     // Optimized prompt for face swap compatibility - needs clear frontal face AND visible upper body
     const result = await generateText({
-      model: "google/gemini-3-pro-image",
+      model,
       prompt: `Professional portrait photograph of ${prompt}. 
 CRITICAL REQUIREMENTS for face swap compatibility:
 - Full head and complete upper body (shoulders, chest, arms) must be clearly visible in frame

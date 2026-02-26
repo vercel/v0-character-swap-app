@@ -3,6 +3,7 @@ import { start } from "workflow/api"
 import { generateVideoWorkflow } from "@/workflows/generate-video"
 import { createGeneration, updateGenerationStartProcessing, updateGenerationRunId } from "@/lib/db"
 import { toWorkflowErrorObject } from "@/lib/workflow-errors"
+import { getSession } from "@/lib/auth"
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,6 +45,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Read the user's AI Gateway API key (if authenticated)
+    const session = await getSession()
+    const userApiKey = session?.apiKey || undefined
+
     // Start the durable workflow via the Workflow SDK
     // Each step runs on its own request, avoiding the 5-minute serverless timeout
     // The .well-known/workflow/v1/step route has maxDuration=800 via vercel.json
@@ -56,6 +61,7 @@ export async function POST(request: NextRequest) {
       userEmail: sendEmail ? userEmail : undefined,
       sourceVideoUrl: videoUrl,
       sourceVideoAspectRatio: sourceVideoAspectRatio || "fill",
+      gatewayApiKey: userApiKey,
     }])
 
     // Store the workflow run ID so the UI can track progress
