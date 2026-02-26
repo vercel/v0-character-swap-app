@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     // Read the user's AI Gateway API key before entering after() (cookies not available there)
     const session = await getSession()
-    const userApiKey = session?.apiKey || undefined
+    const userApiKey = undefined // TEMP: use project-level OIDC
 
     console.log(`[GenerateDirect] Starting direct generation ${generationId} (no workflow)`)
 
