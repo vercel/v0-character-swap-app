@@ -15,6 +15,8 @@ import { useVideoDownload } from "@/hooks/use-video-download"
 import { STORAGE_KEYS } from "@/lib/constants"
 import { cn, detectImageAspectRatio } from "@/lib/utils"
 import { useCloudinaryPrewarm } from "@/hooks/use-cloudinary-prewarm"
+import { useCredits } from "@/hooks/use-credits"
+import { Coins } from "lucide-react"
 
 // Convert a Vercel Blob video URL to MP4 via Cloudinary (for cross-browser playback)
 function toMp4Url(url: string | null): string | null {
@@ -35,7 +37,7 @@ async function getCharacterAspectRatio(src: string): Promise<"9:16" | "16:9" | "
 }
 
 export default function Home() {
-  const { user, isLoading: authLoading, login, logout } = useAuth()
+  const { user, isLoading: authLoading, login, logout, hasApiKey } = useAuth()
   const isMobile = useIsMobile()
   
   // State
@@ -59,6 +61,10 @@ export default function Home() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [showUploadingWarning, setShowUploadingWarning] = useState(false)
   const [sendEmailNotification, setSendEmailNotification] = useState(false)
+  const [showBuyOptions, setShowBuyOptions] = useState(false)
+  const [buyAmount, setBuyAmount] = useState("")
+  const [purchasing, setPurchasing] = useState(false)
+  const [purchaseError, setPurchaseError] = useState<string | null>(null)
   const [expandedCharacter, setExpandedCharacter] = useState<{
     imageUrl: string
     id: number
@@ -124,6 +130,39 @@ export default function Home() {
   })
 
   const [errorToast, setErrorToast] = useState<string | null>(null)
+
+  // Credits / wallet
+  const { balance, creditsLoading, error: creditsError, refresh: refreshCredits } = useCredits()
+
+  const handleBuyCredits = useCallback(async (amount: number) => {
+    if (!amount || amount <= 0) return
+    setPurchasing(true)
+    setPurchaseError(null)
+    try {
+      const res = await fetch("/api/credits/buy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setPurchaseError(data.error || `Purchase failed (${res.status})`)
+        return
+      }
+      if (data.checkoutSessionUrl) {
+        window.location.href = data.checkoutSessionUrl
+        return
+      }
+      // Success without redirect — refresh balance and collapse
+      refreshCredits()
+      setShowBuyOptions(false)
+      setBuyAmount("")
+    } catch (err) {
+      setPurchaseError(err instanceof Error ? err.message : "An unexpected error occurred")
+    } finally {
+      setPurchasing(false)
+    }
+  }, [refreshCredits])
   
   const {
     processVideo,
@@ -282,6 +321,9 @@ export default function Home() {
   }, [recordedVideo, selectedCharacter, saveToSession, login])
 
   // Render helpers
+  const parsedBuyAmount = Number.parseFloat(buyAmount)
+  const isValidBuyAmount = buyAmount !== "" && Number.isFinite(parsedBuyAmount) && parsedBuyAmount > 0
+
   const renderAuthSection = (size: "desktop" | "mobile") => {
     // Invisible placeholder while auth resolves — same height, no flash
     if (!mounted || authLoading) {
@@ -290,14 +332,83 @@ export default function Home() {
 
     if (user) {
       return (
-        <div className="mb-4 flex items-center justify-between">
-          <span className="font-mono text-[11px] text-neutral-500">{user.name?.toLowerCase()}</span>
-          <button
-            onClick={logout}
-            className="font-mono text-[11px] text-neutral-600 transition-colors hover:text-white"
-          >
-            sign out
-          </button>
+        <div className="mb-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[11px] text-neutral-500">{user.name?.toLowerCase()}</span>
+            <button
+              onClick={logout}
+              className="font-mono text-[11px] text-neutral-600 transition-colors hover:text-white"
+            >
+              sign out
+            </button>
+          </div>
+          {/* Credits row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Coins className="h-3 w-3 text-yellow-500" />
+              {creditsLoading ? (
+                <span className="font-mono text-[11px] text-neutral-600">loading...</span>
+              ) : creditsError ? (
+                <span className="font-mono text-[11px] text-neutral-600">unavailable</span>
+              ) : (
+                <span className="font-mono text-[11px] tabular-nums text-neutral-400">
+                  ${Number.parseFloat(balance).toFixed(2)}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => { setShowBuyOptions(!showBuyOptions); setPurchaseError(null); setBuyAmount("") }}
+              className="font-mono text-[11px] text-neutral-600 transition-colors hover:text-white"
+            >
+              {showBuyOptions ? "cancel" : "buy"}
+            </button>
+          </div>
+          {/* Expandable buy presets + custom input */}
+          {showBuyOptions && (
+            <div className="space-y-2">
+              <div className="flex gap-1.5">
+                {[5, 10, 25, 50].map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => setBuyAmount(String(amount))}
+                    disabled={purchasing}
+                    className={`flex-1 rounded border py-1 font-mono text-[10px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                      buyAmount === String(amount)
+                        ? "border-neutral-500 text-white"
+                        : "border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-white"
+                    }`}
+                  >
+                    ${amount}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                <div className="relative flex-1">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 font-mono text-[10px] text-neutral-600">$</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="any"
+                    placeholder="0.00"
+                    value={buyAmount}
+                    onChange={(e) => { setBuyAmount(e.target.value); setPurchaseError(null) }}
+                    disabled={purchasing}
+                    className="w-full rounded border border-neutral-800 bg-transparent py-1 pl-5 pr-2 font-mono text-[10px] tabular-nums text-neutral-300 placeholder:text-neutral-700 focus:border-neutral-600 focus:outline-none disabled:opacity-40"
+                  />
+                </div>
+                <button
+                  onClick={() => handleBuyCredits(parsedBuyAmount)}
+                  disabled={!isValidBuyAmount || purchasing}
+                  className="rounded border border-neutral-800 px-3 py-1 font-mono text-[10px] text-neutral-400 transition-colors hover:border-neutral-600 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {purchasing ? "..." : "purchase"}
+                </button>
+              </div>
+              {purchaseError && (
+                <p className="font-mono text-[10px] text-red-400">{purchaseError}</p>
+              )}
+            </div>
+          )}
         </div>
       )
     }

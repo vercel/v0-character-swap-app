@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { setSession, getBaseUrl, getOAuthCookies, clearOAuthCookies } from "@/lib/auth"
+import { setSession, getBaseUrl, getOAuthCookies, clearOAuthCookies, getAuthenticatedUser } from "@/lib/auth"
+import { exchangePersonalAccessTokenForGatewayApiKey } from "@/lib/exchange-token"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -83,8 +84,29 @@ export async function GET(request: NextRequest) {
     }
     
     const userData = await userResponse.json()
+
+    // Fetch authenticated user to get teamId + exchange for AI Gateway API key
+    const authenticatedUser = await getAuthenticatedUser(accessToken)
+
+    let aiGatewayApiKey: string | undefined
+    let apiKeyObtainedAt: number | undefined
+
+    if (authenticatedUser?.teamId) {
+      try {
+        const exchangedKey = await exchangePersonalAccessTokenForGatewayApiKey({
+          personalAccessToken: accessToken,
+          teamId: authenticatedUser.teamId,
+        })
+        if (exchangedKey) {
+          aiGatewayApiKey = exchangedKey
+          apiKeyObtainedAt = Date.now()
+        }
+      } catch (error) {
+        console.error("Failed to get API key during login:", error)
+      }
+    }
     
-    // Create session
+    // Create session (encrypted via iron-session)
     await setSession({
       user: {
         id: userData.sub || userData.id,
@@ -93,6 +115,13 @@ export async function GET(request: NextRequest) {
         avatar: userData.picture,
       },
       accessToken,
+      refreshToken: tokenData.refresh_token,
+      teamId: authenticatedUser?.teamId,
+      apiKey: aiGatewayApiKey,
+      apiKeyObtainedAt,
+      expiresAt: tokenData.expires_in
+        ? Date.now() + tokenData.expires_in * 1000
+        : undefined,
     })
     
     // Clear OAuth cookies

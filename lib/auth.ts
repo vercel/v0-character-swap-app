@@ -1,5 +1,6 @@
 import { cookies } from "next/headers"
 import crypto from "node:crypto"
+import { getIronSessionData } from "./secure-session"
 
 export interface VercelUser {
   id: string
@@ -11,9 +12,13 @@ export interface VercelUser {
 export interface AuthSession {
   user: VercelUser
   accessToken: string
+  refreshToken?: string
+  teamId?: string
+  apiKey?: string
+  apiKeyObtainedAt?: number
+  expiresAt?: number
 }
 
-const SESSION_COOKIE = "vercel_session"
 const STATE_COOKIE = "oauth_state"
 const VERIFIER_COOKIE = "oauth_verifier"
 
@@ -44,18 +49,28 @@ export function getBaseUrl(): string {
   return "http://localhost:3000"
 }
 
+// ── Session management (backed by iron-session) ─────────────────────────
+
 export async function getSession(): Promise<AuthSession | null> {
-  const cookieStore = await cookies()
-  const sessionCookie = cookieStore.get(SESSION_COOKIE)
-  
-  if (!sessionCookie?.value) {
+  const session = await getIronSessionData()
+
+  if (!session.isLoggedIn || !session.email) {
     return null
   }
-  
-  try {
-    return JSON.parse(sessionCookie.value) as AuthSession
-  } catch {
-    return null
+
+  return {
+    user: {
+      id: session.userId || "",
+      email: session.email,
+      name: session.name || "",
+      avatar: session.picture,
+    },
+    accessToken: session.accessToken,
+    refreshToken: session.refreshToken,
+    teamId: session.teamId,
+    apiKey: session.apiKey,
+    apiKeyObtainedAt: session.apiKeyObtainedAt,
+    expiresAt: session.expiresAt,
   }
 }
 
@@ -63,21 +78,32 @@ export async function verifySession(): Promise<AuthSession | null> {
   return getSession()
 }
 
-export async function setSession(session: AuthSession): Promise<void> {
-  const cookieStore = await cookies()
-  cookieStore.set(SESSION_COOKIE, JSON.stringify(session), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 7, // 1 week
-    path: "/",
-  })
+export async function setSession(data: AuthSession): Promise<void> {
+  const session = await getIronSessionData()
+  session.userId = data.user.id
+  session.email = data.user.email
+  session.name = data.user.name
+  session.picture = data.user.avatar
+  session.accessToken = data.accessToken
+  session.refreshToken = data.refreshToken
+  session.teamId = data.teamId
+  session.apiKey = data.apiKey
+  session.apiKeyObtainedAt = data.apiKeyObtainedAt
+  session.expiresAt = data.expiresAt || 0
+  session.isLoggedIn = true
+  await session.save()
 }
 
 export async function clearSession(): Promise<void> {
+  const session = await getIronSessionData()
+  session.destroy()
+
+  // Also delete the old plain-text cookie from before the iron-session migration
   const cookieStore = await cookies()
-  cookieStore.delete(SESSION_COOKIE)
+  cookieStore.delete("vercel_session")
 }
+
+// ── OAuth utilities ─────────────────────────────────────────────────────
 
 export async function createAuthUrl(): Promise<string> {
   const clientId = process.env.NEXT_PUBLIC_VERCEL_APP_CLIENT_ID!
@@ -127,4 +153,59 @@ export async function clearOAuthCookies(): Promise<void> {
   const cookieStore = await cookies()
   cookieStore.delete(STATE_COOKIE)
   cookieStore.delete(VERIFIER_COOKIE)
+}
+
+// ── Vercel API helpers (for wallet / credits) ───────────────────────────
+
+// Fetch the authenticated user's info from Vercel API (includes defaultTeamId)
+export async function getAuthenticatedUser(accessToken: string) {
+  try {
+    const response = await fetch("https://api.vercel.com/v2/user", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+
+    if (!response.ok) return null
+
+    const data = await response.json()
+    return {
+      user: data.user,
+      teamId: data.user?.defaultTeamId || data.user?.id,
+    }
+  } catch (error) {
+    console.error("Error fetching authenticated user:", error)
+    return null
+  }
+}
+
+// Fetch team info (including slug for buy-credits URL)
+interface TeamResponse {
+  id: string
+  slug: string
+  name: string
+  [key: string]: unknown
+}
+
+export async function getUserTeam(
+  accessToken: string,
+  teamId: string,
+): Promise<TeamResponse | null> {
+  try {
+    const response = await fetch(`https://api.vercel.com/v2/teams/${teamId}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+
+    if (!response.ok) {
+      console.error("Error fetching team:", response.status, response.statusText)
+      return null
+    }
+
+    return (await response.json()) as TeamResponse
+  } catch (error) {
+    console.error("Error fetching user team:", error)
+    return null
+  }
 }

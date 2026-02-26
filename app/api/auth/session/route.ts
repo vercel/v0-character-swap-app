@@ -8,5 +8,9 @@ export async function GET() {
     return NextResponse.json({ user: null })
   }
   
-  return NextResponse.json({ user: session.user })
+  return NextResponse.json({
+    user: session.user,
+    teamId: session.teamId ?? null,
+    hasApiKey: !!session.apiKey,
+  })
 }
