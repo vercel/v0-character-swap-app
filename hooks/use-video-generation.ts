@@ -202,8 +202,9 @@ export function useVideoGeneration({
           throw new Error(getApiErrorMessage(errorData.error))
         }
 
-        // Refresh to show "processing" status
+        // Refresh to show "processing" status and updated credit balance
         window.dispatchEvent(new CustomEvent("refresh-generations"))
+        window.dispatchEvent(new CustomEvent("refresh-credits"))
         
       } catch (error) {
         console.error("Background processing failed:", error)

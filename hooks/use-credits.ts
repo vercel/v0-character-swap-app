@@ -36,7 +36,7 @@ export function useCredits() {
       return json
     },
     {
-      revalidateOnFocus: false,
+      revalidateOnFocus: true,
       revalidateOnReconnect: false,
       dedupingInterval: 5000,
     },
@@ -50,6 +50,13 @@ export function useCredits() {
       }
     }
   }, [])
+
+  // Listen for refresh-credits events (e.g. after video generation)
+  useEffect(() => {
+    const handleRefresh = () => creditsMutate()
+    window.addEventListener("refresh-credits", handleRefresh)
+    return () => window.removeEventListener("refresh-credits", handleRefresh)
+  }, [creditsMutate])
 
   return {
     credits: data ?? null,
