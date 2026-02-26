@@ -106,6 +106,8 @@ export async function GET(request: NextRequest) {
       }
     }
     
+    console.log(`[Auth Callback] API key exchange: ${aiGatewayApiKey ? "success" : "failed"}, teamId: ${authenticatedUser?.teamId || "none"}`)
+
     // Create session (encrypted via iron-session)
     await setSession({
       user: {

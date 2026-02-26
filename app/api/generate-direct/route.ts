@@ -202,6 +202,7 @@ async function generateAndSaveVideoDirect(
       },
     })
 
+    console.log(`[GenerateDirect] [${new Date().toISOString()}] Gateway auth: ${gatewayApiKey ? `api-key (${gatewayApiKey.substring(0, 8)}...)` : "oidc (no user key)"}`)
     console.log(`[GenerateDirect] [${new Date().toISOString()}] Setup done (+${Date.now() - stepStartTime}ms)`)
     console.log(`[GenerateDirect] [${new Date().toISOString()}] characterImageUrl=${characterImageUrl}, videoUrl=${klingVideoUrl}`)
 
