@@ -40,6 +40,7 @@ export const DEFAULT_CHARACTERS: Character[] = [
   { id: 7, src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/think-gpwwAFDFK6EWZ8V7ckfg6Gze8YEV5W.png", name: "Think", category: "memes" },
   { id: 8, src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/nano-banana-pro-image-editing-result%20%2850%29-MKnUP5YDwDFujPEfusSQ5edL6x815s.png", name: "Einstein", category: "celebs" },
   { id: 9, src: "/characters/fatma.png", name: "Fatma", category: "celebs" },
+  { id: 10, src: "/characters/felon.png", name: "Felon", category: "memes" },
 ]
 
 // ===========================================
