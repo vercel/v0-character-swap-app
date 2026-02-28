@@ -276,6 +276,11 @@ export default function Home() {
     if (!recordedVideo || !selectedCharacter) return
     const character = allCharacters.find(c => c.id === selectedCharacter)
     if (character) {
+      // Pause/mute the preview video so it doesn't play in the background
+      if (previewVideoRef.current) {
+        previewVideoRef.current.pause()
+        previewVideoRef.current.muted = true
+      }
       // Track character usage for popularity
       trackCharacterUsage(character.id)
       // Use character image aspect ratio for generated video, but also pass recorded video aspect ratio
@@ -635,7 +640,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-        ) : recordedVideoUrl ? (
+        ) : (recordedVideoUrl && showPreview) ? (
           <div 
             className="relative flex h-full w-full items-center justify-center bg-black"
             onClick={(e) => {
@@ -658,7 +663,6 @@ export default function Home() {
                 controls={!isUploading}
                 autoPlay
                 muted
-                loop
                 playsInline
                 preload="auto"
                 className="h-full w-full object-cover"
@@ -670,6 +674,13 @@ export default function Home() {
                   }
                   // Unmute after autoplay starts
                   video.muted = false
+                }}
+                onEnded={(e) => {
+                  // Manual loop: MediaRecorder blobs have mismatched audio/video durations
+                  // which causes audio to desync or repeat when using the loop attribute
+                  const video = e.currentTarget
+                  video.currentTime = 0
+                  video.play()
                 }}
               />
               {/* Upload indicator */}

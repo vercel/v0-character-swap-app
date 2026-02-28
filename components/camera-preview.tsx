@@ -204,11 +204,9 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     
     // Start recording
     try {
-      if (isSafari || isIOS) {
-        mediaRecorder.start() // No timeslice for Safari
-      } else {
-        mediaRecorder.start(1000) // 1 second chunks for Chrome
-      }
+      // No timeslice — recording in one chunk avoids audio discontinuities
+      // at chunk boundaries that cause desync/repeat around second 5-6
+      mediaRecorder.start()
     } catch (err) {
       console.error("MediaRecorder.start() failed:", err)
       alert("Failed to start recording. Please try again.")
