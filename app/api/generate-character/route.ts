@@ -33,7 +33,7 @@ COMPOSITION REQUIREMENTS for face swap compatibility:
 - Even, soft lighting on face with no harsh shadows
 - Sharp focus on facial features
 - Simple illustrated or solid color background
-- Character visible from head to at least waist level`,
+- Show as much of the character as the prompt implies — full body if described doing a full-body action or wearing a full outfit, upper body otherwise`,
     })
 
     const imageFile = result.files?.find((f) => f.mediaType?.startsWith("image/"))

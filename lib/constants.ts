@@ -31,6 +31,7 @@ export const DEFAULT_CHARACTERS: Character[] = [
   { id: 10, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/fairy-queen.png", name: "Fairy Queen" },
   { id: 11, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/warrior-queen.png", name: "Warrior Queen" },
   { id: 12, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/dark-elf-empress.png", name: "Dark Elf Empress" },
+  { id: 13, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/A%20pirate%20cat%20standin-2PUt9DWEP8rjgCkZngT57NY7uM9eaq.png", name: "Pirate Cat" },
 ]
 
 // ===========================================
