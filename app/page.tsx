@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react"
 import Image from "next/image"
 import { CameraPreview } from "@/components/camera-preview"
-import { CharacterGrid, DEFAULT_CHARACTERS } from "@/components/character-grid"
+import { CharacterGrid } from "@/components/character-grid"
 import { useAuth } from "@/components/auth-provider"
 import { BottomSheet } from "@/components/bottom-sheet"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -79,19 +79,12 @@ export default function Home() {
   // Custom hooks
   const {
     customCharacters,
-    hiddenDefaultIds,
     selectedCharacter,
     setSelectedCharacter,
     addCustomCharacter,
     deleteCustomCharacter,
-    hideDefaultCharacter,
-    visibleDefaultCharacters,
     allCharacters,
     trackCharacterUsage,
-    selectedCategory,
-    setSelectedCategory,
-    filteredCharacters,
-    updateCustomCharacterCategory,
     isReady: charactersReady,
   } = useCharacters({ user, authLoading })
 
@@ -183,13 +176,13 @@ export default function Home() {
   // Initialize and restore session state
   useEffect(() => {
     setMounted(true)
-    
+
     const savedCharacter = sessionStorage.getItem(STORAGE_KEYS.PENDING_CHARACTER)
     if (savedCharacter) {
       setSelectedCharacter(Number(savedCharacter))
       sessionStorage.removeItem(STORAGE_KEYS.PENDING_CHARACTER)
     }
-    
+
     restoreFromSession().then(({ shouldAutoSubmit }) => {
       if (shouldAutoSubmit) {
         setPendingAutoSubmit(true)
@@ -197,11 +190,33 @@ export default function Home() {
     })
   }, [restoreFromSession, setSelectedCharacter])
 
+  // After login, restore pending character that was generated without auth
+  const restoredPendingChar = useRef(false)
+  useEffect(() => {
+    if (restoredPendingChar.current || !user || !charactersReady) return
+    const raw = sessionStorage.getItem("pendingCharacterData")
+    if (!raw) return
+    restoredPendingChar.current = true
+    sessionStorage.removeItem("pendingCharacterData")
+    try {
+      const { src, name } = JSON.parse(raw)
+      if (src) {
+        addCustomCharacter({ id: Date.now(), src, name: name || "Generated" })
+      }
+    } catch {}
+  }, [user, charactersReady, addCustomCharacter])
+
   // Auto-submit generation after login
   useEffect(() => {
-    if (pendingAutoSubmit && user && recordedVideo && selectedCharacter) {
-      const character = allCharacters.find(c => c.id === selectedCharacter)
-      if (!character) return // Wait for characters to load (custom chars need auth fetch)
+    if (pendingAutoSubmit && user && recordedVideo) {
+      // Find the selected character, or fall back to the most recently added custom character
+      // (the pending character was re-created with a new ID after login)
+      let character = selectedCharacter ? allCharacters.find(c => c.id === selectedCharacter) : null
+      if (!character && customCharacters.length > 0) {
+        character = customCharacters[customCharacters.length - 1]
+        setSelectedCharacter(character.id)
+      }
+      if (!character) return // Wait for characters to load
       setPendingAutoSubmit(false)
       // Use character image aspect ratio, not recorded video aspect ratio
       getCharacterAspectRatio(character.src).then(characterAspectRatio => {
@@ -210,7 +225,7 @@ export default function Home() {
         }, 100)
       })
     }
-  }, [pendingAutoSubmit, user, recordedVideo, selectedCharacter, allCharacters, processVideo, uploadedVideoUrl, getVideoForUpload, recordedAspectRatio, sendEmailNotification])
+  }, [pendingAutoSubmit, user, recordedVideo, selectedCharacter, allCharacters, customCharacters, setSelectedCharacter, processVideo, uploadedVideoUrl, getVideoForUpload, recordedAspectRatio, sendEmailNotification])
 
   // Simulate upload progress over ~20 seconds
   useEffect(() => {
@@ -314,11 +329,19 @@ export default function Home() {
 
   const handleLoginAndContinue = useCallback(async () => {
     setIsLoggingIn(true)
+    // Save the selected character's full data so we can restore it after login
+    // (AI-generated characters aren't in DB yet if user wasn't authenticated)
+    if (selectedCharacter) {
+      const char = allCharacters.find(c => c.id === selectedCharacter)
+      if (char) {
+        sessionStorage.setItem("pendingCharacterData", JSON.stringify({ src: char.src, name: char.name }))
+      }
+    }
     if (recordedVideo) {
       await saveToSession(recordedVideo, selectedCharacter)
     }
     login()
-  }, [recordedVideo, selectedCharacter, saveToSession, login])
+  }, [recordedVideo, selectedCharacter, allCharacters, saveToSession, login])
 
   // Render helpers
   const parsedBuyAmount = Number.parseFloat(buyAmount)
@@ -466,7 +489,7 @@ export default function Home() {
                 playsInline
                 preload="auto"
                 poster={allCharacters.find(c => c.id === selectedCharacter)?.src || undefined}
-                className="h-full w-full cursor-pointer object-contain object-top"
+                className="h-full w-full cursor-pointer object-contain object-center"
                 onClick={(e) => {
                   const v = e.currentTarget
                   if (v.paused) v.play(); else v.pause()
@@ -697,21 +720,15 @@ export default function Home() {
                 <CharacterGrid
                   selectedId={selectedCharacter}
                   onSelect={setSelectedCharacter}
-                  customCharacters={customCharacters}
+                  customCharacters={charactersReady ? customCharacters : []}
                   onAddCustom={addCustomCharacter}
                   onDeleteCustom={deleteCustomCharacter}
-                  hiddenDefaultIds={hiddenDefaultIds}
-                  onHideDefault={hideDefaultCharacter}
                   onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
                   canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
                   hasVideo={!!recordedVideo}
                   hasCharacter={!!selectedCharacter}
                   onGenerate={handleProcess}
                   onRetake={() => { setShowPreview(false); clearRecording() }}
-                  selectedCategory={selectedCategory}
-                  onCategoryChange={setSelectedCategory}
-                  filteredCharacters={charactersReady ? filteredCharacters : []}
-                  onUpdateCharacterCategory={updateCustomCharacterCategory}
                   sendEmail={sendEmailNotification}
                   onSendEmailChange={setSendEmailNotification}
                   userEmail={user?.email}
@@ -770,30 +787,30 @@ export default function Home() {
                   Select Character
                 </p>
                 <div className="flex gap-1 overflow-x-auto pb-1">
-                  {[...visibleDefaultCharacters, ...customCharacters].slice(0, 8).map((char) => (
+                    {allCharacters.slice(0, 8).map((char) => (
+                      <button
+                        key={char.id}
+                        onClick={() => {
+                          setSelectedCharacter(char.id)
+                          if (recordedVideo) setBottomSheetExpanded(true)
+                        }}
+                        className={cn(
+                          "relative h-12 w-9 shrink-0 overflow-hidden rounded",
+                          selectedCharacter === char.id ? "ring-2 ring-white" : "ring-1 ring-neutral-800"
+                        )}
+                      >
+                        <Image src={char.src || "/placeholder.svg"} alt={char.name} fill className="object-cover" sizes="36px" />
+                      </button>
+                    ))}
                     <button
-                      key={char.id}
-                      onClick={() => {
-                        setSelectedCharacter(char.id)
-                        if (recordedVideo) setBottomSheetExpanded(true)
-                      }}
-                      className={cn(
-                        "relative h-12 w-9 shrink-0 overflow-hidden rounded",
-                        selectedCharacter === char.id ? "ring-2 ring-white" : "ring-1 ring-neutral-800"
-                      )}
+                      onClick={() => setBottomSheetExpanded(true)}
+                      className="flex h-12 w-9 shrink-0 items-center justify-center rounded border border-dashed border-neutral-700"
                     >
-                      <Image src={char.src || "/placeholder.svg"} alt={char.name} fill className="object-cover" sizes="36px" />
+                      <svg className="h-3 w-3 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                      </svg>
                     </button>
-                  ))}
-                  <button
-                    onClick={() => setBottomSheetExpanded(true)}
-                    className="flex h-12 w-9 shrink-0 items-center justify-center rounded border border-dashed border-neutral-700"
-                  >
-                    <svg className="h-3 w-3 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                    </svg>
-                  </button>
-                </div>
+                  </div>
               </>
             )
           }
@@ -824,21 +841,15 @@ export default function Home() {
               <CharacterGrid
                 selectedId={selectedCharacter}
                 onSelect={setSelectedCharacter}
-                customCharacters={customCharacters}
+                customCharacters={charactersReady ? customCharacters : []}
                 onAddCustom={addCustomCharacter}
                 onDeleteCustom={deleteCustomCharacter}
-                hiddenDefaultIds={hiddenDefaultIds}
-                onHideDefault={hideDefaultCharacter}
                 onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
                 canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
                 hasVideo={!!recordedVideo}
                 hasCharacter={!!selectedCharacter}
                 onGenerate={handleProcess}
                 onRetake={() => { setShowPreview(false); clearRecording() }}
-                selectedCategory={selectedCategory}
-                onCategoryChange={setSelectedCategory}
-                filteredCharacters={charactersReady ? filteredCharacters : []}
-                onUpdateCharacterCategory={updateCustomCharacterCategory}
                 sendEmail={sendEmailNotification}
                 onSendEmailChange={setSendEmailNotification}
                 userEmail={user?.email}
@@ -848,21 +859,15 @@ export default function Home() {
             <CharacterGrid
               selectedId={selectedCharacter}
               onSelect={setSelectedCharacter}
-              customCharacters={customCharacters}
+              customCharacters={charactersReady ? customCharacters : []}
               onAddCustom={addCustomCharacter}
               onDeleteCustom={deleteCustomCharacter}
-              hiddenDefaultIds={hiddenDefaultIds}
-              onHideDefault={hideDefaultCharacter}
               onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
               canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
               hasVideo={!!recordedVideo}
               hasCharacter={!!selectedCharacter}
               onGenerate={handleProcess}
               onRetake={() => { setShowPreview(false); clearRecording() }}
-              selectedCategory={selectedCategory}
-              onCategoryChange={setSelectedCategory}
-              filteredCharacters={charactersReady ? filteredCharacters : []}
-              onUpdateCharacterCategory={updateCustomCharacterCategory}
               sendEmail={sendEmailNotification}
               onSendEmailChange={setSendEmailNotification}
               userEmail={user?.email}

@@ -13,19 +13,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Use project-level OIDC auth (env-based API key)
+    // Cartoon-only prompt — no photorealistic images or real people
     const result = await generateText({
       model: "google/gemini-3-pro-image",
-      prompt: `Professional portrait photograph of ${prompt}. 
-CRITICAL REQUIREMENTS for face swap compatibility:
-- Full head and complete upper body (shoulders, chest, arms) must be clearly visible in frame
-- Face looking directly at camera, frontal view, no profile angles
+      prompt: `Create a cartoon character illustration of ${prompt}.
+
+STYLE REQUIREMENTS - MANDATORY:
+- Art style MUST be 3D animated in the style of Pixar/Disney — smooth, rounded shapes, soft subsurface scattering on skin, big expressive eyes, slightly exaggerated proportions
+- Render quality should look like a still frame from a Pixar movie
+- NEVER generate a photorealistic image or photograph
+- NEVER generate a real person, celebrity, politician, or any recognizable public figure
+- The character must be clearly fictional and illustrated
+- If the description sounds like a real person, create an original Pixar-style cartoon character inspired by the concept instead
+
+COMPOSITION REQUIREMENTS for face swap compatibility:
+- Full head and complete upper body (shoulders, chest, arms) clearly visible
+- Face looking directly at viewer, frontal view, no profile angles
 - Face completely unobstructed - no sunglasses, masks, hands covering face, or hair covering face
 - Even, soft lighting on face with no harsh shadows
 - Sharp focus on facial features
-- Photorealistic style, like a real photograph
-- Subject should be standing or sitting with relaxed pose
-- Plain or softly blurred background
-- The person should appear from head to at least waist level`,
+- Simple illustrated or solid color background
+- Character visible from head to at least waist level`,
     })
 
     const imageFile = result.files?.find((f) => f.mediaType?.startsWith("image/"))

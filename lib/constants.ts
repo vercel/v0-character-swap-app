@@ -1,4 +1,4 @@
-import type { Character, CharacterCategory } from "./types"
+import type { Character } from "./types"
 
 // ===========================================
 // Video Constraints
@@ -15,32 +15,22 @@ export const MIN_VIDEO_DURATION = 4 // seconds - KlingAI requires >=3s, buffer f
 export const MIN_IMAGE_DIMENSION = 340 // pixels - KlingAI minimum
 
 // ===========================================
-// Character Categories
-// ===========================================
-
-export const CHARACTER_CATEGORIES: { id: CharacterCategory | "all"; label: string }[] = [
-  { id: "popular", label: "popular" },
-  { id: "memes", label: "memes" },
-  { id: "cartoons", label: "cartoons" },
-  { id: "celebs", label: "celebs" },
-  { id: "all", label: "all" },
-]
-
-// ===========================================
 // Default Characters
 // ===========================================
 
 export const DEFAULT_CHARACTERS: Character[] = [
-  { id: 1, src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/jdvance-oKoVK6voLTrIRvXMDVyb7Ixo1hiqOf.png", name: "JD Vance", category: "memes" },
-  { id: 2, src: "/characters/leodc.png", name: "Django", category: "celebs" },
-  { id: 3, src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/aliens-rPpxM5sHYuGsDnqZcvSH8AWxQiTqXw.png", name: "Aliens", category: "memes" },
-  { id: 4, src: "/characters/dolly.png", name: "Dolly Parton", category: "celebs" },
-  { id: 5, src: "/characters/aubrey.png", name: "Aubrey Plaza", category: "celebs" },
-  { id: 6, src: "/characters/donald.png", name: "Donald Trump", category: "celebs" },
-  { id: 7, src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/think-gpwwAFDFK6EWZ8V7ckfg6Gze8YEV5W.png", name: "Think", category: "memes" },
-  { id: 8, src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/nano-banana-pro-image-editing-result%20%2850%29-MKnUP5YDwDFujPEfusSQ5edL6x815s.png", name: "Einstein", category: "celebs" },
-  { id: 9, src: "/characters/fatma.png", name: "Fatma", category: "celebs" },
-  { id: 10, src: "/characters/felon.png", name: "Felon", category: "memes" },
+  { id: 1, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/firefighter.png", name: "Firefighter" },
+  { id: 2, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/vampire-girl.png", name: "Vampire Girl" },
+  { id: 3, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/hacker-grandma.png", name: "Hacker Grandma" },
+  { id: 4, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/alien-chef.png", name: "Alien Chef" },
+  { id: 5, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/disco-robot.png", name: "Disco Robot" },
+  { id: 6, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/grumpy-wizard.png", name: "Grumpy Wizard" },
+  { id: 7, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/knight-princess.png", name: "Knight Princess" },
+  { id: 8, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/space-pirate.png", name: "Space Pirate" },
+  { id: 9, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/wise-king.png", name: "Wise King" },
+  { id: 10, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/fairy-queen.png", name: "Fairy Queen" },
+  { id: 11, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/warrior-queen.png", name: "Warrior Queen" },
+  { id: 12, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/dark-elf-empress.png", name: "Dark Elf Empress" },
 ]
 
 // ===========================================
@@ -48,7 +38,6 @@ export const DEFAULT_CHARACTERS: Character[] = [
 // ===========================================
 
 export const STORAGE_KEYS = {
-  HIDDEN_CHARACTERS: "hiddenDefaultCharacters",
   PENDING_CHARACTER: "pendingCharacter",
   PENDING_VIDEO_URL: "pendingVideoUrl",
   PENDING_UPLOADED: "pendingUploaded",

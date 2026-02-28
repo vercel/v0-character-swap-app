@@ -1,17 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import type { Character, User, ReferenceImage, CharacterCategory } from "@/lib/types"
-import { STORAGE_KEYS, CUSTOM_CHARACTER_ID_OFFSET, DEFAULT_CHARACTERS } from "@/lib/constants"
-
-// Preload optimized grid thumbnails into browser cache
-function preloadImages(urls: string[]) {
-  urls.forEach(url => {
-    const img = new window.Image()
-    // Local images don't need optimization, remote ones go through Next.js
-    img.src = url.startsWith("/") ? url : `/_next/image?url=${encodeURIComponent(url)}&w=128&q=75`
-  })
-}
+import { useState, useEffect, useCallback } from "react"
+import type { Character, User, ReferenceImage } from "@/lib/types"
+import { CUSTOM_CHARACTER_ID_OFFSET, DEFAULT_CHARACTERS } from "@/lib/constants"
 
 interface UseCharactersOptions {
   user: User | null
@@ -20,81 +11,19 @@ interface UseCharactersOptions {
 
 interface UseCharactersReturn {
   customCharacters: Character[]
-  hiddenDefaultIds: number[]
   selectedCharacter: number | null
   setSelectedCharacter: (id: number | null) => void
   addCustomCharacter: (character: Character) => Promise<void>
   deleteCustomCharacter: (id: number) => Promise<void>
-  hideDefaultCharacter: (id: number) => void
-  visibleDefaultCharacters: Character[]
   allCharacters: Character[]
   trackCharacterUsage: (characterId: number) => void
-  selectedCategory: CharacterCategory | "all"
-  setSelectedCategory: (category: CharacterCategory | "all") => void
-  filteredCharacters: Character[]
-  updateCustomCharacterCategory: (characterId: number, category: CharacterCategory) => void
   isReady: boolean
 }
 
 export function useCharacters({ user, authLoading = false }: UseCharactersOptions): UseCharactersReturn {
   const [customCharacters, setCustomCharacters] = useState<Character[]>([])
-  const [hiddenDefaultIds, setHiddenDefaultIds] = useState<number[]>([])
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null)
-  const [usageMap, setUsageMap] = useState<Record<string, number>>({})
-  const [selectedCategory, setSelectedCategory] = useState<CharacterCategory | "all">("popular")
-  const [approvedCharacters, setApprovedCharacters] = useState<Character[]>([])
-  const [approvedLoaded, setApprovedLoaded] = useState(false)
-  const [usageLoaded, setUsageLoaded] = useState(false)
   const [customLoaded, setCustomLoaded] = useState(false)
-
-  // Preload default character images immediately
-  const preloadedDefaults = useRef(false)
-  useEffect(() => {
-    if (!preloadedDefaults.current) {
-      preloadedDefaults.current = true
-      preloadImages(DEFAULT_CHARACTERS.map(c => c.src))
-    }
-  }, [])
-
-  // Load hidden default characters from localStorage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.HIDDEN_CHARACTERS)
-      if (stored) {
-        setHiddenDefaultIds(JSON.parse(stored))
-      }
-    } catch {
-      // Gracefully handle incognito/disabled localStorage
-    }
-  }, [])
-
-  // Fetch character usage stats and approved characters in parallel
-  useEffect(() => {
-    fetch("/api/character-usage")
-      .then(res => res.json())
-      .then(data => {
-        if (data.usage) setUsageMap(data.usage)
-      })
-      .catch(console.error)
-      .finally(() => setUsageLoaded(true))
-
-    fetch("/api/approved-characters")
-      .then(res => res.json())
-      .then(data => {
-        if (data.characters) {
-          const approved = data.characters.map((c: { id: number; image_url: string; suggested_name: string | null; suggested_category: string | null }, i: number) => ({
-            id: 5000 + c.id,
-            src: c.image_url,
-            name: c.suggested_name || `Community ${i + 1}`,
-            category: c.suggested_category as CharacterCategory,
-          }))
-          setApprovedCharacters(approved)
-          preloadImages(approved.map((c: Character) => c.src))
-        }
-      })
-      .catch(console.error)
-      .finally(() => setApprovedLoaded(true))
-  }, [])
 
   // Load user's reference images from database
   // Wait for auth to resolve before marking custom as loaded
@@ -106,15 +35,13 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
         .then(res => res.json())
         .then(data => {
           if (data.images) {
-            const loadedCharacters: Character[] = data.images.map((img: ReferenceImage & { category?: string }) => ({
+            const loadedCharacters: Character[] = data.images.map((img: ReferenceImage) => ({
               id: CUSTOM_CHARACTER_ID_OFFSET + img.id,
               name: img.name,
               src: img.image_url,
               dbId: img.id,
-              category: img.category as CharacterCategory | undefined,
             }))
             setCustomCharacters(loadedCharacters)
-            preloadImages(loadedCharacters.map(c => c.src))
           }
         })
         .catch(console.error)
@@ -156,7 +83,7 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
 
   const deleteCustomCharacter = useCallback(async (id: number) => {
     const character = customCharacters.find(c => c.id === id)
-    
+
     if (character?.dbId) {
       try {
         await fetch(`/api/reference-images/${character.dbId}`, {
@@ -167,23 +94,12 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
         console.error("Failed to delete reference image:", error)
       }
     }
-    
+
     setCustomCharacters(prev => prev.filter(c => c.id !== id))
     if (selectedCharacter === id) {
       setSelectedCharacter(null)
     }
   }, [selectedCharacter, customCharacters])
-
-  const hideDefaultCharacter = useCallback((id: number) => {
-    setHiddenDefaultIds(prev => {
-      const newHidden = [...prev, id]
-      try { localStorage.setItem(STORAGE_KEYS.HIDDEN_CHARACTERS, JSON.stringify(newHidden)) } catch {}
-      return newHidden
-    })
-    if (selectedCharacter === id) {
-      setSelectedCharacter(null)
-    }
-  }, [selectedCharacter])
 
   // Track character usage (call when generating video)
   const trackCharacterUsage = useCallback((characterId: number) => {
@@ -192,91 +108,20 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ characterId: String(characterId) }),
     }).catch(console.error)
-    
-    // Update local state optimistically
-    setUsageMap(prev => ({
-      ...prev,
-      [String(characterId)]: (prev[String(characterId)] || 0) + 1,
-    }))
   }, [])
 
-  // Update custom character category (when user shares it)
-  const updateCustomCharacterCategory = useCallback((characterId: number, category: CharacterCategory) => {
-    // Find the character to get its dbId
-    const character = customCharacters.find(c => c.id === characterId)
-    
-    // Update local state immediately
-    setCustomCharacters(prev =>
-      prev.map(c => c.id === characterId ? { ...c, category } : c)
-    )
-    
-    // Persist to database if the character has a dbId
-    if (character?.dbId) {
-      fetch(`/api/reference-images/${character.dbId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ category }),
-      }).catch(console.error)
-    }
-  }, [customCharacters])
+  const allCharacters = [...DEFAULT_CHARACTERS, ...customCharacters]
 
-  // Add usage count to characters and sort by popularity
-  const charactersWithUsage = DEFAULT_CHARACTERS.map(c => ({
-    ...c,
-    usageCount: usageMap[String(c.id)] || 0,
-  }))
-
-  const visibleDefaultCharacters = charactersWithUsage.filter(
-    c => !hiddenDefaultIds.includes(c.id)
-  )
-
-  // Get URLs of custom characters to filter out duplicates from approved
-  // Normalize URLs by removing query params and extracting just the path
-  const normalizeUrl = (url: string) => {
-    try {
-      const u = new URL(url)
-      return u.pathname
-    } catch {
-      return url
-    }
-  }
-  const customCharacterUrls = new Set(customCharacters.map(c => normalizeUrl(c.src)))
-  
-  // Filter approved characters to exclude ones that are already in custom characters (same image URL)
-  const filteredApprovedCharacters = approvedCharacters.filter(
-    c => !customCharacterUrls.has(normalizeUrl(c.src))
-  )
-
-  const allCharacters = [...visibleDefaultCharacters, ...filteredApprovedCharacters, ...customCharacters]
-
-  // Filter characters by category
-  // Custom characters are ALWAYS shown regardless of category filter
-  const customCharacterIds = new Set(customCharacters.map(c => c.id))
-  
-  const filteredCharacters = selectedCategory === "popular"
-    ? [...allCharacters].sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0))
-    : selectedCategory === "all"
-    ? allCharacters
-    : allCharacters.filter(c => c.category === selectedCategory || customCharacterIds.has(c.id))
-
-  const isReady = approvedLoaded && usageLoaded && customLoaded
+  const isReady = customLoaded
 
   return {
     customCharacters,
-    hiddenDefaultIds,
     selectedCharacter,
     setSelectedCharacter,
     addCustomCharacter,
     deleteCustomCharacter,
-    hideDefaultCharacter,
-    visibleDefaultCharacters,
     allCharacters,
     trackCharacterUsage,
-    selectedCategory,
-    setSelectedCategory,
-    filteredCharacters,
-    updateCustomCharacterCategory,
     isReady,
   }
 }

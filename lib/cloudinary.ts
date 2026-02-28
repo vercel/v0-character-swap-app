@@ -39,7 +39,7 @@ function base64UrlEncode(url: string): string {
 export function buildMp4ConversionUrl(blobUrl: string, cloudName: string): string {
   validateBlobUrl(blobUrl)
   const encodedUrl = encodeURIComponent(blobUrl)
-  return `https://res.cloudinary.com/${cloudName}/video/fetch/f_mp4,vc_h264,ac_aac/${encodedUrl}`
+  return `https://res.cloudinary.com/${cloudName}/video/fetch/f_mp4,vc_h264,ac_aac,eo_auto/${encodedUrl}`
 }
 
 interface CompositeVideoOptions {
