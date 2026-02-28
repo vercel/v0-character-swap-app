@@ -5,7 +5,7 @@ import type { Character } from "./types"
 // ===========================================
 
 export const MAX_VIDEO_SIZE = 50 * 1024 * 1024 // 50MB
-export const MAX_VIDEO_DURATION = 25 // seconds - KlingAI limit via AI Gateway
+export const MAX_VIDEO_DURATION = 30 // seconds - KlingAI limit via AI Gateway
 export const MIN_VIDEO_DURATION = 4 // seconds - KlingAI requires >=3s, buffer for MP4 conversion
 
 // ===========================================
