@@ -12,12 +12,20 @@ function thumbUrl(src: string): string {
   return `/_next/image?url=${encodeURIComponent(src)}&w=256&q=75`
 }
 
+// Generate a video poster thumbnail via Cloudinary (single frame, tiny image)
+function videoThumbUrl(videoUrl: string): string | null {
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  if (!cloudName || !videoUrl.includes(".public.blob.vercel-storage.com")) return null
+  return `https://res.cloudinary.com/${cloudName}/video/fetch/w_128,h_128,c_fill,so_1,f_jpg,q_60/${encodeURIComponent(videoUrl)}`
+}
+
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 interface ShowcaseVideo {
   video_url: string
   character_image_url: string | null
   character_name: string | null
+  source_video_url: string | null
   aspect_ratio: string
 }
 
@@ -132,7 +140,7 @@ export function SidebarStrip({ onSelectVideo, onSelectError, onBuyCredits }: Sid
               <button
                 key={i}
                 className="group relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-neutral-50 ring-1 ring-neutral-200"
-                onClick={() => onSelectVideo(vid.video_url, null, "fill", (vid.aspect_ratio as "9:16" | "16:9" | "fill") || "fill")}
+                onClick={() => onSelectVideo(vid.video_url, vid.source_video_url, "fill", (vid.aspect_ratio as "9:16" | "16:9" | "fill") || "fill")}
                 onMouseEnter={(e) => {
                   const video = e.currentTarget.querySelector("video")
                   video?.play()
@@ -142,16 +150,15 @@ export function SidebarStrip({ onSelectVideo, onSelectError, onBuyCredits }: Sid
                   if (video) { video.pause(); video.currentTime = 0 }
                 }}
               >
-                {vid.character_image_url && (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={thumbUrl(vid.character_image_url)}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-cover"
-                    loading="lazy"
-                    draggable={false}
-                  />
-                )}
+                {/* Poster: character image or video frame via Cloudinary */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={vid.character_image_url ? thumbUrl(vid.character_image_url) : (videoThumbUrl(vid.video_url) || undefined)!}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                  loading="lazy"
+                  draggable={false}
+                />
                 <video
                   src={vid.video_url}
                   className="relative h-full w-full object-cover"

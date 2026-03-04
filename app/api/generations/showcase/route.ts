@@ -3,7 +3,7 @@ import { sql } from "@/lib/db"
 export async function GET() {
   try {
     const videos = await sql`
-      SELECT video_url, character_image_url, character_name, 'fill' as aspect_ratio
+      SELECT video_url, character_image_url, character_name, source_video_url, 'fill' as aspect_ratio
       FROM video_submissions
       WHERE status = 'approved' AND video_url IS NOT NULL
       ORDER BY created_at DESC
