@@ -768,7 +768,7 @@ export default function Home() {
                 }}
               />
               {/* Bottom action bar */}
-              <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-6 pb-[max(2rem,env(safe-area-inset-bottom,2rem))] pt-12">
+              <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-6 pb-[max(4rem,calc(env(safe-area-inset-bottom,1rem)+3rem))] pt-12 md:pb-8">
                 {selectedCharacter ? (
                   /* Has character — show Generate / Retake */
                   <>
@@ -868,24 +868,22 @@ export default function Home() {
         )}
       </div>
 
-      {/* Desktop Sidebar Strip */}
-      {!isMobile && (
-        <SidebarStrip
-          onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
-            setSelectedError(null)
-            setSelectedGeneratedVideo(url)
-            setResultUrl(url)
-            setSourceVideoUrl(sourceUrl)
-            setSourceVideoAspectRatio(sourceAR)
-            setGeneratedVideoAspectRatio(genAR)
-          }}
-          onSelectError={(error) => {
-            setResultUrl(null)
-            setSelectedError(error)
-          }}
-          onBuyCredits={() => { setShowBuyOptions(true); setPurchaseError(null); setBuyAmount("") }}
-        />
-      )}
+      {/* Sidebar Strip — vertical on desktop, horizontal bottom bar on mobile */}
+      <SidebarStrip
+        onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
+          setSelectedError(null)
+          setSelectedGeneratedVideo(url)
+          setResultUrl(url)
+          setSourceVideoUrl(sourceUrl)
+          setSourceVideoAspectRatio(sourceAR)
+          setGeneratedVideoAspectRatio(genAR)
+        }}
+        onSelectError={(error) => {
+          setResultUrl(null)
+          setSelectedError(error)
+        }}
+        onBuyCredits={() => { setShowBuyOptions(true); setPurchaseError(null); setBuyAmount("") }}
+      />
 
       {/* Mobile Bottom Sheet — only for result view (My Videos) */}
       {isMobile && resultUrl && (
