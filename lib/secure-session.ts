@@ -20,18 +20,13 @@ export interface SessionData {
 }
 
 function getSessionOptions(): SessionOptions {
+  if (!process.env.SESSION_SECRET && process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET environment variable is required in production")
+  }
+
   const sessionSecret =
     process.env.SESSION_SECRET ||
     "default-secret-for-development-only-not-secure-32-chars-minimum"
-
-  if (
-    !process.env.SESSION_SECRET &&
-    process.env.NODE_ENV === "production"
-  ) {
-    console.warn(
-      "SESSION_SECRET is not set. Using insecure fallback. Set SESSION_SECRET in production.",
-    )
-  }
 
   return {
     password: sessionSecret,

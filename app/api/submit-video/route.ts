@@ -5,11 +5,14 @@ import { verifySession } from "@/lib/auth"
 export async function POST(request: Request) {
   try {
     const session = await verifySession()
-    const userId = session?.user?.id || null
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+    const userId = session.user.id
 
     const { videoUrl, characterImageUrl, characterName, sourceVideoUrl } = await request.json()
 
-    if (!videoUrl) {
+    if (!videoUrl || typeof videoUrl !== "string") {
       return NextResponse.json({ error: "Video URL required" }, { status: 400 })
     }
 

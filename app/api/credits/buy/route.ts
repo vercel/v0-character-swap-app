@@ -47,6 +47,13 @@ export async function POST(request: Request) {
       )
     }
 
+    if (amount > 500) {
+      return NextResponse.json(
+        { error: "Maximum purchase amount is $500" },
+        { status: 400 },
+      )
+    }
+
     // Session checks
     const session = await getSession()
 

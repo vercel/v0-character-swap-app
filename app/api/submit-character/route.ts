@@ -5,11 +5,14 @@ import { verifySession } from "@/lib/auth"
 export async function POST(request: Request) {
   try {
     const session = await verifySession()
-    const userId = session?.user?.id || null
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+    const userId = session.user.id
 
     const { imageUrl, name } = await request.json()
 
-    if (!imageUrl) {
+    if (!imageUrl || typeof imageUrl !== "string") {
       return NextResponse.json({ error: "Image URL required" }, { status: 400 })
     }
 
