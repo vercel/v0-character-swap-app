@@ -6,20 +6,6 @@ import { useCredits } from "@/hooks/use-credits"
 import { GenerationsPanel } from "@/components/generations-panel"
 import { Coins, LogOut } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
-import useSWR from "swr"
-
-function thumbUrl(src: string): string {
-  return `/_next/image?url=${encodeURIComponent(src)}&w=256&q=75`
-}
-
-const fetcher = (url: string) => fetch(url).then(res => res.json())
-
-interface ShowcaseGeneration {
-  video_url: string
-  character_image_url: string
-  character_name: string | null
-  aspect_ratio: "9:16" | "16:9" | "fill"
-}
 
 interface SidebarStripProps {
   onSelectVideo: (videoUrl: string, sourceVideoUrl: string | null, sourceAspectRatio: "9:16" | "16:9" | "fill", generatedAspectRatio: "9:16" | "16:9" | "fill") => void
@@ -32,14 +18,6 @@ export function SidebarStrip({ onSelectVideo, onSelectError, onBuyCredits }: Sid
   const { balance, creditsLoading, error: creditsError } = useCredits()
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-
-  // Showcase demos for logged-out users
-  const { data: showcaseData } = useSWR<{ generations: ShowcaseGeneration[] }>(
-    !user && !authLoading ? "/api/generations/showcase" : null,
-    fetcher,
-    { dedupingInterval: 60000 }
-  )
-  const showcaseGenerations = showcaseData?.generations || []
 
   useEffect(() => {
     if (!showMenu) return
@@ -117,56 +95,11 @@ export function SidebarStrip({ onSelectVideo, onSelectError, onBuyCredits }: Sid
 
       {/* Generation thumbnails — vertical scroll */}
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5">
-        {user ? (
-          <GenerationsPanel
-            onSelectVideo={onSelectVideo}
-            onSelectError={onSelectError}
-            variant="sidebar"
-          />
-        ) : (
-          /* Showcase demos for logged-out users */
-          showcaseGenerations.length > 0 && (
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-[9px] font-medium uppercase tracking-wider text-black/30">demos</span>
-              {showcaseGenerations.map((gen, i) => (
-                <button
-                  key={i}
-                  className="group relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-neutral-50 ring-1 ring-neutral-200"
-                  onClick={() => onSelectVideo(gen.video_url, null, "fill", gen.aspect_ratio || "fill")}
-                  onMouseEnter={(e) => {
-                    const video = e.currentTarget.querySelector("video")
-                    video?.play()
-                  }}
-                  onMouseLeave={(e) => {
-                    const video = e.currentTarget.querySelector("video")
-                    if (video) { video.pause(); video.currentTime = 0 }
-                  }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={thumbUrl(gen.character_image_url)}
-                    alt={gen.character_name || ""}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    loading="lazy"
-                    draggable={false}
-                  />
-                  <video
-                    src={gen.video_url}
-                    className="relative h-full w-full object-cover"
-                    muted
-                    playsInline
-                    preload="none"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100">
-                    <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )
-        )}
+        <GenerationsPanel
+          onSelectVideo={onSelectVideo}
+          onSelectError={onSelectError}
+          variant="sidebar"
+        />
       </div>
 
       {/* Bottom: How it works */}
