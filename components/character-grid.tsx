@@ -35,6 +35,8 @@ interface CharacterGridProps {
   userEmail?: string | null
   // Hide generate button section (for step 1 character selection)
   showGenerateButton?: boolean
+  // Hide the "Select Cartoon" title (parent provides its own)
+  showTitle?: boolean
 }
 
 export function CharacterGrid({
@@ -55,6 +57,7 @@ export function CharacterGrid({
   onSendEmailChange,
   userEmail,
   showGenerateButton = true,
+  showTitle = true,
 }: CharacterGridProps) {
   const prefetchedFullRef = useRef(new Set<string>())
   const [prompt, setPrompt] = useState("")
@@ -138,13 +141,15 @@ export function CharacterGrid({
   return (
     <div className="relative flex max-h-full flex-col">
       <div className="shrink overflow-y-auto md:min-h-0 md:flex-1">
-        <p className="mb-2 text-xl font-pixel text-black md:mb-3">
-          Select Cartoon
-        </p>
+        {showTitle && (
+          <p className="mb-2 text-xl font-pixel text-black md:mb-3">
+            Select Cartoon
+          </p>
+        )}
 
         {/* Grid container */}
-        <div className="overflow-visible pl-2 pt-3">
-          <div className="flex flex-wrap gap-1.5 md:gap-2">
+        <div className="overflow-visible pl-1.5 pt-2">
+          <div className="flex flex-wrap justify-center gap-2 md:gap-2.5">
           {displayCharacters.length === 0 && !isGenerating && (
             <p className="w-full py-2 text-center text-sm text-black/50">
               Create your first cartoon below
@@ -169,7 +174,7 @@ export function CharacterGrid({
                   onClick={() => onSelect(char.id)}
                   disabled={disabled}
                   data-selected={isSelected}
-                  className="relative h-[50px] w-[50px] overflow-hidden rounded-lg border border-neutral-200 bg-white transition-all hover:border-neutral-400 data-[selected=true]:border-[2px] data-[selected=true]:border-black disabled:cursor-not-allowed disabled:opacity-50 md:h-[56px] md:w-[56px]"
+                  className="relative h-[54px] w-[54px] overflow-hidden rounded-xl border border-neutral-200 bg-white transition-all hover:border-neutral-400 hover:shadow-sm data-[selected=true]:border-[2px] data-[selected=true]:border-black data-[selected=true]:shadow-md disabled:cursor-not-allowed disabled:opacity-50 md:h-[60px] md:w-[60px]"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -181,7 +186,7 @@ export function CharacterGrid({
                   />
                   {/* Selected checkmark */}
                   {isSelected && (
-                    <div className="absolute bottom-0.5 right-0.5 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-black">
+                    <div className="absolute bottom-1 right-1 z-10 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-black shadow-sm">
                       <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
@@ -226,11 +231,12 @@ export function CharacterGrid({
           </div>
         </div>
 
-        {/* AI Prompt Bar - always visible */}
-        <p className="mb-1.5 mt-4 text-xl font-pixel text-black">
-          Create Your Cartoon
-        </p>
-        <div className="rounded-xl border border-neutral-200 bg-white p-3">
+        {/* AI Prompt Bar */}
+        <div className="mb-1.5 mt-5 flex items-center gap-2">
+          <p className="text-[15px] font-semibold text-black">Create your own</p>
+          <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-medium text-black/40">AI</span>
+        </div>
+        <div className="rounded-xl border border-neutral-200 bg-neutral-50/50 p-3">
           {isGenerating ? (
             <div className="space-y-2">
               <p className="text-sm text-black/70">
@@ -259,12 +265,12 @@ export function CharacterGrid({
                 }}
                 placeholder="e.g. a pirate cat with an eyepatch"
                 disabled={disabled}
-                className="h-9 flex-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-black placeholder-neutral-400 outline-none transition-colors focus:ring-1 focus:ring-black/20 disabled:opacity-50"
+                className="h-10 flex-1 rounded-xl border border-neutral-200 bg-white px-3.5 text-sm text-black placeholder-neutral-400 outline-none transition-all focus:border-neutral-400 focus:ring-1 focus:ring-black/10 disabled:opacity-50"
               />
               <button
                 onClick={handleGenerate}
                 disabled={disabled || !prompt.trim()}
-                className="flex h-9 items-center justify-center rounded-lg bg-black px-4 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-30"
+                className="flex h-10 items-center justify-center rounded-xl bg-black px-4 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-30"
               >
                 go
               </button>
