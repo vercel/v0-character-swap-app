@@ -8,8 +8,6 @@ import { CharacterSelection } from "@/components/character-selection"
 import { SidebarStrip } from "@/components/sidebar-strip"
 import { StepsIndicator } from "@/components/steps-indicator"
 import { useAuth } from "@/components/auth-provider"
-import { BottomSheet } from "@/components/bottom-sheet"
-import { useIsMobile } from "@/hooks/use-mobile"
 import { GenerationsPanel } from "@/components/generations-panel"
 import { useCharacters } from "@/hooks/use-characters"
 import { useVideoGeneration } from "@/hooks/use-video-generation"
@@ -19,7 +17,6 @@ import { STORAGE_KEYS } from "@/lib/constants"
 import { cn, detectImageAspectRatio } from "@/lib/utils"
 import { useCloudinaryPrewarm } from "@/hooks/use-cloudinary-prewarm"
 import { useCredits } from "@/hooks/use-credits"
-import { Coins, LogOut } from "lucide-react"
 
 // Convert a Vercel Blob video URL to MP4 via Cloudinary (for cross-browser playback)
 function toMp4Url(url: string | null): string | null {
@@ -41,7 +38,6 @@ async function getCharacterAspectRatio(src: string): Promise<"9:16" | "16:9" | "
 
 export default function Home() {
   const { user, isLoading: authLoading, login, logout, hasApiKey } = useAuth()
-  const isMobile = useIsMobile()
   
   // State
   const [mounted, setMounted] = useState(false)
@@ -56,7 +52,6 @@ export default function Home() {
   const [sourceVideoAspectRatio, setSourceVideoAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
   const [selectedGeneratedVideo, setSelectedGeneratedVideo] = useState<string | null>(null)
   const [selectedError, setSelectedError] = useState<{ message: string; characterName: string | null; characterImageUrl: string | null; createdAt: string } | null>(null)
-  const [bottomSheetExpanded, setBottomSheetExpanded] = useState(false)
   const [confirmedCharacter, setConfirmedCharacter] = useState(false)
   const [pendingAutoSubmit, setPendingAutoSubmit] = useState(false)
   // Detected aspect ratio of the generated video (from character image)
@@ -74,9 +69,7 @@ export default function Home() {
     id: number
     isCustom: boolean
   } | null>(null)
-  const [showUserMenu, setShowUserMenu] = useState(false)
   const [videoShared, setVideoShared] = useState(false)
-  const userMenuRef = useRef<HTMLDivElement>(null)
 
   // Video refs for sync
   const mainVideoRef = useRef<HTMLVideoElement>(null)
@@ -272,13 +265,6 @@ export default function Home() {
     return () => window.removeEventListener("beforeunload", handler)
   }, [isUploading])
 
-  // Auto-expand bottom sheet when video is recorded
-  useEffect(() => {
-    if (isMobile && recordedVideo && !resultUrl) {
-      setBottomSheetExpanded(true)
-    }
-  }, [isMobile, recordedVideo, resultUrl])
-
   // Handlers
   const handleProcess = useCallback(async () => {
     if (!recordedVideo || !selectedCharacter) return
@@ -352,17 +338,6 @@ export default function Home() {
   }, [])
 
   // Close user menu on click outside
-  useEffect(() => {
-    if (!showUserMenu) return
-    const handleClick = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setShowUserMenu(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClick)
-    return () => document.removeEventListener("mousedown", handleClick)
-  }, [showUserMenu])
-
   const handleLoginAndContinue = useCallback(async () => {
     setIsLoggingIn(true)
     // Save the selected character's full data so we can restore it after login
@@ -434,91 +409,13 @@ export default function Home() {
   const parsedBuyAmount = Number.parseFloat(buyAmount)
   const isValidBuyAmount = buyAmount !== "" && Number.isFinite(parsedBuyAmount) && parsedBuyAmount > 0
 
-  const renderAuthSection = (size: "desktop" | "mobile") => {
-    // Invisible placeholder while auth resolves — same height, no flash
-    if (!mounted || authLoading) {
-      return <div className="mb-4 h-[17px]" />
-    }
 
-    if (user) {
-      return (
-        <div className="mb-5">
-          <div className="flex items-center justify-between">
-            {/* App title */}
-            <h1 className="text-3xl font-pixel text-black">v0 FaceSwap</h1>
-            {/* User + credits */}
-            <div className="relative flex flex-col items-end" ref={userMenuRef}>
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-black/5"
-              >
-                {user.avatar ? (
-                  <Image
-                    src={user.avatar}
-                    alt={user.name || ""}
-                    width={24}
-                    height={24}
-                    className="rounded-full"
-                  />
-                ) : (
-                  <div className="h-6 w-6 rounded-full bg-black/10" />
-                )}
-                <span className="text-sm text-black">{user.name}</span>
-              </button>
-              {showUserMenu && (
-                <div className="absolute right-0 top-full z-50 mt-1 min-w-[120px] rounded-lg border border-black/10 bg-white py-1 shadow-sm">
-                  <button
-                    onClick={() => { setShowUserMenu(false); logout() }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-black/70 transition-colors hover:bg-black/5 hover:text-black"
-                  >
-                    <LogOut className="h-3 w-3" />
-                    sign out
-                  </button>
-                </div>
-              )}
-              <button
-                onClick={() => { setShowBuyOptions(true); setPurchaseError(null); setBuyAmount("") }}
-                className="flex items-center gap-1.5 rounded-lg px-2 py-0.5 transition-colors hover:bg-black/5"
-              >
-                <Coins className="h-3 w-3 text-yellow-500" />
-                {creditsLoading ? (
-                  <span className="text-xs text-black/50">...</span>
-                ) : creditsError ? (
-                  <span className="text-xs text-black/50">--</span>
-                ) : (
-                  <span className="text-xs tabular-nums text-black/70">
-                    ${Number.parseFloat(balance).toFixed(2)}
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )
-    }
 
-    return (
-      <div className="mb-5">
-        <h1 className="text-3xl font-pixel text-black">v0 FaceSwap</h1>
-        <button
-          onClick={login}
-          className="flex items-center gap-2 text-sm text-black/50 transition-colors hover:text-black"
-        >
-          <svg className="h-3 w-3" viewBox="0 0 76 65" fill="currentColor">
-            <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
-          </svg>
-          sign in with vercel
-        </button>
-      </div>
-    )
-  }
-
-  
 
   return (
     <main className="relative flex h-[100dvh] flex-row overflow-hidden bg-white">
       {/* Main Preview Area — fullscreen step content */}
-      <div className="flex flex-1 flex-col items-center justify-center overflow-hidden" onClick={() => { if (isMobile && bottomSheetExpanded) setBottomSheetExpanded(false) }}>
+      <div className="flex flex-1 flex-col items-center justify-center overflow-hidden">
         {selectedError ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-8">
             {selectedError.characterImageUrl && (
@@ -885,74 +782,6 @@ export default function Home() {
         onBuyCredits={() => { setShowBuyOptions(true); setPurchaseError(null); setBuyAmount("") }}
       />
 
-      {/* Mobile Bottom Sheet — only for result view (My Videos) */}
-      {isMobile && resultUrl && (
-        <BottomSheet
-          isExpanded={bottomSheetExpanded}
-          onExpandedChange={setBottomSheetExpanded}
-          peekHeight={100}
-          peek={
-            <>
-              <p className="mb-1.5 text-xl font-pixel text-black">
-                My Videos
-              </p>
-              <GenerationsPanel
-                onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
-                  setSelectedError(null)
-                  setSelectedGeneratedVideo(url)
-                  setResultUrl(url)
-                  setSourceVideoUrl(sourceUrl)
-                  setSourceVideoAspectRatio(sourceAR)
-                  setGeneratedVideoAspectRatio(genAR)
-                }}
-                onSelectError={(error) => {
-                  setResultUrl(null)
-                  setSelectedError(error)
-                }}
-                variant="compact"
-              />
-            </>
-          }
-        >
-          {renderAuthSection("mobile")}
-          <GenerationsPanel
-            onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
-              setSelectedError(null)
-              setSelectedGeneratedVideo(url)
-              setResultUrl(url)
-              setSourceVideoUrl(sourceUrl)
-              setSourceVideoAspectRatio(sourceAR)
-              setGeneratedVideoAspectRatio(genAR)
-              setBottomSheetExpanded(false)
-            }}
-            onSelectError={(error) => {
-              setResultUrl(null)
-              setSelectedError(error)
-              setBottomSheetExpanded(false)
-            }}
-            className="mb-6"
-          />
-          <p className="mb-3 text-xl font-pixel text-black">
-            Create New
-          </p>
-          <CharacterGrid
-            selectedId={selectedCharacter}
-            onSelect={setSelectedCharacter}
-            customCharacters={charactersReady ? customCharacters : []}
-            onAddCustom={addCustomCharacter}
-            onDeleteCustom={deleteCustomCharacter}
-            onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
-            canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
-            hasVideo={!!recordedVideo}
-            hasCharacter={!!selectedCharacter}
-            onGenerate={handleProcess}
-            onRetake={() => { setShowPreview(false); clearRecording() }}
-            sendEmail={sendEmailNotification}
-            onSendEmailChange={setSendEmailNotification}
-            userEmail={user?.email}
-          />
-        </BottomSheet>
-      )}
 
       {/* Login Modal */}
       {showLoginModal && (

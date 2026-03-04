@@ -26,10 +26,10 @@ export function CharacterSelection({
 }: CharacterSelectionProps) {
   return (
     <div className="relative flex h-full w-full flex-col overflow-y-auto bg-white">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto flex w-full max-w-lg items-center justify-between px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top,1rem))] md:px-6 md:pt-5">
-          <h1 className="text-xl font-pixel text-black md:text-2xl">v0 FaceSwap</h1>
+      {/* Header — mobile only */}
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm md:hidden">
+        <div className="mx-auto flex w-full max-w-lg items-center justify-between px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top,1rem))]">
+          <h1 className="text-xl font-pixel text-black">v0 FaceSwap</h1>
           <StepsIndicator currentStep={1} />
         </div>
       </div>
