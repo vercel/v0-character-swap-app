@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import type { Character, User, ReferenceImage } from "@/lib/types"
 import { CUSTOM_CHARACTER_ID_OFFSET, DEFAULT_CHARACTERS } from "@/lib/constants"
 
@@ -27,9 +27,29 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
   const [communityCharacters, setCommunityCharacters] = useState<Character[]>([])
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null)
   const [customLoaded, setCustomLoaded] = useState(false)
+  const [communityLoaded, setCommunityLoaded] = useState(false)
+  const communityFetched = useRef(false)
+
+  // Load community-approved characters (once, immediately)
+  useEffect(() => {
+    if (communityFetched.current) return
+    communityFetched.current = true
+    fetch("/api/approved-characters")
+      .then(res => res.json())
+      .then(data => {
+        if (data.characters) {
+          setCommunityCharacters(data.characters.map((c: { id: number; src: string; name: string }) => ({
+            id: COMMUNITY_ID_OFFSET + c.id,
+            src: c.src,
+            name: c.name || "Community",
+          })))
+        }
+      })
+      .catch(() => {})
+      .finally(() => setCommunityLoaded(true))
+  }, [])
 
   // Load user's reference images from database
-  // Wait for auth to resolve before marking custom as loaded
   useEffect(() => {
     if (authLoading) return
     if (user) {
@@ -80,7 +100,6 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
         console.error("Failed to save reference image:", error)
       }
     }
-    // Fallback: just add locally
     setCustomCharacters(prev => [...prev, character])
   }, [user])
 
@@ -104,23 +123,6 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
     }
   }, [selectedCharacter, customCharacters])
 
-  // Load community-approved characters
-  useEffect(() => {
-    fetch("/api/approved-characters")
-      .then(res => res.json())
-      .then(data => {
-        if (data.characters) {
-          setCommunityCharacters(data.characters.map((c: { id: number; src: string; name: string }) => ({
-            id: COMMUNITY_ID_OFFSET + c.id,
-            src: c.src,
-            name: c.name || "Community",
-          })))
-        }
-      })
-      .catch(() => {})
-  }, [])
-
-  // Track character usage (call when generating video)
   const trackCharacterUsage = useCallback((characterId: number) => {
     fetch("/api/character-usage", {
       method: "POST",
@@ -129,9 +131,11 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
     }).catch(console.error)
   }, [])
 
+  // All characters in one pass — no reflow
   const allCharacters = [...DEFAULT_CHARACTERS, ...communityCharacters, ...customCharacters]
 
-  const isReady = customLoaded
+  // Only ready when both community and custom are loaded
+  const isReady = communityLoaded && customLoaded
 
   return {
     customCharacters,

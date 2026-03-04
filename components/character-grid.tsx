@@ -60,6 +60,7 @@ export function CharacterGrid({
   showTitle = true,
 }: CharacterGridProps) {
   const prefetchedFullRef = useRef(new Set<string>())
+  const [showCreateInput, setShowCreateInput] = useState(false)
   const [prompt, setPrompt] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
@@ -228,55 +229,80 @@ export function CharacterGrid({
               </div>
             )
           })}
+
+          {/* Create with AI tile */}
+          <button
+            onClick={() => {
+              setShowCreateInput(true)
+              setTimeout(() => document.getElementById("ai-prompt-input")?.focus(), 100)
+            }}
+            disabled={disabled}
+            className="relative flex h-[54px] w-[54px] flex-col items-center justify-center gap-0.5 overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-neutral-50 transition-all hover:border-neutral-400 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50 md:h-[60px] md:w-[60px]"
+          >
+            <svg className="h-4 w-4 text-black/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span className="text-[8px] font-medium text-black/30">AI</span>
+          </button>
           </div>
         </div>
 
-        {/* AI Prompt Bar */}
-        <div className="mb-1.5 mt-5 flex items-center gap-2">
-          <p className="text-[15px] font-semibold text-black">Create your own</p>
-          <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-medium text-black/40">AI</span>
-        </div>
-        <div className="rounded-xl border border-neutral-200 bg-neutral-50/50 p-3">
-          {isGenerating ? (
-            <div className="space-y-2">
-              <p className="text-sm text-black/70">
-                Generating with <span className="font-medium text-black">Nano Banana Pro</span> via{" "}
-                <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="font-medium text-black underline underline-offset-2 hover:text-black/60">AI Gateway</a>
-              </p>
-              <div className="h-px w-full overflow-hidden rounded-full bg-neutral-200">
-                <div
-                  className="h-full bg-black transition-all duration-100 ease-linear"
-                  style={{ width: `${generationProgress}%` }}
-                />
+        {/* AI Create input — inline, shown when + tile clicked */}
+        {(showCreateInput || isGenerating) && (
+          <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50/50 p-3">
+            {isGenerating ? (
+              <div className="space-y-2">
+                <p className="text-sm text-black/70">
+                  Generating with <span className="font-medium text-black">Nano Banana Pro</span> via{" "}
+                  <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="font-medium text-black underline underline-offset-2 hover:text-black/60">AI Gateway</a>
+                </p>
+                <div className="h-px w-full overflow-hidden rounded-full bg-neutral-200">
+                  <div
+                    className="h-full bg-black transition-all duration-100 ease-linear"
+                    style={{ width: `${generationProgress}%` }}
+                  />
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <input
-                id="ai-prompt-input"
-                type="text"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault()
-                    handleGenerate()
-                  }
-                }}
-                placeholder="e.g. a pirate cat with an eyepatch"
-                disabled={disabled}
-                className="h-10 flex-1 rounded-xl border border-neutral-200 bg-white px-3.5 text-sm text-black placeholder-neutral-400 outline-none transition-all focus:border-neutral-400 focus:ring-1 focus:ring-black/10 disabled:opacity-50"
-              />
-              <button
-                onClick={handleGenerate}
-                disabled={disabled || !prompt.trim()}
-                className="flex h-10 items-center justify-center rounded-xl bg-black px-4 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-30"
-              >
-                go
-              </button>
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  id="ai-prompt-input"
+                  type="text"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      handleGenerate()
+                    }
+                    if (e.key === "Escape") {
+                      setShowCreateInput(false)
+                      setPrompt("")
+                    }
+                  }}
+                  placeholder="e.g. a pirate cat with an eyepatch"
+                  disabled={disabled}
+                  className="h-9 flex-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-black placeholder-neutral-400 outline-none transition-all focus:border-neutral-400 focus:ring-1 focus:ring-black/10 disabled:opacity-50"
+                />
+                <button
+                  onClick={handleGenerate}
+                  disabled={disabled || !prompt.trim()}
+                  className="flex h-9 items-center justify-center rounded-lg bg-black px-3.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-30"
+                >
+                  go
+                </button>
+                <button
+                  onClick={() => { setShowCreateInput(false); setPrompt("") }}
+                  className="text-black/30 hover:text-black"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Share to community prompt */}
         {sharePrompt && !shareSubmitted && (

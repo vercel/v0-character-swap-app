@@ -5,6 +5,7 @@ import Image from "next/image"
 import { CameraPreview } from "@/components/camera-preview"
 import { CharacterGrid } from "@/components/character-grid"
 import { CharacterSelection } from "@/components/character-selection"
+import { WelcomePage } from "@/components/welcome-page"
 import { SidebarStrip } from "@/components/sidebar-strip"
 import { StepsIndicator } from "@/components/steps-indicator"
 import { useAuth } from "@/components/auth-provider"
@@ -53,6 +54,7 @@ export default function Home() {
   const [selectedGeneratedVideo, setSelectedGeneratedVideo] = useState<string | null>(null)
   const [selectedError, setSelectedError] = useState<{ message: string; characterName: string | null; characterImageUrl: string | null; createdAt: string } | null>(null)
   const [confirmedCharacter, setConfirmedCharacter] = useState(false)
+  const [showWelcome, setShowWelcome] = useState(true)
   const [pendingAutoSubmit, setPendingAutoSubmit] = useState(false)
   // Detected aspect ratio of the generated video (from character image)
   const [generatedVideoAspectRatio, setGeneratedVideoAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
@@ -364,38 +366,57 @@ export default function Home() {
         ? 2
         : 1
 
-  // Sync step to URL hash for browser back/forward navigation
-  const stepNames = { 1: "", 2: "record", 3: "generate" } as const
+  // Sync step + welcome to URL hash for browser back/forward navigation
   const prevStepRef = useRef(currentStep)
+  const prevWelcomeRef = useRef(showWelcome)
 
   useEffect(() => {
-    // Push hash when step changes forward (not on initial mount)
-    if (currentStep !== prevStepRef.current) {
-      const target = currentStep === 1 ? window.location.pathname : `#${stepNames[currentStep]}`
-      const currentHash = window.location.hash.replace("#", "")
-      const targetHash = currentStep === 1 ? "" : stepNames[currentStep]
-      if (currentHash !== targetHash) {
+    const stepChanged = currentStep !== prevStepRef.current
+    const welcomeChanged = showWelcome !== prevWelcomeRef.current
+
+    if (stepChanged || welcomeChanged) {
+      let target: string
+      if (showWelcome && currentStep === 1) {
+        target = window.location.pathname // home = clean URL
+      } else if (currentStep === 1) {
+        target = "#pick"
+      } else if (currentStep === 2) {
+        target = "#record"
+      } else {
+        target = "#generate"
+      }
+
+      const currentUrl = window.location.hash ? `#${window.location.hash.replace("#", "")}` : window.location.pathname
+      if (currentUrl !== target) {
         window.history.pushState(null, "", target)
       }
       prevStepRef.current = currentStep
+      prevWelcomeRef.current = showWelcome
     }
-  }, [currentStep])
+  }, [currentStep, showWelcome])
 
   useEffect(() => {
-    // Set initial hash on mount
-    if (!window.location.hash && currentStep > 1) {
-      window.history.replaceState(null, "", `#${stepNames[currentStep]}`)
+    // Restore state from hash on mount
+    const hash = window.location.hash.replace("#", "")
+    if (hash === "pick") {
+      setShowWelcome(false)
     }
 
     const handlePopState = () => {
       const hash = window.location.hash.replace("#", "")
-      if ((!hash || hash === "/") && currentStep > 1) {
-        // Go back to step 1
+      if (!hash) {
+        // Back to home/welcome
+        setShowWelcome(true)
+        setSelectedCharacter(null)
+        setConfirmedCharacter(false)
+        setShowPreview(false)
+      } else if (hash === "pick" && currentStep > 1) {
+        // Back to pick cartoon
         setSelectedCharacter(null)
         setConfirmedCharacter(false)
         setShowPreview(false)
       } else if (hash === "record" && currentStep > 2) {
-        // Go back to step 2
+        // Back to record
         setShowPreview(false)
         clearRecording()
       }
@@ -665,7 +686,7 @@ export default function Home() {
                 }}
               />
               {/* Bottom action bar */}
-              <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-6 pb-[max(5.5rem,calc(env(safe-area-inset-bottom,1rem)+4.5rem))] pt-12 md:pb-8">
+              <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-6 pb-24 pt-12 md:pb-8">
                 {selectedCharacter ? (
                   /* Has character — show Generate / Retake */
                   <>
@@ -737,12 +758,16 @@ export default function Home() {
               </div>
             </div>
           </div>
+        ) : (currentStep === 1 && showWelcome) ? (
+          /* Welcome landing page */
+          <WelcomePage onStart={() => setShowWelcome(false)} />
         ) : currentStep === 1 ? (
-          /* Step 1: Choose character — fullscreen in preview area */
+          /* Step 1: Choose character */
           <CharacterSelection
             selectedId={selectedCharacter}
             onSelect={setSelectedCharacter}
             onNext={() => setConfirmedCharacter(true)}
+            allCharacters={allCharacters}
             customCharacters={charactersReady ? customCharacters : []}
             onAddCustom={addCustomCharacter}
             onDeleteCustom={deleteCustomCharacter}
