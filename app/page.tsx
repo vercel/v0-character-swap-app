@@ -760,7 +760,7 @@ export default function Home() {
           </div>
         ) : (currentStep === 1 && showWelcome) ? (
           /* Welcome landing page */
-          <WelcomePage onStart={() => setShowWelcome(false)} />
+          <WelcomePage onStart={() => setShowWelcome(false)} characterSrcs={allCharacters.map(c => c.src)} />
         ) : currentStep === 1 ? (
           /* Step 1: Choose character */
           <CharacterSelection
