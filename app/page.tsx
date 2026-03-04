@@ -57,6 +57,7 @@ export default function Home() {
   const [selectedGeneratedVideo, setSelectedGeneratedVideo] = useState<string | null>(null)
   const [selectedError, setSelectedError] = useState<{ message: string; characterName: string | null; characterImageUrl: string | null; createdAt: string } | null>(null)
   const [bottomSheetExpanded, setBottomSheetExpanded] = useState(false)
+  const [confirmedCharacter, setConfirmedCharacter] = useState(false)
   const [pendingAutoSubmit, setPendingAutoSubmit] = useState(false)
   // Detected aspect ratio of the generated video (from character image)
   const [generatedVideoAspectRatio, setGeneratedVideoAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
@@ -74,6 +75,7 @@ export default function Home() {
     isCustom: boolean
   } | null>(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [videoShared, setVideoShared] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   // Video refs for sync
@@ -170,6 +172,7 @@ export default function Home() {
     onSuccess: () => {
       // Don't clear recording - allow user to generate with another character
       setSelectedCharacter(null)
+      setConfirmedCharacter(false)
       setResultUrl(null)
     },
     onError: (message) => {
@@ -300,9 +303,11 @@ export default function Home() {
     setResultUrl(null)
     setSourceVideoUrl(null)
     setSelectedCharacter(null)
+    setConfirmedCharacter(false)
     setSelectedGeneratedVideo(null)
     setGeneratedVideoAspectRatio("fill")
     setSelectedError(null)
+    setVideoShared(false)
   }, [clearRecording, setSelectedCharacter])
 
   // Handle Escape key — use refs for stable listener (no re-registration)
@@ -375,13 +380,55 @@ export default function Home() {
   }, [recordedVideo, selectedCharacter, allCharacters, saveToSession, login])
 
   // Step state machine: character first (1), then record (2), then generate (3)
+  // Step 1 stays until user clicks "Next" (confirmedCharacter)
   const currentStep: 1 | 2 | 3 = resultUrl
     ? 3
     : (recordedVideo && selectedCharacter)
       ? 3
-      : selectedCharacter
+      : (selectedCharacter && confirmedCharacter)
         ? 2
         : 1
+
+  // Sync step to URL hash for browser back/forward navigation
+  const stepNames = { 1: "", 2: "record", 3: "generate" } as const
+  const prevStepRef = useRef(currentStep)
+
+  useEffect(() => {
+    // Push hash when step changes forward (not on initial mount)
+    if (currentStep !== prevStepRef.current) {
+      const target = currentStep === 1 ? window.location.pathname : `#${stepNames[currentStep]}`
+      const currentHash = window.location.hash.replace("#", "")
+      const targetHash = currentStep === 1 ? "" : stepNames[currentStep]
+      if (currentHash !== targetHash) {
+        window.history.pushState(null, "", target)
+      }
+      prevStepRef.current = currentStep
+    }
+  }, [currentStep])
+
+  useEffect(() => {
+    // Set initial hash on mount
+    if (!window.location.hash && currentStep > 1) {
+      window.history.replaceState(null, "", `#${stepNames[currentStep]}`)
+    }
+
+    const handlePopState = () => {
+      const hash = window.location.hash.replace("#", "")
+      if ((!hash || hash === "/") && currentStep > 1) {
+        // Go back to step 1
+        setSelectedCharacter(null)
+        setConfirmedCharacter(false)
+        setShowPreview(false)
+      } else if (hash === "record" && currentStep > 2) {
+        // Go back to step 2
+        setShowPreview(false)
+        clearRecording()
+      }
+    }
+
+    window.addEventListener("popstate", handlePopState)
+    return () => window.removeEventListener("popstate", handlePopState)
+  }, [currentStep, setSelectedCharacter, clearRecording, setShowPreview])
 
   // Render helpers
   const parsedBuyAmount = Number.parseFloat(buyAmount)
@@ -630,6 +677,42 @@ export default function Home() {
                 >
                   new video
                 </button>
+                {resultUrl && (
+                  <button
+                    disabled={videoShared}
+                    onClick={async () => {
+                      const char = allCharacters.find(c => c.id === selectedCharacter)
+                      await fetch("/api/submit-video", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          videoUrl: resultUrl,
+                          characterImageUrl: char?.src || null,
+                          characterName: char?.name || null,
+                        }),
+                      })
+                      setVideoShared(true)
+                    }}
+                    title={videoShared ? "Submitted for community review" : "Submit this video to the community gallery for others to see"}
+                    className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm transition-all hover:bg-white/25 active:scale-95 disabled:opacity-50"
+                  >
+                    {videoShared ? (
+                      <>
+                        <svg className="h-3 w-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        shared!
+                      </>
+                    ) : (
+                      <>
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                        </svg>
+                        share to community
+                      </>
+                    )}
+                  </button>
+                )}
                 {(sourceVideoUrl || recordedVideoUrl) && (
                   <button
                     onClick={() => setShowPip(!showPip)}
@@ -649,7 +732,7 @@ export default function Home() {
           <div className="relative flex h-full w-full items-center justify-center bg-black">
             {/* Back to character selection */}
             <button
-              onClick={() => { setSelectedCharacter(null); setShowPreview(false) }}
+              onClick={() => { setSelectedCharacter(null); setConfirmedCharacter(false); setShowPreview(false) }}
               className="absolute left-4 top-4 z-30 flex items-center gap-1.5 rounded-full bg-black/50 px-3.5 py-2 backdrop-blur-sm transition-colors hover:bg-black/70 active:bg-black/80"
             >
               <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -735,6 +818,17 @@ export default function Home() {
                       </svg>
                       <span className="text-sm font-medium text-white">Generating your video...</span>
                     </div>
+                    <p className="text-center text-xs text-white/40">
+                      Generating with <span className="text-white/60">Kling Motion Control</span> via{" "}
+                      <a
+                        href="https://vercel.com/ai-gateway"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-white/60 underline underline-offset-2 hover:text-white/80"
+                      >
+                        AI Gateway
+                      </a>
+                    </p>
                     <button
                       onClick={handleReset}
                       className="flex h-12 items-center gap-2.5 rounded-full bg-white px-7 text-[15px] font-bold text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-95"
@@ -751,6 +845,7 @@ export default function Home() {
           <CharacterSelection
             selectedId={selectedCharacter}
             onSelect={setSelectedCharacter}
+            onNext={() => setConfirmedCharacter(true)}
             customCharacters={charactersReady ? customCharacters : []}
             onAddCustom={addCustomCharacter}
             onDeleteCustom={deleteCustomCharacter}
@@ -761,14 +856,14 @@ export default function Home() {
           <CameraPreview
             onVideoRecorded={handleVideoRecorded}
             isProcessing={false}
-            onBack={() => setSelectedCharacter(null)}
+            onBack={() => { setSelectedCharacter(null); setConfirmedCharacter(false) }}
           />
         ) : (
           /* Step 3 without result yet — shouldn't normally reach here */
           <CameraPreview
             onVideoRecorded={handleVideoRecorded}
             isProcessing={false}
-            onBack={() => setSelectedCharacter(null)}
+            onBack={() => { setSelectedCharacter(null); setConfirmedCharacter(false) }}
           />
         )}
       </div>

@@ -102,16 +102,20 @@ export function SidebarStrip({ onSelectVideo, onSelectError, onBuyCredits }: Sid
         />
       </div>
 
-      {/* Bottom: How it works */}
+      {/* Bottom: Open in v0 */}
       <div className="mt-2 shrink-0">
         <a
-          href="https://v0.app/templates/1Nu0E0eAo9q"
+          href="https://v0.app/templates/face-swap-template-1Nu0E0eAo9q"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[9px] text-black/30 transition-colors hover:text-black/60"
-          title="Template in v0"
+          className="flex flex-col items-center gap-1 text-black/30 transition-colors hover:text-black/60"
+          title="Open in v0"
         >
-          v0
+          <svg className="h-4 w-auto" viewBox="0 0 252 120" fill="currentColor">
+            <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
+            <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
+          </svg>
+          <span className="text-[8px] leading-tight">Open in v0</span>
         </a>
       </div>
     </div>

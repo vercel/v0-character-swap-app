@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { upload } from "@vercel/blob/client"
 import type { Character } from "@/lib/types"
@@ -56,11 +56,14 @@ export function CharacterGrid({
   userEmail,
   showGenerateButton = true,
 }: CharacterGridProps) {
+  const prefetchedFullRef = useRef(new Set<string>())
   const [prompt, setPrompt] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [showHowItWorks, setShowHowItWorks] = useState(false)
+  const [sharePrompt, setSharePrompt] = useState<{ url: string; name: string } | null>(null)
+  const [shareSubmitted, setShareSubmitted] = useState(false)
 
   // Deduplicate by image URL — custom characters override defaults with same image
   const seen = new Set<string>()
@@ -112,10 +115,13 @@ export function CharacterGrid({
           // Use original URL if upload fails
         }
 
+        const charName = prompt.trim().slice(0, 20)
         const newId = Math.max(...displayCharacters.map(c => c.id), 0) + 1
-        onAddCustom({ id: newId, src: finalUrl, name: prompt.trim().slice(0, 20) })
+        onAddCustom({ id: newId, src: finalUrl, name: charName })
         setPrompt("")
-        onSelect(newId)
+        // Offer to share to community
+        setSharePrompt({ url: finalUrl, name: charName })
+        setShareSubmitted(false)
       }
     } catch (error) {
       console.error("Failed to generate:", error)
@@ -137,7 +143,7 @@ export function CharacterGrid({
         </p>
 
         {/* Grid container */}
-        <div className="py-1">
+        <div className="overflow-visible pl-2 pt-3">
           <div className="flex flex-wrap gap-1.5 md:gap-2">
           {displayCharacters.length === 0 && !isGenerating && (
             <p className="w-full py-2 text-center text-sm text-black/50">
@@ -149,13 +155,18 @@ export function CharacterGrid({
             const isCustom = customCharacters.some(c => c.id === char.id)
 
             return (
-              <div key={char.id} className="group relative">
+              <div key={char.id} className="group relative"
+                onMouseEnter={() => {
+                  // Prefetch full-size image on hover so lightbox is instant
+                  if (onExpand && char.src && !char.src.startsWith("/") && !prefetchedFullRef.current.has(char.src)) {
+                    prefetchedFullRef.current.add(char.src)
+                    const img = new window.Image()
+                    img.src = char.src
+                  }
+                }}
+              >
                 <button
-                  onClick={() => {
-                    if (!isSelected) {
-                      onSelect(char.id)
-                    }
-                  }}
+                  onClick={() => onSelect(char.id)}
                   disabled={disabled}
                   data-selected={isSelected}
                   className="relative h-[50px] w-[50px] overflow-hidden rounded-lg border border-neutral-200 bg-white transition-all hover:border-neutral-400 data-[selected=true]:border-[2px] data-[selected=true]:border-black disabled:cursor-not-allowed disabled:opacity-50 md:h-[56px] md:w-[56px]"
@@ -168,27 +179,31 @@ export function CharacterGrid({
                     loading="eager"
                     draggable={false}
                   />
-                  {/* Selected overlay: expand — inside button so overflow-hidden clips it */}
-                  {isSelected && onExpand && (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onExpand(char.src, char.id, true)
-                        }}
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onExpand(char.src, char.id, true) } }}
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30"
-                        title="View full image"
-                      >
-                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                        </svg>
-                      </span>
+                  {/* Selected checkmark */}
+                  {isSelected && (
+                    <div className="absolute bottom-0.5 right-0.5 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-black">
+                      <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
                     </div>
                   )}
                 </button>
+
+                {/* Expand button — appears on hover */}
+                {onExpand && !disabled && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onExpand(char.src, char.id, !!isCustom)
+                    }}
+                    className="absolute -left-1 -top-1 z-20 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-100 text-black/50 opacity-0 ring-1 ring-neutral-200 transition-all hover:bg-neutral-200 hover:text-black group-hover:opacity-100"
+                    title="View full image"
+                  >
+                    <svg className="h-2 w-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m6 6v-6m0 6h-6M3 3l6 6M3 3v6m0-6h6" />
+                    </svg>
+                  </button>
+                )}
 
                 {/* Delete button */}
                 {isCustom && onDeleteCustom && !disabled && (
@@ -219,7 +234,8 @@ export function CharacterGrid({
           {isGenerating ? (
             <div className="space-y-2">
               <p className="text-sm text-black/70">
-                Generating with <span className="font-medium text-black">Nano Banana Pro</span>...
+                Generating with <span className="font-medium text-black">Nano Banana Pro</span> via{" "}
+                <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="font-medium text-black underline underline-offset-2 hover:text-black/60">AI Gateway</a>
               </p>
               <div className="h-px w-full overflow-hidden rounded-full bg-neutral-200">
                 <div
@@ -255,6 +271,48 @@ export function CharacterGrid({
             </div>
           )}
         </div>
+
+        {/* Share to community prompt */}
+        {sharePrompt && !shareSubmitted && (
+          <div className="mt-2 flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={sharePrompt.url} alt="" className="h-9 w-9 rounded-lg object-cover" />
+            <div className="flex-1">
+              <p className="text-xs font-medium text-black">Share to community?</p>
+              <p className="text-[10px] text-black/40">Others can use your cartoon</p>
+            </div>
+            <button
+              onClick={async () => {
+                await fetch("/api/submit-character", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ imageUrl: sharePrompt.url, name: sharePrompt.name }),
+                })
+                setShareSubmitted(true)
+                setTimeout(() => setSharePrompt(null), 2000)
+              }}
+              className="rounded-lg bg-black px-3 py-1.5 text-[11px] font-medium text-white hover:bg-gray-800"
+            >
+              Share
+            </button>
+            <button
+              onClick={() => setSharePrompt(null)}
+              className="text-black/30 hover:text-black"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+        {shareSubmitted && (
+          <div className="mt-2 flex items-center gap-2 rounded-xl bg-green-50 px-3 py-2.5 text-xs text-green-700">
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            Submitted for review — thanks!
+          </div>
+        )}
 
         {/* Generate error message */}
         {generateError && (

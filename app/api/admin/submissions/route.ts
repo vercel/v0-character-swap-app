@@ -11,7 +11,7 @@ async function requireAdmin() {
   return session
 }
 
-// Get all submissions
+// Get all submissions (characters + videos)
 export async function GET() {
   try {
     const session = await requireAdmin()
@@ -19,12 +19,17 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const submissions = await sql`
-      SELECT * FROM character_submissions
+    const characters = await sql`
+      SELECT *, 'character' as type FROM character_submissions
       ORDER BY created_at DESC
       LIMIT 200
     `
-    return NextResponse.json({ submissions })
+    const videos = await sql`
+      SELECT *, 'video' as type FROM video_submissions
+      ORDER BY created_at DESC
+      LIMIT 200
+    `
+    return NextResponse.json({ characters, videos })
   } catch (error) {
     console.error("Failed to fetch submissions:", error)
     return NextResponse.json({ error: "Failed to fetch" }, { status: 500 })
@@ -39,7 +44,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { id, status, name, category } = await request.json()
+    const { id, status, name, category, type } = await request.json()
 
     if (!id || !status) {
       return NextResponse.json({ error: "ID and status required" }, { status: 400 })
@@ -49,13 +54,17 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
 
-    await sql`
-      UPDATE character_submissions
-      SET status = ${status},
-          suggested_name = COALESCE(${name || null}, suggested_name),
-          suggested_category = COALESCE(${category || null}, suggested_category)
-      WHERE id = ${id}
-    `
+    if (type === "video") {
+      await sql`UPDATE video_submissions SET status = ${status} WHERE id = ${id}`
+    } else {
+      await sql`
+        UPDATE character_submissions
+        SET status = ${status},
+            suggested_name = COALESCE(${name || null}, suggested_name),
+            suggested_category = COALESCE(${category || null}, suggested_category)
+        WHERE id = ${id}
+      `
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -72,13 +81,17 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { id } = await request.json()
+    const { id, type } = await request.json()
 
     if (!id) {
       return NextResponse.json({ error: "ID required" }, { status: 400 })
     }
 
-    await sql`DELETE FROM character_submissions WHERE id = ${id}`
+    if (type === "video") {
+      await sql`DELETE FROM video_submissions WHERE id = ${id}`
+    } else {
+      await sql`DELETE FROM character_submissions WHERE id = ${id}`
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
