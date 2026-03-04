@@ -23,6 +23,7 @@ interface CharacterSelectionProps {
   selectedId: number | null
   onSelect: (id: number) => void
   onNext: () => void
+  onHome?: () => void
   allCharacters: Character[]
   customCharacters: Character[]
   onAddCustom: (character: Character) => void
@@ -34,6 +35,7 @@ export function CharacterSelection({
   selectedId,
   onSelect,
   onNext,
+  onHome,
   allCharacters,
 }: CharacterSelectionProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -96,7 +98,7 @@ export function CharacterSelection({
   return (
     <div className="relative flex h-full w-full flex-col bg-white">
       {/* Logo */}
-      <h1 className="absolute left-6 top-5 z-10 hidden text-2xl font-pixel text-black md:block">v0 FaceSwap</h1>
+      <button onClick={onHome} className="absolute left-6 top-5 z-10 hidden text-2xl font-pixel text-black transition-opacity hover:opacity-60 md:block">v0 FaceSwap</button>
 
       {/* Content centered vertically */}
       <div className="flex flex-1 flex-col items-center justify-center">

@@ -183,12 +183,28 @@ export function WelcomePage({ onStart, characterSrcs = [] }: WelcomePageProps) {
           </button>
 
           {/* Powered by */}
-          <p className="mt-4 text-[11px] text-black/30">
-            Powered by{" "}
-            <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-black/50">AI Gateway</a>
-            {" · "}
-            <a href="https://v0.app/templates/face-swap-template-1Nu0E0eAo9q" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-black/50">Open in v0</a>
-          </p>
+          <div className="mt-6 flex items-center justify-center gap-4">
+            <a
+              href="https://vercel.com/ai-gateway"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 rounded-full bg-neutral-100 px-3.5 py-2 text-[13px] font-medium text-black/60 transition-colors hover:bg-neutral-200 hover:text-black"
+            >
+              Powered by AI Gateway
+            </a>
+            <a
+              href="https://v0.app/templates/face-swap-template-1Nu0E0eAo9q"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 rounded-full bg-neutral-100 px-3.5 py-2 text-[13px] font-medium text-black/60 transition-colors hover:bg-neutral-200 hover:text-black"
+            >
+              <svg className="h-3.5 w-auto" viewBox="0 0 252 120" fill="currentColor">
+                <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
+                <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
+              </svg>
+              Open in v0
+            </a>
+          </div>
         </div>
       </div>
     </div>

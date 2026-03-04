@@ -767,6 +767,7 @@ export default function Home() {
             selectedId={selectedCharacter}
             onSelect={setSelectedCharacter}
             onNext={() => setConfirmedCharacter(true)}
+            onHome={() => setShowWelcome(true)}
             allCharacters={allCharacters}
             customCharacters={charactersReady ? customCharacters : []}
             onAddCustom={addCustomCharacter}
