@@ -20,8 +20,11 @@ interface UseCharactersReturn {
   isReady: boolean
 }
 
+const COMMUNITY_ID_OFFSET = 5000
+
 export function useCharacters({ user, authLoading = false }: UseCharactersOptions): UseCharactersReturn {
   const [customCharacters, setCustomCharacters] = useState<Character[]>([])
+  const [communityCharacters, setCommunityCharacters] = useState<Character[]>([])
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null)
   const [customLoaded, setCustomLoaded] = useState(false)
 
@@ -101,6 +104,22 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
     }
   }, [selectedCharacter, customCharacters])
 
+  // Load community-approved characters
+  useEffect(() => {
+    fetch("/api/approved-characters")
+      .then(res => res.json())
+      .then(data => {
+        if (data.characters) {
+          setCommunityCharacters(data.characters.map((c: { id: number; src: string; name: string }) => ({
+            id: COMMUNITY_ID_OFFSET + c.id,
+            src: c.src,
+            name: c.name || "Community",
+          })))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   // Track character usage (call when generating video)
   const trackCharacterUsage = useCallback((characterId: number) => {
     fetch("/api/character-usage", {
@@ -110,7 +129,7 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
     }).catch(console.error)
   }, [])
 
-  const allCharacters = [...DEFAULT_CHARACTERS, ...customCharacters]
+  const allCharacters = [...DEFAULT_CHARACTERS, ...communityCharacters, ...customCharacters]
 
   const isReady = customLoaded
 
