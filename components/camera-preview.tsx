@@ -378,7 +378,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         )}
 
         {/* Record button - positioned above mobile bottom sheet (100px peek) */}
-        <div className="absolute bottom-28 left-1/2 z-40 -translate-x-1/2 md:bottom-6">
+        <div className="absolute bottom-[max(2rem,env(safe-area-inset-bottom,2rem))] left-1/2 z-40 -translate-x-1/2 md:bottom-6">
           {/* OK button to dismiss tips */}
           {showTips && hasPermission && (
             <button

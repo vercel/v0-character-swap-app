@@ -768,7 +768,7 @@ export default function Home() {
                 }}
               />
               {/* Bottom action bar */}
-              <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-6 pb-28 pt-12 md:pb-8">
+              <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-6 pb-[max(2rem,env(safe-area-inset-bottom,2rem))] pt-12">
                 {selectedCharacter ? (
                   /* Has character — show Generate / Retake */
                   <>
@@ -887,112 +887,17 @@ export default function Home() {
         />
       )}
 
-      {/* Mobile Bottom Sheet — content changes per step */}
-      {isMobile && (
+      {/* Mobile Bottom Sheet — only for result view (My Videos) */}
+      {isMobile && resultUrl && (
         <BottomSheet
           isExpanded={bottomSheetExpanded}
           onExpandedChange={setBottomSheetExpanded}
           peekHeight={100}
           peek={
-            resultUrl ? (
-              /* Result: peek = generation history compact */
-              <>
-                <p className="mb-1.5 text-xl font-pixel text-black">
-                  My Videos
-                </p>
-                <GenerationsPanel
-                  onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
-                    setSelectedError(null)
-                    setSelectedGeneratedVideo(url)
-                    setResultUrl(url)
-                    setSourceVideoUrl(sourceUrl)
-                    setSourceVideoAspectRatio(sourceAR)
-                    setGeneratedVideoAspectRatio(genAR)
-                  }}
-                  onSelectError={(error) => {
-                    setResultUrl(null)
-                    setSelectedError(error)
-                  }}
-                  variant="compact"
-                />
-              </>
-            ) : currentStep === 1 ? (
-              /* Step 1: peek = character strip */
-              <>
-                <div className="mb-2">
-                  <StepsIndicator currentStep={1} />
-                </div>
-                <p className="mb-1.5 text-sm font-medium text-black/50">
-                  Choose a cartoon
-                </p>
-                <div className="flex gap-1 overflow-x-auto pb-1">
-                  {allCharacters.slice(0, 8).map((char) => (
-                    <button
-                      key={char.id}
-                      onClick={() => {
-                        setSelectedCharacter(char.id)
-                      }}
-                      className={cn(
-                        "relative h-12 w-9 shrink-0 overflow-hidden rounded",
-                        selectedCharacter === char.id ? "ring-2 ring-black" : "ring-1 ring-neutral-200"
-                      )}
-                    >
-                      <Image src={char.src || "/placeholder.svg"} alt={char.name} fill className="object-cover" sizes="36px" />
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => setBottomSheetExpanded(true)}
-                    className="flex h-12 w-9 shrink-0 items-center justify-center rounded border border-dashed border-neutral-300"
-                  >
-                    <svg className="h-3 w-3 text-black/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                    </svg>
-                  </button>
-                </div>
-              </>
-            ) : currentStep === 2 ? (
-              /* Step 2: peek = selected character + record status */
-              <>
-                <div className="mb-2">
-                  <StepsIndicator currentStep={2} />
-                </div>
-                <div className="flex items-center gap-2">
-                  {selectedCharacter && (() => {
-                    const char = allCharacters.find(c => c.id === selectedCharacter)
-                    return char ? (
-                      <div className="relative h-10 w-8 shrink-0 overflow-hidden rounded ring-2 ring-black">
-                        <Image src={char.src} alt={char.name} fill className="object-cover" sizes="32px" />
-                      </div>
-                    ) : null
-                  })()}
-                  <span className="text-sm text-black/50">Tap record when ready</span>
-                </div>
-              </>
-            ) : (
-              /* Step 3: peek = "Generate" button */
-              <>
-                <div className="mb-2">
-                  <StepsIndicator currentStep={3} />
-                </div>
-                <button
-                  onClick={handleProcess}
-                  disabled={!recordedVideo || !selectedCharacter}
-                  className={cn(
-                    "flex h-10 w-full items-center justify-center rounded-lg text-sm font-semibold transition-all active:scale-[0.98]",
-                    (recordedVideo && selectedCharacter)
-                      ? "bg-black text-white hover:bg-gray-800"
-                      : "bg-neutral-100 text-black/50"
-                  )}
-                >
-                  Generate video
-                </button>
-              </>
-            )
-          }
-        >
-          {renderAuthSection("mobile")}
-          {resultUrl ? (
             <>
+              <p className="mb-1.5 text-xl font-pixel text-black">
+                My Videos
+              </p>
               <GenerationsPanel
                 onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
                   setSelectedError(null)
@@ -1001,83 +906,53 @@ export default function Home() {
                   setSourceVideoUrl(sourceUrl)
                   setSourceVideoAspectRatio(sourceAR)
                   setGeneratedVideoAspectRatio(genAR)
-                  setBottomSheetExpanded(false)
                 }}
                 onSelectError={(error) => {
                   setResultUrl(null)
                   setSelectedError(error)
-                  setBottomSheetExpanded(false)
                 }}
-                className="mb-6"
-              />
-              <p className="mb-3 text-xl font-pixel text-black">
-                Create New
-              </p>
-              <CharacterGrid
-                selectedId={selectedCharacter}
-                onSelect={setSelectedCharacter}
-                customCharacters={charactersReady ? customCharacters : []}
-                onAddCustom={addCustomCharacter}
-                onDeleteCustom={deleteCustomCharacter}
-                onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
-                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
-                hasVideo={!!recordedVideo}
-                hasCharacter={!!selectedCharacter}
-                onGenerate={handleProcess}
-                onRetake={() => { setShowPreview(false); clearRecording() }}
-                sendEmail={sendEmailNotification}
-                onSendEmailChange={setSendEmailNotification}
-                userEmail={user?.email}
+                variant="compact"
               />
             </>
-          ) : currentStep === 1 ? (
-            /* Step 1 expanded: full character grid + create */
-            <CharacterGrid
-              selectedId={selectedCharacter}
-              onSelect={setSelectedCharacter}
-              customCharacters={charactersReady ? customCharacters : []}
-              onAddCustom={addCustomCharacter}
-              onDeleteCustom={deleteCustomCharacter}
-              onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
-              hasVideo={true}
-              hasCharacter={!!selectedCharacter}
-              showGenerateButton={false}
-            />
-          ) : currentStep === 2 ? (
-            /* Step 2 expanded: tips */
-            <div className="flex flex-col gap-3 py-2">
-              <p className="text-sm font-semibold text-black/50">Tips for best results</p>
-              <p className="text-sm text-black">
-                <span className="text-black/40">1.</span> Show head + upper body clearly
-              </p>
-              <p className="text-sm text-black">
-                <span className="text-black/40">2.</span> Good lighting on your face
-              </p>
-              <p className="text-sm text-black">
-                <span className="text-black/40">3.</span> Record 3-30 seconds of movement
-              </p>
-            </div>
-          ) : (
-            /* Step 3 expanded: generate options */
-            <div className="flex flex-col gap-3">
-              <CharacterGrid
-                selectedId={selectedCharacter}
-                onSelect={setSelectedCharacter}
-                customCharacters={charactersReady ? customCharacters : []}
-                onAddCustom={addCustomCharacter}
-                onDeleteCustom={deleteCustomCharacter}
-                onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
-                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
-                hasVideo={!!recordedVideo}
-                hasCharacter={!!selectedCharacter}
-                onGenerate={handleProcess}
-                onRetake={() => { setShowPreview(false); clearRecording() }}
-                sendEmail={sendEmailNotification}
-                onSendEmailChange={setSendEmailNotification}
-                userEmail={user?.email}
-              />
-            </div>
-          )}
+          }
+        >
+          {renderAuthSection("mobile")}
+          <GenerationsPanel
+            onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
+              setSelectedError(null)
+              setSelectedGeneratedVideo(url)
+              setResultUrl(url)
+              setSourceVideoUrl(sourceUrl)
+              setSourceVideoAspectRatio(sourceAR)
+              setGeneratedVideoAspectRatio(genAR)
+              setBottomSheetExpanded(false)
+            }}
+            onSelectError={(error) => {
+              setResultUrl(null)
+              setSelectedError(error)
+              setBottomSheetExpanded(false)
+            }}
+            className="mb-6"
+          />
+          <p className="mb-3 text-xl font-pixel text-black">
+            Create New
+          </p>
+          <CharacterGrid
+            selectedId={selectedCharacter}
+            onSelect={setSelectedCharacter}
+            customCharacters={charactersReady ? customCharacters : []}
+            onAddCustom={addCustomCharacter}
+            onDeleteCustom={deleteCustomCharacter}
+            onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
+            canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
+            hasVideo={!!recordedVideo}
+            hasCharacter={!!selectedCharacter}
+            onGenerate={handleProcess}
+            onRetake={() => { setShowPreview(false); clearRecording() }}
+            sendEmail={sendEmailNotification}
+            onSendEmailChange={setSendEmailNotification}
+            userEmail={user?.email}
+          />
         </BottomSheet>
       )}
 
