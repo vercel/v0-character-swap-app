@@ -59,7 +59,7 @@ export function CharacterSelection({
       </div>
 
       {/* Sticky Next button — extra padding on mobile for bottom bar */}
-      <div className="sticky bottom-0 z-10 border-t border-neutral-100 bg-white/95 px-5 pb-[max(3.5rem,calc(env(safe-area-inset-bottom,0.75rem)+2.5rem))] pt-3 backdrop-blur-sm md:pb-3 md:px-6">
+      <div className="sticky bottom-0 z-10 border-t border-neutral-100 bg-white/95 px-5 pb-[max(4.5rem,calc(env(safe-area-inset-bottom,0.75rem)+3.5rem))] pt-3 backdrop-blur-sm md:pb-3 md:px-6">
         <div className="mx-auto w-full max-w-lg">
           <button
             onClick={onNext}
