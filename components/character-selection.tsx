@@ -164,27 +164,28 @@ export function CharacterSelection({
                         : "ring-1 ring-black/10 hover:ring-black/20 hover:shadow-md"
                     )}
                   >
-                    {/* Video or image */}
-                    {videoUrl ? (
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={optimizedUrl(char.src, 384)}
+                      alt={char.name}
+                      className="h-full w-full object-cover object-top"
+                      draggable={false}
+                      onError={(e) => { e.currentTarget.src = char.src }}
+                    />
+                    {/* Video loads ONLY on hover */}
+                    {videoUrl && (
                       <video
-                        src={videoUrl}
-                        className="h-full w-full object-cover"
+                        className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100"
                         muted
                         loop
                         playsInline
-                        preload="metadata"
-                        onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+                        preload="none"
+                        onMouseEnter={(e) => {
+                          const v = e.currentTarget
+                          if (!v.src) v.src = videoUrl
+                          v.play().catch(() => {})
+                        }}
                         onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0 }}
-                      />
-                    ) : (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={optimizedUrl(char.src, 384)}
-                        alt={char.name}
-                        className="h-full w-full object-cover object-top"
-                        loading="lazy"
-                        draggable={false}
-                        onError={(e) => { e.currentTarget.src = char.src }}
                       />
                     )}
 
