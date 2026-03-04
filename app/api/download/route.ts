@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { buildCompositeVideoUrl, blobUrlToPublicId, buildUploadCompositeUrl } from "@/lib/cloudinary"
+import { verifySession } from "@/lib/auth"
 
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME
 
@@ -13,6 +14,11 @@ function isBlobUrl(url: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
+  const session = await verifySession()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+  }
+
   if (!CLOUD_NAME) {
     return NextResponse.json(
       { error: "Cloudinary not configured" },

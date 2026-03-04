@@ -10,20 +10,25 @@ export const maxDuration = 800
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify session server-side
+    const session = await getSession()
+    if (!session?.userId) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
-    const { generationId: existingGenerationId, videoUrl, characterImageUrl, userId, userName, userEmail, characterName, sendEmail } = body
+    const { generationId: existingGenerationId, videoUrl, characterImageUrl, characterName, sendEmail } = body
+    const userId = session.userId
+    const userName = session.name || undefined
+    const userEmail = session.email || undefined
 
     if (!videoUrl || !characterImageUrl) {
       return NextResponse.json(
         { error: "Video URL and character image URL are required" },
         { status: 400 }
-      )
-    }
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "User must be logged in" },
-        { status: 401 }
       )
     }
 
@@ -50,9 +55,7 @@ export async function POST(request: NextRequest) {
 
     await updateGenerationRunId(generationId, `direct-${generationId}`)
 
-    // Read the user's AI Gateway API key before entering after() (cookies not available there)
-    const session = await getSession()
-    const userApiKey = undefined // TEMP: use project-level OIDC
+    // TEMP: use project-level OIDC (session already verified above)
 
     console.log(`[GenerateDirect] Starting direct generation ${generationId} (no workflow)`)
 

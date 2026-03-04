@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
+import { verifySession } from "@/lib/auth"
 
 export async function POST(request: Request) {
   try {
+    const session = await verifySession()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
     const { characterId } = await request.json()
 
     if (!characterId) {
