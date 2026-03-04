@@ -79,7 +79,7 @@ interface GenerationsPanelProps {
   onSelectVideo?: (videoUrl: string, sourceVideoUrl: string | null, sourceAspectRatio: "9:16" | "16:9" | "fill", generatedAspectRatio: "9:16" | "16:9" | "fill") => void
   onSelectError?: (error: { message: string; characterName: string | null; characterImageUrl: string | null; createdAt: string }) => void
   className?: string
-  variant?: "default" | "compact"
+  variant?: "default" | "compact" | "sidebar"
 }
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
@@ -94,7 +94,7 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
     fetcher,
     {
       revalidateOnFocus: true,
-      dedupingInterval: 2000,
+      dedupingInterval: 500,
     }
   )
 
@@ -179,13 +179,13 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
 
   // Show sign in prompt if user is not logged in
   if (!user) {
-    if (variant === "compact") return null
+    if (variant === "compact" || variant === "sidebar") return null
     return (
       <div className={className}>
-        <p className="mb-2 font-mono text-[11px] lowercase text-neutral-500">
+        <p className="mb-2 text-xl font-pixel text-black">
           my videos
         </p>
-        <p className="font-mono text-[11px] text-neutral-600">
+        <p className="text-sm text-black/40">
           sign in to see your videos
         </p>
       </div>
@@ -194,20 +194,20 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
 
   // Show loading state
   if (isLoading) {
-    if (variant === "compact") {
+    if (variant === "compact" || variant === "sidebar") {
       return (
         <div className="flex items-center justify-center py-2">
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-700 border-t-white" />
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-600" />
         </div>
       )
     }
     return (
       <div className={`${className}`}>
-        <p className="font-mono text-[11px] lowercase text-neutral-500">
+        <p className="text-xl font-pixel text-black">
           my videos
         </p>
         <div className="mt-2 flex items-center justify-center py-4">
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-700 border-t-white" />
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-600" />
         </div>
       </div>
     )
@@ -215,13 +215,13 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
 
   // Show empty state with helpful message
   if (generations.length === 0) {
-    if (variant === "compact") return null
+    if (variant === "compact" || variant === "sidebar") return null
     return (
       <div className={className}>
-        <p className="mb-2 font-mono text-[11px] lowercase text-neutral-500">
+        <p className="mb-2 text-xl font-pixel text-black">
           my videos
         </p>
-        <p className="font-mono text-[11px] text-neutral-600">
+        <p className="text-sm text-black/40">
           your generated videos will appear here
         </p>
       </div>
@@ -231,31 +231,39 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
   // Filter generations based on variant
   // Compact: show completed and processing videos (not cancelled/failed)
   // Default: show all except cancelled
-  const displayGenerations = variant === "compact"
+  const displayGenerations = (variant === "compact" || variant === "sidebar")
     ? generations.filter(g => (g.status === "completed" && g.video_url) || g.status === "processing" || g.status === "pending")
     : generations.filter(g => g.status !== "cancelled")
 
-  if (variant === "compact" && displayGenerations.length === 0) {
+  if ((variant === "compact" || variant === "sidebar") && displayGenerations.length === 0) {
     return null
   }
 
   return (
     <div className={className}>
-      {variant !== "compact" && (
-        <p className="mb-1.5 font-mono text-[10px] lowercase text-neutral-500 md:mb-2 md:text-[11px]">
-          my videos
+      {variant !== "compact" && variant !== "sidebar" && (
+        <p className="mb-1.5 text-xl font-pixel text-black md:mb-2">
+          My Videos
         </p>
       )}
 
-      <div className={variant === "compact" ? "-mx-1 flex gap-1 overflow-x-auto px-1 pb-1" : "-mx-2 flex gap-2.5 overflow-x-auto px-2 pb-2 pt-3"}>
+      <div className={
+        variant === "compact"
+          ? "-mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
+          : variant === "sidebar"
+            ? "flex flex-col items-center gap-2"
+            : "-mx-2 flex gap-2.5 overflow-x-auto px-2 pb-2 pt-3"
+      }>
         {displayGenerations.map((gen) => {
           // Determine thumbnail width based on aspect ratio
           const isLandscape = gen.aspect_ratio === "16:9"
           const thumbnailClass = variant === "compact"
             ? isLandscape ? "h-12 w-16" : "h-12 w-9"
-            : isLandscape
-              ? "h-16 w-[85px] md:h-20 md:w-[107px]" // 16:9 ratio
-              : "h-16 w-11 md:h-20 md:w-14" // portrait/fill
+            : variant === "sidebar"
+              ? "h-12 w-12" // Square thumbnails for thin sidebar
+              : isLandscape
+                ? "h-16 w-[85px] md:h-20 md:w-[107px]" // 16:9 ratio
+                : "h-16 w-11 md:h-20 md:w-14" // portrait/fill
 
           const showDeleteButton = gen.status === "completed" || gen.status === "failed"
 
@@ -265,7 +273,7 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
             className={`group relative shrink-0 ${thumbnailClass}`}
           >
             {/* Content container with overflow hidden */}
-            <div className="h-full w-full overflow-hidden rounded-lg bg-neutral-900 ring-1 ring-neutral-800">
+            <div className="h-full w-full overflow-hidden rounded-lg bg-neutral-50 ring-1 ring-neutral-200">
             {/* Thumbnail or status indicator */}
             {gen.status === "completed" && gen.video_url ? (
               <button
@@ -333,7 +341,7 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
             {showDeleteButton && (
               <button
                 onClick={(e) => handleDelete(gen.id, e)}
-                className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-800 text-neutral-400 opacity-0 shadow-md ring-1 ring-neutral-700 transition-all hover:bg-neutral-700 hover:text-white group-hover:opacity-100"
+                className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-100 text-black/50 opacity-0 shadow-md ring-1 ring-neutral-300 transition-all hover:bg-neutral-200 hover:text-black group-hover:opacity-100"
                 title="Delete video"
               >
                 <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

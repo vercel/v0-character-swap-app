@@ -255,7 +255,7 @@ export function BottomSheet({
   return (
     <div
       ref={sheetRef}
-      className="fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-3xl bg-neutral-950"
+      className="fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-3xl border-t border-neutral-200 bg-white"
       style={{
         height: `${expandedHeight}px`,
         willChange: "transform",
@@ -267,7 +267,7 @@ export function BottomSheet({
         className="flex shrink-0 cursor-grab items-center justify-center py-2 active:cursor-grabbing"
         onClick={() => onExpandedChange(!isExpanded)}
       >
-        <div className="h-1 w-8 rounded-full bg-neutral-700" />
+        <div className="h-1 w-8 rounded-full bg-neutral-300" />
       </div>
 
       {/* Content area */}

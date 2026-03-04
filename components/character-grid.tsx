@@ -33,6 +33,8 @@ interface CharacterGridProps {
   sendEmail?: boolean
   onSendEmailChange?: (value: boolean) => void
   userEmail?: string | null
+  // Hide generate button section (for step 1 character selection)
+  showGenerateButton?: boolean
 }
 
 export function CharacterGrid({
@@ -52,6 +54,7 @@ export function CharacterGrid({
   sendEmail = false,
   onSendEmailChange,
   userEmail,
+  showGenerateButton = true,
 }: CharacterGridProps) {
   const [prompt, setPrompt] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
@@ -59,7 +62,13 @@ export function CharacterGrid({
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [showHowItWorks, setShowHowItWorks] = useState(false)
 
-  const displayCharacters = [...DEFAULT_CHARACTERS, ...customCharacters]
+  // Deduplicate by image URL — custom characters override defaults with same image
+  const seen = new Set<string>()
+  const displayCharacters = [...DEFAULT_CHARACTERS, ...customCharacters].filter(c => {
+    if (seen.has(c.src)) return false
+    seen.add(c.src)
+    return true
+  })
 
   const handleGenerate = async () => {
     if (!prompt.trim() || isGenerating) return
@@ -123,16 +132,16 @@ export function CharacterGrid({
   return (
     <div className="relative flex max-h-full flex-col">
       <div className="shrink overflow-y-auto md:min-h-0 md:flex-1">
-        <p className="mb-2 font-mono text-[10px] lowercase text-neutral-500 md:mb-3 md:text-[11px]">
-          select character
+        <p className="mb-2 text-xl font-pixel text-black md:mb-3">
+          Select Cartoon
         </p>
 
         {/* Grid container */}
         <div className="py-1">
           <div className="flex flex-wrap gap-1.5 md:gap-2">
           {displayCharacters.length === 0 && !isGenerating && (
-            <p className="w-full py-2 text-center font-mono text-[11px] text-neutral-600">
-              create a cartoon character below
+            <p className="w-full py-2 text-center text-sm text-black/50">
+              Create your first cartoon below
             </p>
           )}
           {displayCharacters.map((char) => {
@@ -149,7 +158,7 @@ export function CharacterGrid({
                   }}
                   disabled={disabled}
                   data-selected={isSelected}
-                  className="relative h-[50px] w-[50px] overflow-hidden rounded-lg border border-neutral-800 transition-all hover:border-neutral-600 data-[selected=true]:border-[2px] data-[selected=true]:border-white disabled:cursor-not-allowed disabled:opacity-50 md:h-[56px] md:w-[56px]"
+                  className="relative h-[50px] w-[50px] overflow-hidden rounded-lg border border-neutral-200 bg-white transition-all hover:border-neutral-400 data-[selected=true]:border-[2px] data-[selected=true]:border-black disabled:cursor-not-allowed disabled:opacity-50 md:h-[56px] md:w-[56px]"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -159,6 +168,26 @@ export function CharacterGrid({
                     loading="eager"
                     draggable={false}
                   />
+                  {/* Selected overlay: expand — inside button so overflow-hidden clips it */}
+                  {isSelected && onExpand && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onExpand(char.src, char.id, true)
+                        }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onExpand(char.src, char.id, true) } }}
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30"
+                        title="View full image"
+                      >
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                        </svg>
+                      </span>
+                    </div>
+                  )}
                 </button>
 
                 {/* Delete button */}
@@ -168,56 +197,13 @@ export function CharacterGrid({
                       e.stopPropagation()
                       onDeleteCustom(char.id)
                     }}
-                    className="absolute -right-1 -top-1 z-20 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-800/90 text-neutral-500 opacity-0 ring-1 ring-neutral-700 transition-all hover:bg-neutral-700 hover:text-white group-hover:opacity-100"
+                    className="absolute -right-1 -top-1 z-20 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-100 text-black/50 opacity-0 ring-1 ring-neutral-200 transition-all hover:bg-neutral-200 hover:text-black group-hover:opacity-100"
                     title="Delete character"
                   >
                     <svg className="h-2 w-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
-                )}
-
-                {/* Selected overlay: expand + download */}
-                {isSelected && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center gap-1.5 rounded-lg bg-black/50">
-                    {onExpand && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onExpand(char.src, char.id, true)
-                        }}
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30"
-                        title="View full image"
-                      >
-                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                        </svg>
-                      </button>
-                    )}
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        try {
-                          const res = await fetch(char.src)
-                          const blob = await res.blob()
-                          const url = URL.createObjectURL(blob)
-                          const a = document.createElement("a")
-                          a.href = url
-                          a.download = `${char.name || "character"}.png`
-                          a.click()
-                          URL.revokeObjectURL(url)
-                        } catch {
-                          window.open(char.src, "_blank")
-                        }
-                      }}
-                      className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30"
-                      title="Download image"
-                    >
-                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                    </button>
-                  </div>
                 )}
               </div>
             )
@@ -226,18 +212,18 @@ export function CharacterGrid({
         </div>
 
         {/* AI Prompt Bar - always visible */}
-        <p className="mb-1 mt-3 font-mono text-[10px] lowercase text-neutral-500">
-          prompt and generate your cartoon!
+        <p className="mb-1.5 mt-4 text-xl font-pixel text-black">
+          Create Your Cartoon
         </p>
-        <div className="rounded-lg bg-neutral-900 p-3">
+        <div className="rounded-xl border border-neutral-200 bg-white p-3">
           {isGenerating ? (
             <div className="space-y-2">
-              <p className="font-mono text-[11px] text-neutral-400">
-                Generating with <span className="text-white">Nano Banana Pro</span>...
+              <p className="text-sm text-black/70">
+                Generating with <span className="font-medium text-black">Nano Banana Pro</span>...
               </p>
-              <div className="h-px w-full overflow-hidden bg-neutral-800">
+              <div className="h-px w-full overflow-hidden rounded-full bg-neutral-200">
                 <div
-                  className="h-full bg-white transition-all duration-100 ease-linear"
+                  className="h-full bg-black transition-all duration-100 ease-linear"
                   style={{ width: `${generationProgress}%` }}
                 />
               </div>
@@ -257,12 +243,12 @@ export function CharacterGrid({
                 }}
                 placeholder="e.g. a pirate cat with an eyepatch"
                 disabled={disabled}
-                className="h-8 flex-1 rounded-lg border-0 bg-neutral-800 px-3 font-mono text-[12px] text-white placeholder-neutral-500 outline-none transition-colors focus:ring-1 focus:ring-neutral-600 disabled:opacity-50"
+                className="h-9 flex-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-black placeholder-neutral-400 outline-none transition-colors focus:ring-1 focus:ring-black/20 disabled:opacity-50"
               />
               <button
                 onClick={handleGenerate}
                 disabled={disabled || !prompt.trim()}
-                className="flex h-8 items-center justify-center rounded-lg bg-white px-3 font-mono text-[11px] text-black transition-opacity hover:opacity-80 disabled:opacity-30"
+                className="flex h-9 items-center justify-center rounded-lg bg-black px-4 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-30"
               >
                 go
               </button>
@@ -272,11 +258,11 @@ export function CharacterGrid({
 
         {/* Generate error message */}
         {generateError && (
-          <div className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-[11px] text-red-400">
+          <div className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">
             {generateError}
             <button
               onClick={() => setGenerateError(null)}
-              className="ml-2 text-red-300 hover:text-red-200"
+              className="ml-2 text-red-400 hover:text-red-300"
             >
               Dismiss
             </button>
@@ -289,11 +275,11 @@ export function CharacterGrid({
       {children && <div className="shrink-0">{children}</div>}
 
       {/* Generate Video CTA */}
-      {onGenerate && (
+      {onGenerate && showGenerateButton && (
         <div className="shrink-0 pt-2 md:pt-4">
           <div className="flex flex-col gap-1.5 md:gap-4">
             {generateError && (
-              <p className="font-mono text-[10px] text-amber-400 md:text-[11px]">
+              <p className="text-xs text-yellow-500 md:text-sm">
                 {generateError}
               </p>
             )}
@@ -302,8 +288,8 @@ export function CharacterGrid({
                 <div className={cn(
                   "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors",
                   sendEmail
-                    ? "border-white bg-white"
-                    : "border-neutral-600 bg-neutral-800"
+                    ? "border-black bg-black"
+                    : "border-neutral-300 bg-neutral-100"
                 )}>
                   {sendEmail && (
                     <svg className="h-2.5 w-2.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -311,8 +297,8 @@ export function CharacterGrid({
                     </svg>
                   )}
                 </div>
-                <span className="font-mono text-[10px] text-neutral-500 md:text-[11px]">
-                  email me when ready
+                <span className="text-xs text-black/50 md:text-sm">
+                  Email me when ready
                 </span>
               </label>
             )}
@@ -330,10 +316,10 @@ export function CharacterGrid({
                 }
               }}
               className={cn(
-                "flex h-9 w-full items-center justify-center rounded-lg font-mono text-[12px] font-medium transition-all active:scale-[0.98] md:h-10 md:text-[13px]",
+                "flex h-10 w-full items-center justify-center rounded-lg text-sm font-semibold transition-all active:scale-[0.98] md:h-11 md:text-base",
                 canGenerate
-                  ? "bg-white text-black hover:bg-neutral-200"
-                  : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+                  ? "bg-black text-white hover:bg-gray-800"
+                  : "bg-neutral-100 text-black/50 hover:bg-neutral-200"
               )}
             >
               Generate video
@@ -341,24 +327,24 @@ export function CharacterGrid({
             {hasVideo && onRetake && (
               <button
                 onClick={onRetake}
-                className="flex h-9 w-full items-center justify-center rounded-lg font-mono text-[12px] font-medium text-neutral-400 transition-all hover:text-white active:scale-[0.98] md:h-10 md:text-[13px]"
+                className="flex h-10 w-full items-center justify-center rounded-lg text-sm font-medium text-black/50 transition-all hover:text-black active:scale-[0.98] md:h-11 md:text-base"
               >
                 Retake video
               </button>
             )}
-            <div className="hidden items-center justify-center gap-3 font-mono text-[10px] text-neutral-500 md:flex">
+            <div className="hidden items-center justify-center gap-3 text-xs text-black/40 md:flex">
               <a
                 href="https://v0.app/templates/1Nu0E0eAo9q"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="transition-colors hover:text-white"
+                className="transition-colors hover:text-black"
               >
                 template in v0
               </a>
-              <span className="text-neutral-700">·</span>
+              <span className="text-black/30">·</span>
               <button
                 onClick={() => setShowHowItWorks(true)}
-                className="cursor-pointer transition-colors hover:text-white"
+                className="cursor-pointer transition-colors hover:text-black"
               >
                 How it works
               </button>
@@ -377,83 +363,83 @@ export function CharacterGrid({
           ref={(el) => el?.focus()}
         >
           <div
-            className="relative max-h-[80vh] w-full max-w-md overflow-y-auto rounded-lg border border-neutral-800 bg-neutral-950 p-5"
+            className="relative max-h-[80vh] w-full max-w-md overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => setShowHowItWorks(false)}
-              className="absolute right-3 top-3 text-neutral-500 transition-colors hover:text-white"
+              className="absolute right-3 top-3 text-black/50 transition-colors hover:text-black"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
 
-            <h2 className="mb-6 font-mono text-[13px] font-medium text-white">how it works</h2>
+            <h2 className="mb-6 text-xl font-pixel text-black">How It Works</h2>
 
-            <div className="space-y-6 font-mono text-[11px] text-neutral-400">
+            <div className="space-y-6 text-sm text-black/70">
               <div>
-                <p className="mb-2 text-neutral-500">// the flow</p>
+                <p className="mb-2 text-black/40">// the flow</p>
                 <p>
                   record yourself → your video is uploaded to {" "}
-                  <a href="https://vercel.com/docs/storage/vercel-blob" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">vercel blob</a>
+                  <a href="https://vercel.com/docs/storage/vercel-blob" target="_blank" rel="noopener noreferrer" className="text-black underline hover:text-black/60">vercel blob</a>
                   {" "} → pick a character → a {" "}
-                  <a href="https://vercel.com/docs/workflow" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">vercel workflow</a>
+                  <a href="https://vercel.com/docs/workflow" target="_blank" rel="noopener noreferrer" className="text-black underline hover:text-black/60">vercel workflow</a>
                   {" "} kicks off the generation → download with picture-in-picture and watermark via cloudinary.
                 </p>
               </div>
 
               <div>
-                <p className="mb-2 text-neutral-500">// ai generation</p>
+                <p className="mb-2 text-black/40">// ai generation</p>
                 <p>
-                  <a href="https://vercel.com/docs/ai-gateway" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">ai gateway</a>
+                  <a href="https://vercel.com/docs/ai-gateway" target="_blank" rel="noopener noreferrer" className="text-black underline hover:text-black/60">ai gateway</a>
                   {" "} routes the request to klingai/kling-v2.6-motion-control. the model analyzes your facial landmarks, expressions, and head pose frame-by-frame, then transfers that motion onto the character image. the {" "}
-                  <a href="https://sdk.vercel.ai" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">ai sdk</a>
+                  <a href="https://sdk.vercel.ai" target="_blank" rel="noopener noreferrer" className="text-black underline hover:text-black/60">ai sdk</a>
                   {" "} handles polling until the video is ready.
                 </p>
               </div>
 
               <div>
-                <p className="mb-2 text-neutral-500">// infrastructure</p>
+                <p className="mb-2 text-black/40">// infrastructure</p>
                 <div className="mt-2 space-y-2">
                   <p>
-                    <a href="https://vercel.com/docs/workflow" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">workflow</a>
-                    <span className="text-neutral-500"> — </span>
+                    <a href="https://vercel.com/docs/workflow" target="_blank" rel="noopener noreferrer" className="text-black underline hover:text-black/60">workflow</a>
+                    <span className="text-black/40"> — </span>
                     durable execution that survives serverless timeouts. orchestrates: convert video → call ai gateway → save result → update db → send email.
                   </p>
                   <p>
-                    <a href="https://vercel.com/docs/storage/vercel-blob" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">blob</a>
-                    <span className="text-neutral-500"> — </span>
+                    <a href="https://vercel.com/docs/storage/vercel-blob" target="_blank" rel="noopener noreferrer" className="text-black underline hover:text-black/60">blob</a>
+                    <span className="text-black/40"> — </span>
                     stores raw recordings, character images, and generated videos. serves everything via edge cdn.
                   </p>
                   <p>
-                    <a href="https://vercel.com/docs/ai-gateway" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">ai gateway</a>
-                    <span className="text-neutral-500"> — </span>
+                    <a href="https://vercel.com/docs/ai-gateway" target="_blank" rel="noopener noreferrer" className="text-black underline hover:text-black/60">ai gateway</a>
+                    <span className="text-black/40"> — </span>
                     unified routing for ai model requests. handles auth, rate limiting, and provider abstraction for klingai.
                   </p>
                   <p>
-                    <a href="https://neon.tech" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">neon postgres</a>
-                    <span className="text-neutral-500"> — </span>
+                    <a href="https://neon.tech" target="_blank" rel="noopener noreferrer" className="text-black underline hover:text-black/60">neon postgres</a>
+                    <span className="text-black/40"> — </span>
                     tracks generation state (pending → processing → completed/failed), users, and character library.
                   </p>
                   <p>
-                    <span className="text-neutral-300">cloudinary</span>
-                    <span className="text-neutral-500"> — </span>
+                    <span className="text-black underline">cloudinary</span>
+                    <span className="text-black/40"> — </span>
                     server-side video conversion (webm/mov → mp4 for cross-browser compat) and compositing (pip overlay + watermark) on download.
                   </p>
                 </div>
               </div>
 
               <div>
-                <p className="mb-2 text-neutral-500">// built with</p>
+                <p className="mb-2 text-black/40">// built with</p>
                 <p>
-                  <a href="https://nextjs.org" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">next.js 16</a>
-                  <span className="text-neutral-500"> + </span>
-                  <a href="https://sdk.vercel.ai" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">ai sdk</a>
-                  <span className="text-neutral-500"> + </span>
-                  <a href="https://v0.dev" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">v0</a>
-                  <span className="text-neutral-500"> + </span>
-                  <a href="https://vercel.com" target="_blank" rel="noopener noreferrer" className="text-neutral-300 hover:text-white">vercel</a>
+                  <a href="https://nextjs.org" target="_blank" rel="noopener noreferrer" className="text-black underline hover:text-black/60">next.js 16</a>
+                  <span className="text-black/40"> + </span>
+                  <a href="https://sdk.vercel.ai" target="_blank" rel="noopener noreferrer" className="text-black underline hover:text-black/60">ai sdk</a>
+                  <span className="text-black/40"> + </span>
+                  <a href="https://v0.dev" target="_blank" rel="noopener noreferrer" className="text-black underline hover:text-black/60">v0</a>
+                  <span className="text-black/40"> + </span>
+                  <a href="https://vercel.com" target="_blank" rel="noopener noreferrer" className="text-black underline hover:text-black/60">vercel</a>
                 </p>
               </div>
             </div>

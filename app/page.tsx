@@ -4,6 +4,9 @@ import { useState, useCallback, useEffect, useRef } from "react"
 import Image from "next/image"
 import { CameraPreview } from "@/components/camera-preview"
 import { CharacterGrid } from "@/components/character-grid"
+import { CharacterSelection } from "@/components/character-selection"
+import { SidebarStrip } from "@/components/sidebar-strip"
+import { StepsIndicator } from "@/components/steps-indicator"
 import { useAuth } from "@/components/auth-provider"
 import { BottomSheet } from "@/components/bottom-sheet"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -16,7 +19,7 @@ import { STORAGE_KEYS } from "@/lib/constants"
 import { cn, detectImageAspectRatio } from "@/lib/utils"
 import { useCloudinaryPrewarm } from "@/hooks/use-cloudinary-prewarm"
 import { useCredits } from "@/hooks/use-credits"
-import { Coins } from "lucide-react"
+import { Coins, LogOut } from "lucide-react"
 
 // Convert a Vercel Blob video URL to MP4 via Cloudinary (for cross-browser playback)
 function toMp4Url(url: string | null): string | null {
@@ -70,6 +73,8 @@ export default function Home() {
     id: number
     isCustom: boolean
   } | null>(null)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
 
   // Video refs for sync
   const mainVideoRef = useRef<HTMLVideoElement>(null)
@@ -306,15 +311,24 @@ export default function Home() {
   const recordedVideoUrlRef = useRef(recordedVideoUrl)
   const isUploadingRef = useRef(isUploading)
   const handleResetRef = useRef(handleReset)
+  const showBuyOptionsRef = useRef(showBuyOptions)
   selectedErrorRef.current = selectedError
   resultUrlRef.current = resultUrl
   recordedVideoUrlRef.current = recordedVideoUrl
   isUploadingRef.current = isUploading
   handleResetRef.current = handleReset
+  showBuyOptionsRef.current = showBuyOptions
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (showBuyOptionsRef.current) {
+          e.preventDefault()
+          setShowBuyOptions(false)
+          setBuyAmount("")
+          setPurchaseError(null)
+          return
+        }
         if (selectedErrorRef.current) {
           e.preventDefault()
           setSelectedError(null)
@@ -332,6 +346,18 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
 
+  // Close user menu on click outside
+  useEffect(() => {
+    if (!showUserMenu) return
+    const handleClick = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [showUserMenu])
+
   const handleLoginAndContinue = useCallback(async () => {
     setIsLoggingIn(true)
     // Save the selected character's full data so we can restore it after login
@@ -348,6 +374,15 @@ export default function Home() {
     login()
   }, [recordedVideo, selectedCharacter, allCharacters, saveToSession, login])
 
+  // Step state machine: character first (1), then record (2), then generate (3)
+  const currentStep: 1 | 2 | 3 = resultUrl
+    ? 3
+    : (recordedVideo && selectedCharacter)
+      ? 3
+      : selectedCharacter
+        ? 2
+        : 1
+
   // Render helpers
   const parsedBuyAmount = Number.parseFloat(buyAmount)
   const isValidBuyAmount = buyAmount !== "" && Number.isFinite(parsedBuyAmount) && parsedBuyAmount > 0
@@ -360,229 +395,199 @@ export default function Home() {
 
     if (user) {
       return (
-        <div className="mb-4 space-y-2">
+        <div className="mb-5">
           <div className="flex items-center justify-between">
-            <span className="font-mono text-[11px] text-neutral-500">{user.name?.toLowerCase()}</span>
-            <button
-              onClick={logout}
-              className="font-mono text-[11px] text-neutral-600 transition-colors hover:text-white"
-            >
-              sign out
-            </button>
-          </div>
-          {/* Credits row */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <Coins className="h-3 w-3 text-yellow-500" />
-              {creditsLoading ? (
-                <span className="font-mono text-[11px] text-neutral-600">loading...</span>
-              ) : creditsError ? (
-                <span className="font-mono text-[11px] text-neutral-600">unavailable</span>
-              ) : (
-                <span className="font-mono text-[11px] tabular-nums text-neutral-400">
-                  ${Number.parseFloat(balance).toFixed(2)}
-                </span>
-              )}
-            </div>
-            <button
-              onClick={() => { setShowBuyOptions(!showBuyOptions); setPurchaseError(null); setBuyAmount("") }}
-              className="font-mono text-[11px] text-neutral-600 transition-colors hover:text-white"
-            >
-              {showBuyOptions ? "cancel" : "buy"}
-            </button>
-          </div>
-          {/* Expandable buy presets + custom input */}
-          {showBuyOptions && (
-            <div className="space-y-2">
-              <div className="flex gap-1.5">
-                {[5, 10, 25, 50].map((amount) => (
-                  <button
-                    key={amount}
-                    onClick={() => setBuyAmount(String(amount))}
-                    disabled={purchasing}
-                    className={`flex-1 rounded border py-1 font-mono text-[10px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                      buyAmount === String(amount)
-                        ? "border-neutral-500 text-white"
-                        : "border-neutral-800 text-neutral-400 hover:border-neutral-600 hover:text-white"
-                    }`}
-                  >
-                    ${amount}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-1.5">
-                <div className="relative flex-1">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 font-mono text-[10px] text-neutral-600">$</span>
-                  <input
-                    type="number"
-                    min="1"
-                    step="any"
-                    placeholder="0.00"
-                    value={buyAmount}
-                    onChange={(e) => { setBuyAmount(e.target.value); setPurchaseError(null) }}
-                    disabled={purchasing}
-                    className="w-full rounded border border-neutral-800 bg-transparent py-1 pl-5 pr-2 font-mono text-[10px] tabular-nums text-neutral-300 placeholder:text-neutral-700 focus:border-neutral-600 focus:outline-none disabled:opacity-40"
+            {/* App title */}
+            <h1 className="text-3xl font-pixel text-black">v0 FaceSwap</h1>
+            {/* User + credits */}
+            <div className="relative flex flex-col items-end" ref={userMenuRef}>
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-black/5"
+              >
+                {user.avatar ? (
+                  <Image
+                    src={user.avatar}
+                    alt={user.name || ""}
+                    width={24}
+                    height={24}
+                    className="rounded-full"
                   />
+                ) : (
+                  <div className="h-6 w-6 rounded-full bg-black/10" />
+                )}
+                <span className="text-sm text-black">{user.name}</span>
+              </button>
+              {showUserMenu && (
+                <div className="absolute right-0 top-full z-50 mt-1 min-w-[120px] rounded-lg border border-black/10 bg-white py-1 shadow-sm">
+                  <button
+                    onClick={() => { setShowUserMenu(false); logout() }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-black/70 transition-colors hover:bg-black/5 hover:text-black"
+                  >
+                    <LogOut className="h-3 w-3" />
+                    sign out
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleBuyCredits(parsedBuyAmount)}
-                  disabled={!isValidBuyAmount || purchasing}
-                  className="rounded border border-neutral-800 px-3 py-1 font-mono text-[10px] text-neutral-400 transition-colors hover:border-neutral-600 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {purchasing ? "..." : "purchase"}
-                </button>
-              </div>
-              {purchaseError && (
-                <p className="font-mono text-[10px] text-red-400">{purchaseError}</p>
               )}
+              <button
+                onClick={() => { setShowBuyOptions(true); setPurchaseError(null); setBuyAmount("") }}
+                className="flex items-center gap-1.5 rounded-lg px-2 py-0.5 transition-colors hover:bg-black/5"
+              >
+                <Coins className="h-3 w-3 text-yellow-500" />
+                {creditsLoading ? (
+                  <span className="text-xs text-black/50">...</span>
+                ) : creditsError ? (
+                  <span className="text-xs text-black/50">--</span>
+                ) : (
+                  <span className="text-xs tabular-nums text-black/70">
+                    ${Number.parseFloat(balance).toFixed(2)}
+                  </span>
+                )}
+              </button>
             </div>
-          )}
+          </div>
         </div>
       )
     }
 
     return (
-      <button
-        onClick={login}
-        className="mb-4 flex items-center gap-2 font-mono text-[11px] text-neutral-500 transition-colors hover:text-white"
-      >
-        <svg className="h-3 w-3" viewBox="0 0 76 65" fill="currentColor">
-          <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
-        </svg>
-        sign in with vercel
-      </button>
+      <div className="mb-5">
+        <h1 className="text-3xl font-pixel text-black">v0 FaceSwap</h1>
+        <button
+          onClick={login}
+          className="flex items-center gap-2 text-sm text-black/50 transition-colors hover:text-black"
+        >
+          <svg className="h-3 w-3" viewBox="0 0 76 65" fill="currentColor">
+            <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
+          </svg>
+          sign in with vercel
+        </button>
+      </div>
     )
   }
 
   
 
   return (
-    <main className="relative flex h-[100dvh] flex-row overflow-hidden bg-black">
-      {/* Camera/Video Section */}
-      <div className="flex flex-1 items-center justify-center" onClick={() => { if (isMobile && bottomSheetExpanded) setBottomSheetExpanded(false) }}>
+    <main className="relative flex h-[100dvh] flex-row overflow-hidden bg-white">
+      {/* Main Preview Area — fullscreen step content */}
+      <div className="flex flex-1 flex-col items-center justify-center overflow-hidden" onClick={() => { if (isMobile && bottomSheetExpanded) setBottomSheetExpanded(false) }}>
         {selectedError ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-8">
             {selectedError.characterImageUrl && (
-              <div className="h-20 w-20 overflow-hidden rounded-xl bg-neutral-900 ring-1 ring-neutral-800">
+              <div className="h-20 w-20 overflow-hidden rounded-xl bg-neutral-100 ring-1 ring-neutral-200">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={selectedError.characterImageUrl} alt="" className="h-full w-full object-cover object-top" />
               </div>
             )}
             <div className="max-w-xs text-center">
-              <p className="mb-3 font-mono text-[13px] font-medium text-white">
-                generation failed
+              <p className="mb-3 text-xl font-pixel text-black">
+                Generation Failed
               </p>
-              <p className="font-mono text-[11px] leading-relaxed text-neutral-500">
+              <p className="text-sm leading-relaxed text-black/50">
                 {selectedError.message}
               </p>
             </div>
             <button
               onClick={() => setSelectedError(null)}
-              className="rounded-lg bg-white px-5 py-2.5 font-mono text-[12px] font-medium text-black transition-colors hover:bg-neutral-200"
+              className="rounded-lg bg-black px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
             >
               try again
             </button>
           </div>
         ) : resultUrl ? (
-          <div className="relative flex h-full w-full flex-col">
-            <div className="relative min-h-0 flex-1 bg-black">
-              <video
-                ref={mainVideoRef}
-                src={resultUrl}
-                muted
-                loop
-                playsInline
-                preload="auto"
-                poster={allCharacters.find(c => c.id === selectedCharacter)?.src || undefined}
-                className="h-full w-full cursor-pointer object-contain object-center"
-                onClick={(e) => {
-                  const v = e.currentTarget
-                  if (v.paused) v.play(); else v.pause()
-                }}
-                onLoadedData={(e) => {
-                  e.currentTarget.muted = false
-                  // If no PiP needed, play immediately
-                  const hasPip = !!(sourceVideoUrl || recordedVideoUrl) && showPip
-                  if (!hasPip) {
-                    e.currentTarget.play()
-                    return
+          <div className="relative h-full w-full bg-black">
+            <video
+              ref={mainVideoRef}
+              src={resultUrl}
+              muted
+              loop
+              playsInline
+              preload="auto"
+              poster={allCharacters.find(c => c.id === selectedCharacter)?.src || undefined}
+              className="h-full w-full cursor-pointer object-contain md:object-cover"
+              onClick={(e) => {
+                const v = e.currentTarget
+                if (v.paused) v.play(); else v.pause()
+              }}
+              onLoadedData={(e) => {
+                e.currentTarget.muted = false
+                const hasPip = !!(sourceVideoUrl || recordedVideoUrl) && showPip
+                if (!hasPip) {
+                  e.currentTarget.play()
+                  return
+                }
+                const pip = pipVideoRef.current
+                if (pip && pip.readyState >= 2) {
+                  pip.currentTime = 0
+                  e.currentTarget.currentTime = 0
+                  e.currentTarget.play()
+                  pip.play()
+                }
+              }}
+              onPlay={() => {
+                setIsPlaying(true)
+                const pip = pipVideoRef.current
+                if (pip) {
+                  pip.currentTime = mainVideoRef.current?.currentTime || 0
+                  pip.play()
+                }
+              }}
+              onPause={() => {
+                setIsPlaying(false)
+                pipVideoRef.current?.pause()
+              }}
+              onSeeked={() => {
+                if (pipVideoRef.current && mainVideoRef.current) {
+                  pipVideoRef.current.currentTime = mainVideoRef.current.currentTime
+                }
+              }}
+              onTimeUpdate={(e) => {
+                const v = e.currentTarget
+                if (v.duration) setVideoProgress(v.currentTime / v.duration)
+                const pip = pipVideoRef.current
+                if (pip && v) {
+                  const diff = Math.abs(pip.currentTime - v.currentTime)
+                  if (diff > 0.15) {
+                    pip.currentTime = v.currentTime
                   }
-                  // If PiP is also ready, start both together
-                  const pip = pipVideoRef.current
-                  if (pip && pip.readyState >= 2) {
-                    pip.currentTime = 0
-                    e.currentTarget.currentTime = 0
-                    e.currentTarget.play()
-                    pip.play()
-                  }
-                }}
-                onPlay={() => {
-                  setIsPlaying(true)
-                  const pip = pipVideoRef.current
-                  if (pip) {
-                    pip.currentTime = mainVideoRef.current?.currentTime || 0
-                    pip.play()
-                  }
-                }}
-                onPause={() => {
-                  setIsPlaying(false)
-                  pipVideoRef.current?.pause()
-                }}
-                onSeeked={() => {
-                  if (pipVideoRef.current && mainVideoRef.current) {
-                    pipVideoRef.current.currentTime = mainVideoRef.current.currentTime
-                  }
-                }}
-                onTimeUpdate={(e) => {
-                  const v = e.currentTarget
-                  if (v.duration) setVideoProgress(v.currentTime / v.duration)
-                  const pip = pipVideoRef.current
-                  if (pip && v) {
-                    const diff = Math.abs(pip.currentTime - v.currentTime)
-                    if (diff > 0.15) {
-                      pip.currentTime = v.currentTime
+                }
+              }}
+            />
+            {/* PiP video overlay */}
+            {(sourceVideoUrl || recordedVideoUrl) && showPip && (
+              <div className={cn(
+                "absolute bottom-20 right-4 overflow-hidden rounded-lg border-2 border-black/20 shadow-lg",
+                pipAspectRatio === "9:16" && "aspect-[9/16] h-28 md:h-40",
+                pipAspectRatio !== "9:16" && "aspect-video w-28 md:w-48"
+              )}>
+                <video
+                  ref={pipVideoRef}
+                  src={toMp4Url(sourceVideoUrl) || recordedVideoUrl || ""}
+                  muted
+                  loop
+                  playsInline
+                  preload="auto"
+                  className="h-full w-full object-cover"
+                  onLoadedData={() => {
+                    const main = mainVideoRef.current
+                    const pip = pipVideoRef.current
+                    if (main && pip && main.readyState >= 2) {
+                      pip.currentTime = 0
+                      main.currentTime = 0
+                      main.muted = false
+                      main.play()
+                      pip.play()
                     }
-                  }
-                }}
-              />
-              {/* PiP video overlay - positioned at bottom right */}
-              {(sourceVideoUrl || recordedVideoUrl) && showPip && (
-                <div className={cn(
-                  "absolute bottom-4 right-4 overflow-hidden rounded-lg border-2 border-white/20 shadow-lg md:bottom-20",
-                  pipAspectRatio === "9:16" && "aspect-[9/16] h-28 md:h-40",
-                  pipAspectRatio !== "9:16" && "aspect-video w-28 md:w-48"
-                )}>
-                  <video
-                    ref={pipVideoRef}
-                    src={toMp4Url(sourceVideoUrl) || recordedVideoUrl || ""}
-                    muted
-                    loop
-                    playsInline
-                    preload="auto"
-                    className="h-full w-full object-cover"
-                    onLoadedData={() => {
-                      // If main is also ready, start both together
-                      const main = mainVideoRef.current
-                      const pip = pipVideoRef.current
-                      if (main && pip && main.readyState >= 2) {
-                        pip.currentTime = 0
-                        main.currentTime = 0
-                        main.muted = false
-                        main.play()
-                        pip.play()
-                      }
-                    }}
-                  />
-                </div>
-              )}
-              {/* Bottom fade gradient */}
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black to-transparent" />
-            </div>
-            {/* Playback controls + action buttons */}
-            <div className="flex shrink-0 flex-col gap-4 pb-28 pt-3 md:pb-4">
-              {/* Progress bar — full width */}
+                  }}
+                />
+              </div>
+            )}
+            {/* Overlaid controls at bottom */}
+            <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-3 bg-gradient-to-t from-black/70 via-black/40 to-transparent px-4 pb-4 pt-10">
+              {/* Progress bar */}
               <div
-                className="h-1 w-full cursor-pointer bg-neutral-800"
+                className="h-1 w-full cursor-pointer rounded-full bg-white/20"
                 onClick={(e) => {
                   if (!mainVideoRef.current) return
                   const rect = e.currentTarget.getBoundingClientRect()
@@ -591,76 +596,72 @@ export default function Home() {
                 }}
               >
                 <div
-                  className="h-full bg-white"
+                  className="h-full rounded-full bg-white"
                   style={{ width: `${videoProgress * 100}%` }}
                 />
               </div>
               {/* Buttons */}
-              <div className="flex items-center justify-center gap-3">
-              <button
-                disabled={isDownloading}
-                onClick={handleDownload}
-                className="flex items-center gap-2 rounded-full bg-white px-5 py-2 font-mono text-[12px] font-medium text-black transition-all hover:bg-neutral-200 active:scale-95 disabled:opacity-70"
-              >
-                {isDownloading ? (
-                  <>
-                    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    {Math.round(downloadProgress * 100)}%
-                  </>
-                ) : (
-                  <>
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    download
-                  </>
-                )}
-              </button>
-              <button
-                onClick={handleReset}
-                className="rounded-full bg-white px-5 py-2 font-mono text-[12px] font-medium text-black transition-all hover:bg-neutral-200 active:scale-95"
-              >
-                new video
-              </button>
-              {(sourceVideoUrl || recordedVideoUrl) && (
+              <div className="flex items-center justify-center gap-2.5">
                 <button
-                  onClick={() => setShowPip(!showPip)}
-                  className="flex items-center gap-2 rounded-full bg-white px-4 py-2 font-mono text-[12px] font-medium text-black transition-all hover:bg-neutral-200 active:scale-95"
+                  disabled={isDownloading}
+                  onClick={handleDownload}
+                  className="flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm transition-all hover:bg-white/25 active:scale-95 disabled:opacity-70"
                 >
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <rect x="2" y="3" width="20" height="14" rx="2" />
-                    <rect x="12" y="10" width="8" height="5" rx="1" />
-                  </svg>
-                  {showPip ? "pip on" : "pip off"}
+                  {isDownloading ? (
+                    <>
+                      <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      {Math.round(downloadProgress * 100)}%
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      download
+                    </>
+                  )}
                 </button>
-              )}
+                <button
+                  onClick={handleReset}
+                  className="rounded-full bg-white/15 px-4 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm transition-all hover:bg-white/25 active:scale-95"
+                >
+                  new video
+                </button>
+                {(sourceVideoUrl || recordedVideoUrl) && (
+                  <button
+                    onClick={() => setShowPip(!showPip)}
+                    className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm transition-all hover:bg-white/25 active:scale-95"
+                  >
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <rect x="2" y="3" width="20" height="14" rx="2" />
+                      <rect x="12" y="10" width="8" height="5" rx="1" />
+                    </svg>
+                    {showPip ? "pip" : "pip"}
+                  </button>
+                )}
               </div>
             </div>
           </div>
         ) : (recordedVideoUrl && showPreview) ? (
-          <div 
-            className="relative flex h-full w-full items-center justify-center bg-black"
-            onClick={(e) => {
-              // If clicked outside the video container, go back to recording
-              if (e.target === e.currentTarget) {
-                if (isUploading) {
-                  setShowUploadingWarning(true)
-                  setTimeout(() => setShowUploadingWarning(false), 2000)
-                  return
-                }
-                setShowPreview(false)
-                clearRecording()
-              }
-            }}
-          >
+          <div className="relative flex h-full w-full items-center justify-center bg-black">
+            {/* Back to character selection */}
+            <button
+              onClick={() => { setSelectedCharacter(null); setShowPreview(false) }}
+              className="absolute left-4 top-4 z-30 flex items-center gap-1.5 rounded-full bg-black/50 px-3.5 py-2 backdrop-blur-sm transition-colors hover:bg-black/70 active:bg-black/80"
+            >
+              <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="text-sm font-medium text-white">Change cartoon</span>
+            </button>
             <div className="relative h-full w-full overflow-hidden">
               <video
                 ref={previewVideoRef}
                 src={recordedVideoUrl}
-                controls={!isUploading}
+                controls={false}
                 autoPlay
                 muted
                 playsInline
@@ -683,88 +684,115 @@ export default function Home() {
                   video.play()
                 }}
               />
-              {/* Upload indicator */}
-              {isUploading && (
-                <div className={cn(
-                  "absolute left-4 top-4 flex items-center gap-2 rounded-full px-3 py-1.5 backdrop-blur-sm transition-all duration-300",
-                  showUploadingWarning ? "bg-white/90" : "bg-black/70"
-                )}>
-                  <div className={cn(
-                    "h-2 w-2 animate-pulse rounded-full",
-                    showUploadingWarning ? "bg-black" : "bg-white"
-                  )} />
-                  <span className={cn(
-                    "font-mono text-[11px]",
-                    showUploadingWarning ? "text-black" : "text-white/80"
-                  )}>
-                    {showUploadingWarning ? "Hold on, uploading your video..." : "Uploading"}
-                  </span>
-                </div>
-              )}
-              {/* Retake button */}
-              {!isUploading && (
-                <button
-                  onClick={() => { setShowPreview(false); clearRecording() }}
-                  className="absolute left-4 top-4 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 backdrop-blur-sm transition-colors active:bg-black/80"
-                >
-                  <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span className="font-mono text-[11px] text-white">Retake</span>
-                </button>
-              )}
+              {/* Bottom action bar */}
+              <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-6 pb-28 pt-12 md:pb-8">
+                {selectedCharacter ? (
+                  /* Has character — show Generate / Retake */
+                  <>
+                    {(() => {
+                      const char = allCharacters.find(c => c.id === selectedCharacter)
+                      return char ? (
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-10 w-10 overflow-hidden rounded-lg ring-2 ring-white/30">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={char.src} alt={char.name} className="h-full w-full object-cover object-top" />
+                          </div>
+                          <span className="text-sm text-white/70">{char.name}</span>
+                        </div>
+                      ) : null
+                    })()}
+                    <div className="flex flex-col items-center gap-2.5">
+                      <button
+                        onClick={handleProcess}
+                        disabled={!recordedVideo || isUploading}
+                        className="flex h-12 items-center gap-2.5 rounded-full bg-white px-7 text-[15px] font-bold text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-95 disabled:opacity-50"
+                      >
+                        {isUploading ? (
+                          <>
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-black" />
+                            Uploading video...
+                          </>
+                        ) : (
+                          "Generate cartoon video"
+                        )}
+                      </button>
+                      {!isUploading && (
+                        <button
+                          onClick={() => { setShowPreview(false); clearRecording() }}
+                          className="flex h-10 items-center gap-1.5 rounded-full bg-white/10 px-5 text-sm font-medium text-white/70 backdrop-blur-sm transition-all hover:bg-white/20 hover:text-white active:scale-95"
+                        >
+                          Retake video
+                        </button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  /* No character — just generated, offer next actions */
+                  <>
+                    <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 backdrop-blur-sm">
+                      <svg className="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-sm font-medium text-white">Generating your video...</span>
+                    </div>
+                    <button
+                      onClick={handleReset}
+                      className="flex h-12 items-center gap-2.5 rounded-full bg-white px-7 text-[15px] font-bold text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-95"
+                    >
+                      Generate a new video
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        ) : (
+        ) : currentStep === 1 ? (
+          /* Step 1: Choose character — fullscreen in preview area */
+          <CharacterSelection
+            selectedId={selectedCharacter}
+            onSelect={setSelectedCharacter}
+            customCharacters={charactersReady ? customCharacters : []}
+            onAddCustom={addCustomCharacter}
+            onDeleteCustom={deleteCustomCharacter}
+            onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
+          />
+        ) : currentStep === 2 ? (
+          /* Step 2: Record — camera with back button */
           <CameraPreview
             onVideoRecorded={handleVideoRecorded}
             isProcessing={false}
+            onBack={() => setSelectedCharacter(null)}
+          />
+        ) : (
+          /* Step 3 without result yet — shouldn't normally reach here */
+          <CameraPreview
+            onVideoRecorded={handleVideoRecorded}
+            isProcessing={false}
+            onBack={() => setSelectedCharacter(null)}
           />
         )}
       </div>
 
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar Strip */}
       {!isMobile && (
-        <div className="flex h-full w-96 flex-col border-l border-neutral-800 bg-neutral-950 p-5">
-          {renderAuthSection("desktop")}
-          <div className="min-h-0 flex-1">
-                <CharacterGrid
-                  selectedId={selectedCharacter}
-                  onSelect={setSelectedCharacter}
-                  customCharacters={charactersReady ? customCharacters : []}
-                  onAddCustom={addCustomCharacter}
-                  onDeleteCustom={deleteCustomCharacter}
-                  onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
-                  canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
-                  hasVideo={!!recordedVideo}
-                  hasCharacter={!!selectedCharacter}
-                  onGenerate={handleProcess}
-                  onRetake={() => { setShowPreview(false); clearRecording() }}
-                  sendEmail={sendEmailNotification}
-                  onSendEmailChange={setSendEmailNotification}
-                  userEmail={user?.email}
-                >
-                <GenerationsPanel
-                  onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
-                    setSelectedError(null)
-                    setSelectedGeneratedVideo(url)
-                    setResultUrl(url)
-                    setSourceVideoUrl(sourceUrl)
-                    setSourceVideoAspectRatio(sourceAR)
-                    setGeneratedVideoAspectRatio(genAR)
-                  }}
-                  onSelectError={(error) => {
-                    setResultUrl(null)
-                    setSelectedError(error)
-                  }}
-                  className="mt-4"
-                />
-              </CharacterGrid>
-          </div>
-        </div>
+        <SidebarStrip
+          onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
+            setSelectedError(null)
+            setSelectedGeneratedVideo(url)
+            setResultUrl(url)
+            setSourceVideoUrl(sourceUrl)
+            setSourceVideoAspectRatio(sourceAR)
+            setGeneratedVideoAspectRatio(genAR)
+          }}
+          onSelectError={(error) => {
+            setResultUrl(null)
+            setSelectedError(error)
+          }}
+          onBuyCredits={() => { setShowBuyOptions(true); setPurchaseError(null); setBuyAmount("") }}
+        />
       )}
 
-      {/* Mobile Bottom Sheet */}
+      {/* Mobile Bottom Sheet — content changes per step */}
       {isMobile && (
         <BottomSheet
           isExpanded={bottomSheetExpanded}
@@ -772,8 +800,9 @@ export default function Home() {
           peekHeight={100}
           peek={
             resultUrl ? (
+              /* Result: peek = generation history compact */
               <>
-                <p className="mb-1.5 font-sans text-[9px] font-medium uppercase tracking-wider text-neutral-500">
+                <p className="mb-1.5 text-xl font-pixel text-black">
                   My Videos
                 </p>
                 <GenerationsPanel
@@ -792,36 +821,76 @@ export default function Home() {
                   variant="compact"
                 />
               </>
-            ) : (
+            ) : currentStep === 1 ? (
+              /* Step 1: peek = character strip */
               <>
-                <p className="mb-1.5 font-sans text-[9px] font-medium uppercase tracking-wider text-neutral-500">
-                  Select Character
+                <div className="mb-2">
+                  <StepsIndicator currentStep={1} />
+                </div>
+                <p className="mb-1.5 text-sm font-medium text-black/50">
+                  Choose a cartoon
                 </p>
                 <div className="flex gap-1 overflow-x-auto pb-1">
-                    {allCharacters.slice(0, 8).map((char) => (
-                      <button
-                        key={char.id}
-                        onClick={() => {
-                          setSelectedCharacter(char.id)
-                          if (recordedVideo) setBottomSheetExpanded(true)
-                        }}
-                        className={cn(
-                          "relative h-12 w-9 shrink-0 overflow-hidden rounded",
-                          selectedCharacter === char.id ? "ring-2 ring-white" : "ring-1 ring-neutral-800"
-                        )}
-                      >
-                        <Image src={char.src || "/placeholder.svg"} alt={char.name} fill className="object-cover" sizes="36px" />
-                      </button>
-                    ))}
+                  {allCharacters.slice(0, 8).map((char) => (
                     <button
-                      onClick={() => setBottomSheetExpanded(true)}
-                      className="flex h-12 w-9 shrink-0 items-center justify-center rounded border border-dashed border-neutral-700"
+                      key={char.id}
+                      onClick={() => {
+                        setSelectedCharacter(char.id)
+                      }}
+                      className={cn(
+                        "relative h-12 w-9 shrink-0 overflow-hidden rounded",
+                        selectedCharacter === char.id ? "ring-2 ring-black" : "ring-1 ring-neutral-200"
+                      )}
                     >
-                      <svg className="h-3 w-3 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                      </svg>
+                      <Image src={char.src || "/placeholder.svg"} alt={char.name} fill className="object-cover" sizes="36px" />
                     </button>
-                  </div>
+                  ))}
+                  <button
+                    onClick={() => setBottomSheetExpanded(true)}
+                    className="flex h-12 w-9 shrink-0 items-center justify-center rounded border border-dashed border-neutral-300"
+                  >
+                    <svg className="h-3 w-3 text-black/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                  </button>
+                </div>
+              </>
+            ) : currentStep === 2 ? (
+              /* Step 2: peek = selected character + record status */
+              <>
+                <div className="mb-2">
+                  <StepsIndicator currentStep={2} />
+                </div>
+                <div className="flex items-center gap-2">
+                  {selectedCharacter && (() => {
+                    const char = allCharacters.find(c => c.id === selectedCharacter)
+                    return char ? (
+                      <div className="relative h-10 w-8 shrink-0 overflow-hidden rounded ring-2 ring-black">
+                        <Image src={char.src} alt={char.name} fill className="object-cover" sizes="32px" />
+                      </div>
+                    ) : null
+                  })()}
+                  <span className="text-sm text-black/50">Tap record when ready</span>
+                </div>
+              </>
+            ) : (
+              /* Step 3: peek = "Generate" button */
+              <>
+                <div className="mb-2">
+                  <StepsIndicator currentStep={3} />
+                </div>
+                <button
+                  onClick={handleProcess}
+                  disabled={!recordedVideo || !selectedCharacter}
+                  className={cn(
+                    "flex h-10 w-full items-center justify-center rounded-lg text-sm font-semibold transition-all active:scale-[0.98]",
+                    (recordedVideo && selectedCharacter)
+                      ? "bg-black text-white hover:bg-gray-800"
+                      : "bg-neutral-100 text-black/50"
+                  )}
+                >
+                  Generate video
+                </button>
               </>
             )
           }
@@ -846,7 +915,7 @@ export default function Home() {
                 }}
                 className="mb-6"
               />
-              <p className="mb-3 font-sans text-[11px] font-medium uppercase tracking-wider text-neutral-500">
+              <p className="mb-3 text-xl font-pixel text-black">
                 Create New
               </p>
               <CharacterGrid
@@ -866,7 +935,8 @@ export default function Home() {
                 userEmail={user?.email}
               />
             </>
-          ) : (
+          ) : currentStep === 1 ? (
+            /* Step 1 expanded: full character grid + create */
             <CharacterGrid
               selectedId={selectedCharacter}
               onSelect={setSelectedCharacter}
@@ -874,33 +944,44 @@ export default function Home() {
               onAddCustom={addCustomCharacter}
               onDeleteCustom={deleteCustomCharacter}
               onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
-              canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
-              hasVideo={!!recordedVideo}
+              hasVideo={true}
               hasCharacter={!!selectedCharacter}
-              onGenerate={handleProcess}
-              onRetake={() => { setShowPreview(false); clearRecording() }}
-              sendEmail={sendEmailNotification}
-              onSendEmailChange={setSendEmailNotification}
-              userEmail={user?.email}
-            >
-              <GenerationsPanel
-                onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
-                  setSelectedError(null)
-                  setSelectedGeneratedVideo(url)
-                  setResultUrl(url)
-                  setSourceVideoUrl(sourceUrl)
-                  setSourceVideoAspectRatio(sourceAR)
-                  setGeneratedVideoAspectRatio(genAR)
-                  setBottomSheetExpanded(false)
-                }}
-                onSelectError={(error) => {
-                  setResultUrl(null)
-                  setSelectedError(error)
-                  setBottomSheetExpanded(false)
-                }}
-                className="mt-4"
+              showGenerateButton={false}
+            />
+          ) : currentStep === 2 ? (
+            /* Step 2 expanded: tips */
+            <div className="flex flex-col gap-3 py-2">
+              <p className="text-sm font-semibold text-black/50">Tips for best results</p>
+              <p className="text-sm text-black">
+                <span className="text-black/40">1.</span> Show head + upper body clearly
+              </p>
+              <p className="text-sm text-black">
+                <span className="text-black/40">2.</span> Good lighting on your face
+              </p>
+              <p className="text-sm text-black">
+                <span className="text-black/40">3.</span> Record 3-30 seconds of movement
+              </p>
+            </div>
+          ) : (
+            /* Step 3 expanded: generate options */
+            <div className="flex flex-col gap-3">
+              <CharacterGrid
+                selectedId={selectedCharacter}
+                onSelect={setSelectedCharacter}
+                customCharacters={charactersReady ? customCharacters : []}
+                onAddCustom={addCustomCharacter}
+                onDeleteCustom={deleteCustomCharacter}
+                onExpand={(imageUrl, id, isCustom) => setExpandedCharacter({ imageUrl, id, isCustom })}
+                canGenerate={!!recordedVideo && !!selectedCharacter && !resultUrl}
+                hasVideo={!!recordedVideo}
+                hasCharacter={!!selectedCharacter}
+                onGenerate={handleProcess}
+                onRetake={() => { setShowPreview(false); clearRecording() }}
+                sendEmail={sendEmailNotification}
+                onSendEmailChange={setSendEmailNotification}
+                userEmail={user?.email}
               />
-            </CharacterGrid>
+            </div>
           )}
         </BottomSheet>
       )}
@@ -908,16 +989,16 @@ export default function Home() {
       {/* Login Modal */}
       {showLoginModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-sm rounded-lg bg-neutral-900 p-6">
-            <h2 className="mb-2 font-sans text-lg font-semibold text-white">Sign in to generate</h2>
-            <p className="mb-6 font-sans text-[13px] text-neutral-400">
+          <div className="mx-4 w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 shadow-xl">
+            <h2 className="mb-2 text-lg font-semibold text-black">Sign in to generate</h2>
+            <p className="mb-6 text-sm text-black/70">
               Create an account to generate your video. Your recording and character selection will be saved.
             </p>
             <div className="flex flex-col gap-3">
               <button
                 onClick={handleLoginAndContinue}
                 disabled={isLoggingIn}
-                className="flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-sans text-[13px] font-medium text-black transition-all hover:bg-neutral-200 active:scale-[0.98] disabled:opacity-70"
+                className="flex items-center justify-center gap-2 rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 active:scale-[0.98] disabled:opacity-70"
               >
                 {isLoggingIn ? (
                   <>
@@ -939,7 +1020,7 @@ export default function Home() {
               <button
                 onClick={() => setShowLoginModal(false)}
                 disabled={isLoggingIn}
-                className="rounded-lg px-4 py-3 font-sans text-[13px] text-neutral-400 transition-colors hover:text-white disabled:opacity-50"
+                className="rounded-xl px-4 py-3 text-sm text-black/50 transition-colors hover:text-black disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -949,10 +1030,82 @@ export default function Home() {
       )}
 
 
+      {/* Buy Credits Modal */}
+      {showBuyOptions && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => { setShowBuyOptions(false); setBuyAmount(""); setPurchaseError(null) }}
+        >
+          <div
+            className="mx-4 w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-1 text-lg font-semibold text-black">Buy Credits</h2>
+            <p className="mb-4 text-sm text-black/50">
+              {!creditsLoading && !creditsError && (
+                <>Current balance: <span className="tabular-nums font-medium text-black">${Number.parseFloat(balance).toFixed(2)}</span></>
+              )}
+            </p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-4 gap-2">
+                {[5, 10, 25, 50].map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => setBuyAmount(String(amount))}
+                    disabled={purchasing}
+                    className={`rounded-xl border py-2.5 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                      buyAmount === String(amount)
+                        ? "border-black bg-black text-white"
+                        : "border-neutral-200 text-black hover:border-neutral-400 hover:text-black"
+                    }`}
+                  >
+                    ${amount}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-black/40">$</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="any"
+                    placeholder="Custom amount"
+                    value={buyAmount}
+                    onChange={(e) => { setBuyAmount(e.target.value); setPurchaseError(null) }}
+                    disabled={purchasing}
+                    className="w-full rounded-xl border border-neutral-200 bg-neutral-50 py-2.5 pl-7 pr-3 text-sm tabular-nums text-black placeholder:text-black/40 focus:border-neutral-400 focus:outline-none disabled:opacity-40"
+                  />
+                </div>
+              </div>
+              {purchaseError && (
+                <p className="text-xs text-red-500">{purchaseError}</p>
+              )}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => { setShowBuyOptions(false); setBuyAmount(""); setPurchaseError(null) }}
+                  disabled={purchasing}
+                  className="flex-1 rounded-xl px-4 py-2.5 text-sm text-black/50 transition-colors hover:text-black disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleBuyCredits(parsedBuyAmount)}
+                  disabled={!isValidBuyAmount || purchasing}
+                  className="flex-1 rounded-xl bg-black px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {purchasing ? "Processing..." : "Purchase"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Error Toast */}
       {errorToast && (
           <div className="fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-lg bg-red-900 px-4 py-2 shadow-lg">
-          <p className="font-sans text-[13px] text-white">{errorToast}</p>
+          <p className="text-sm font-medium text-white">{errorToast}</p>
         </div>
       )}
 
@@ -967,18 +1120,44 @@ export default function Home() {
           tabIndex={0}
           ref={(el) => el?.focus()}
         >
-          {/* Close button */}
-          <button
-            onClick={() => setExpandedCharacter(null)}
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          {/* Top-right actions */}
+          <div className="absolute right-4 top-4 flex items-center gap-2">
+            <button
+              onClick={async (e) => {
+                e.stopPropagation()
+                try {
+                  const res = await fetch(expandedCharacter.imageUrl)
+                  const blob = await res.blob()
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement("a")
+                  a.href = url
+                  const char = allCharacters.find(c => c.id === expandedCharacter.id)
+                  a.download = `${char?.name || "character"}.png`
+                  a.click()
+                  URL.revokeObjectURL(url)
+                } catch {
+                  window.open(expandedCharacter.imageUrl, "_blank")
+                }
+              }}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+              title="Download image"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setExpandedCharacter(null)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
 
-          <img 
-            src={expandedCharacter.imageUrl} 
+          <img
+            src={expandedCharacter.imageUrl}
             alt="Character preview"
             className="max-h-[80vh] max-w-[90vw] rounded-lg object-contain"
             onClick={(e) => e.stopPropagation()}

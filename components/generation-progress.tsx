@@ -69,14 +69,14 @@ export function GenerationProgress({
   }, [createdAt])
 
   return (
-    <div className="group relative flex h-full w-full flex-col overflow-hidden">
+    <div className="group relative flex h-full w-full flex-col overflow-hidden bg-black/80">
       {/* Background character image */}
       {characterImageUrl && (
         <Image
           src={characterImageUrl}
           alt=""
           fill
-          className="object-cover opacity-20"
+          className="object-cover opacity-30"
           sizes="56px"
         />
       )}
@@ -89,7 +89,7 @@ export function GenerationProgress({
             <circle
               cx="18" cy="18" r="15"
               fill="none" stroke="currentColor" strokeWidth="2.5"
-              className="text-neutral-800"
+              className="text-white/20"
             />
             <circle
               cx="18" cy="18" r="15"
@@ -99,7 +99,7 @@ export function GenerationProgress({
               className="text-white transition-all duration-1000"
             />
           </svg>
-          <span className="absolute inset-0 flex items-center justify-center font-mono text-[8px] font-semibold tabular-nums text-white">
+          <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold tabular-nums text-white">
             {Math.round(progress)}%
           </span>
         </div>
@@ -115,7 +115,7 @@ export function GenerationProgress({
           className="absolute inset-0 z-20 flex items-center justify-center bg-black/70 opacity-0 transition-opacity group-hover:opacity-100"
           title="Cancel generation"
         >
-          <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
@@ -186,7 +186,7 @@ export function GenerationProgressExpanded({
 
         <div className="flex-1">
           {/* Status message */}
-          <p className="mb-2 font-sans text-[13px] font-medium text-white">
+          <p className="mb-2 text-sm font-medium text-white">
             {getStatusMessage()}
           </p>
 
@@ -200,10 +200,10 @@ export function GenerationProgressExpanded({
 
           {/* Time info */}
           <div className="flex items-center justify-between">
-            <span className="font-mono text-[11px] text-neutral-500">
+            <span className="text-sm text-black/50">
               {characterName || "Generating"}
             </span>
-            <span className="font-mono text-[11px] tabular-nums text-neutral-400">
+            <span className="text-sm tabular-nums text-black/40">
               Elapsed: {formatTime(elapsedSeconds)}
             </span>
           </div>
@@ -214,7 +214,7 @@ export function GenerationProgressExpanded({
       {onCancel && (
         <button
           onClick={onCancel}
-          className="mt-3 w-full rounded-lg bg-neutral-800 px-3 py-2 font-sans text-[12px] text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-white"
+          className="mt-3 w-full rounded-lg bg-neutral-800 px-3 py-2 text-sm text-black/40 transition-colors hover:bg-neutral-700 hover:text-white"
         >
           Cancel Generation
         </button>

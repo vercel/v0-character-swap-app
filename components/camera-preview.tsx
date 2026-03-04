@@ -9,9 +9,10 @@ interface CameraPreviewProps {
   progress?: number
   progressMessage?: string
   isError?: boolean
+  onBack?: () => void
 }
 
-export function CameraPreview({ onVideoRecorded, isProcessing, progress, progressMessage, isError }: CameraPreviewProps) {
+export function CameraPreview({ onVideoRecorded, isProcessing, progress, progressMessage, isError, onBack }: CameraPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -19,14 +20,12 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
   const [isRecording, setIsRecording] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [recordingTime, setRecordingTime] = useState(0)
-  const [countdown, setCountdown] = useState<number | null>(null)
   const [showFlash, setShowFlash] = useState(false)
   const [showTips, setShowTips] = useState(true)
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user")
   // Always use fill aspect ratio
   const aspectRatio = "fill" as const
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const countdownRef = useRef<NodeJS.Timeout | null>(null)
   const isStartingRef = useRef(false)
 
   const startCamera = useCallback(async () => {
@@ -62,7 +61,6 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         tracks.forEach((track) => track.stop())
       }
       if (timerRef.current) clearInterval(timerRef.current)
-      if (countdownRef.current) clearInterval(countdownRef.current)
     }
   }, [startCamera])
 
@@ -236,40 +234,16 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
 
   const startRecording = useCallback(() => {
     if (!videoRef.current?.srcObject || isStartingRef.current) return
-    
+
     isStartingRef.current = true
-    
-    // Clear any existing countdown
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current)
-      countdownRef.current = null
-    }
-    
-    // Start countdown
-    setCountdown(3)
-    
-    countdownRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev === null) return null
-        if (prev <= 1) {
-          if (countdownRef.current) {
-            clearInterval(countdownRef.current)
-            countdownRef.current = null
-          }
-          // Flash effect
-          setShowFlash(true)
-          setTimeout(() => setShowFlash(false), 150)
-          // Start actual recording
-          setTimeout(() => {
-            setCountdown(null)
-            beginRecording()
-            isStartingRef.current = false
-          }, 150)
-          return null
-        }
-        return prev - 1
-      })
-    }, 1000)
+
+    // Flash effect then start recording immediately — no countdown
+    setShowFlash(true)
+    setTimeout(() => setShowFlash(false), 150)
+    setTimeout(() => {
+      beginRecording()
+      isStartingRef.current = false
+    }, 150)
   }, [beginRecording])
 
   const MIN_RECORDING_SECONDS = MIN_VIDEO_DURATION
@@ -293,7 +267,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
   if (hasPermission === false) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-neutral-500">Camera access denied</p>
+        <p className="text-black/50">Camera access denied</p>
       </div>
     )
   }
@@ -302,7 +276,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     <div className="relative flex h-full w-full">
 
 
-      <div className="relative h-full w-full overflow-hidden bg-neutral-900">
+      <div className="relative h-full w-full overflow-hidden bg-white">
         <video
           ref={videoRef}
           autoPlay
@@ -319,38 +293,27 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
 
         {/* Tips overlay */}
         {showTips && hasPermission && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 px-6 backdrop-blur-sm">
-            <div className="flex max-w-[280px] flex-col gap-4">
-              <div className="flex flex-col gap-0.5">
-                <p className="font-mono text-[12px] text-neutral-400">
-                  Using{" "}
-                  <span className="text-white">Kling AI Motion Control</span>
-                </p>
-                <p className="font-mono text-[12px] text-neutral-400">
-                  via{" "}
-                  <a 
-                    href="https://vercel.com/ai-gateway" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-white underline underline-offset-2 hover:text-neutral-300"
-                  >
-                    AI Gateway
-                  </a>
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/90 px-6 backdrop-blur-sm">
+            <div className="flex max-w-[300px] flex-col gap-5">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-2xl font-bold text-black">
+                  Record a short video
+                </h2>
+                <p className="text-sm text-black/50">
+                  We&apos;ll use AI to transform you into your cartoon — move naturally, make expressions!
                 </p>
               </div>
-              
-              <div className="flex flex-col gap-2">
-                <p className="font-mono text-[11px] uppercase tracking-wide text-neutral-500">
-                  For best results
+
+              <div className="flex flex-col gap-2.5 rounded-xl bg-black/5 p-3.5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-black/40">Tips</p>
+                <p className="text-sm leading-relaxed text-black">
+                  <span className="text-black/30">1.</span> Frame your <span className="font-semibold">head + upper body</span>
                 </p>
-                <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
-                  <span className="text-white">1.</span> <span className="font-semibold text-white">Show head + upper body</span> clearly
+                <p className="text-sm leading-relaxed text-black">
+                  <span className="text-black/30">2.</span> Find <span className="font-semibold">good lighting</span> on your face
                 </p>
-                <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
-                  <span className="text-white">2.</span> Good lighting on your face
-                </p>
-                <p className="font-mono text-[13px] leading-relaxed text-neutral-300">
-                  <span className="text-white">3.</span> Record <span className="font-semibold text-white">3-{MAX_VIDEO_DURATION} seconds</span>
+                <p className="text-sm leading-relaxed text-black">
+                  <span className="text-black/30">3.</span> Record <span className="font-semibold">{MIN_VIDEO_DURATION}-{MAX_VIDEO_DURATION} seconds</span> of movement
                 </p>
               </div>
             </div>
@@ -358,7 +321,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         )}
 
         {/* Flip camera button */}
-        {!isRecording && !showTips && countdown === null && hasPermission && (
+        {!isRecording && !showTips && hasPermission && (
           <button
             onClick={() => setFacingMode(f => f === "user" ? "environment" : "user")}
             className="absolute right-3 top-3 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm transition-colors active:bg-black/60 md:hidden"
@@ -370,19 +333,23 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
           </button>
         )}
 
-        {/* Countdown overlay */}
-        {countdown !== null && (
-          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <span className="font-mono text-8xl font-bold text-white animate-in zoom-in duration-200">
-              {countdown}
-            </span>
-          </div>
+        {/* Change character button */}
+        {onBack && !isRecording && !showTips && (
+          <button
+            onClick={onBack}
+            className="absolute left-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 backdrop-blur-sm transition-colors active:bg-black/60"
+          >
+            <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            <span className="text-sm text-white">Change cartoon</span>
+          </button>
         )}
 
         {isRecording && (
           <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/40 px-2.5 py-1.5 backdrop-blur-sm md:left-4 md:top-4">
             <span className={`h-2 w-2 rounded-full ${recordingTime >= MAX_VIDEO_DURATION - 6 ? "bg-amber-500" : "bg-red-500"} animate-pulse`} />
-            <span className={`font-mono text-[11px] tabular-nums md:text-xs ${recordingTime >= MAX_VIDEO_DURATION - 6 ? "text-amber-400" : "text-white"}`}>
+            <span className={`text-[11px] tabular-nums md:text-xs ${recordingTime >= MAX_VIDEO_DURATION - 6 ? "text-amber-400" : "text-white"}`}>
               {recordingTime}/{MAX_VIDEO_DURATION}s
             </span>
           </div>
@@ -391,9 +358,9 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         {/* Minimum duration indicator - show for first 3 seconds */}
         {isRecording && recordingTime < MIN_RECORDING_SECONDS && (
           <div className="absolute inset-x-0 top-14 flex justify-center md:top-16">
-            <div className="rounded-lg bg-neutral-800 px-4 py-2 shadow-lg">
-              <span className="font-mono text-[13px] text-neutral-300">
-                Min. <span className="font-semibold text-white">{MIN_RECORDING_SECONDS - recordingTime}s</span> more
+            <div className="rounded-lg bg-neutral-100 px-4 py-2 shadow-lg backdrop-blur-sm">
+              <span className="text-sm text-black">
+                Min. <span className="font-semibold text-black">{MIN_RECORDING_SECONDS - recordingTime}s</span> more
               </span>
             </div>
           </div>
@@ -403,7 +370,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
         {isRecording && recordingTime >= MAX_VIDEO_DURATION - 6 && (
           <div className="absolute inset-x-0 top-14 flex justify-center md:top-16">
             <div className="animate-pulse rounded-lg bg-amber-500 px-4 py-2 shadow-lg">
-              <span className="font-mono text-[13px] font-semibold text-black">
+              <span className="text-sm font-semibold text-black">
                 {Math.max(1, MAX_VIDEO_DURATION - 1 - recordingTime)}s left
               </span>
             </div>
@@ -416,16 +383,16 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
           {showTips && hasPermission && (
             <button
               onClick={() => setShowTips(false)}
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-white font-sans text-[15px] font-semibold text-black transition-all hover:scale-105 hover:bg-neutral-200 active:scale-95 md:h-[72px] md:w-[72px] md:text-[16px]"
+              className="flex h-16 w-16 items-center justify-center rounded-full bg-black font-sans text-[15px] font-semibold text-white transition-all hover:scale-105 hover:bg-gray-800 active:scale-95 md:h-[72px] md:w-[72px] md:text-[16px]"
             >
               OK
             </button>
           )}
           
-          {!isRecording && !isProcessing && countdown === null && !showTips && (
+          {!isRecording && !isProcessing && !showTips && (
             <button
               onClick={startRecording}
-              className="flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-white/90 bg-transparent transition-all hover:scale-105 active:scale-95 md:h-[72px] md:w-[72px]"
+              className="flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-neutral-300 bg-transparent transition-all hover:scale-105 active:scale-95 md:h-[72px] md:w-[72px]"
               aria-label="Start recording"
             >
               <span className="h-[52px] w-[52px] rounded-full bg-red-500 md:h-[58px] md:w-[58px]" />
@@ -437,13 +404,13 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
               onClick={stopRecording}
               disabled={recordingTime < MIN_RECORDING_SECONDS}
               className={`flex h-16 w-16 items-center justify-center rounded-full border-[3px] transition-all md:h-[72px] md:w-[72px] ${
-                recordingTime < MIN_RECORDING_SECONDS 
-                  ? "cursor-not-allowed border-neutral-600 opacity-50" 
-                  : "border-white/90 bg-transparent hover:scale-105 active:scale-95"
+                recordingTime < MIN_RECORDING_SECONDS
+                  ? "cursor-not-allowed border-neutral-200 opacity-50"
+                  : "border-neutral-300 bg-transparent hover:scale-105 active:scale-95"
               }`}
               aria-label={recordingTime < MIN_RECORDING_SECONDS ? `Recording minimum ${MIN_RECORDING_SECONDS - recordingTime}s more` : "Stop recording"}
             >
-              <span className={`h-6 w-6 rounded-[4px] md:h-7 md:w-7 ${recordingTime < MIN_RECORDING_SECONDS ? "bg-neutral-500" : "bg-white"}`} />
+              <span className={`h-6 w-6 rounded-[4px] md:h-7 md:w-7 ${recordingTime < MIN_RECORDING_SECONDS ? "bg-neutral-400" : "bg-white"}`} />
             </button>
           )}
 
@@ -469,16 +436,16 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
   
   {/* Progress bar */}
   {!isError && (
-  <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-800">
+  <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-200">
   <div
-  className="h-full rounded-full bg-white transition-all duration-500 ease-out"
+  className="h-full rounded-full bg-black transition-all duration-500 ease-out"
   style={{ width: `${Math.round(progress)}%` }}
   />
               </div>
               )}
               {/* Percentage */}
               {!isError && (
-              <p className="font-mono text-[13px] tabular-nums text-neutral-400">
+              <p className="text-sm tabular-nums text-neutral-300">
                 {Math.round(progress)}%
               </p>
               )}

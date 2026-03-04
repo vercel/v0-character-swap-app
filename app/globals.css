@@ -1,82 +1,80 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+@font-face {
+  font-family: 'Geist Pixel';
+  src: url('/fonts/GeistPixelBETA-Circle.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #000000;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --accent: #f5f5f5;
+  --accent-foreground: #0a0a0a;
+  --destructive: #e05577;
+  --destructive-foreground: #ffffff;
+  --border: #e5e5e5;
+  --input: #ffffff;
+  --ring: #000000;
+  --radius: 0.75rem;
+  --sidebar: #f5f5f5;
+  --sidebar-foreground: #0a0a0a;
+  --sidebar-primary: #000000;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f5f5f5;
+  --sidebar-accent-foreground: #0a0a0a;
+  --sidebar-border: #e5e5e5;
+  --sidebar-ring: #000000;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #000000;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --accent: #f5f5f5;
+  --accent-foreground: #0a0a0a;
+  --destructive: #e05577;
+  --destructive-foreground: #ffffff;
+  --border: #e5e5e5;
+  --input: #ffffff;
+  --ring: #000000;
+  --sidebar: #f5f5f5;
+  --sidebar-foreground: #0a0a0a;
+  --sidebar-primary: #000000;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f5f5f5;
+  --sidebar-accent-foreground: #0a0a0a;
+  --sidebar-border: #e5e5e5;
+  --sidebar-ring: #000000;
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: 'Geist Pixel', var(--font-geist-sans), sans-serif;
+  --font-pixel: 'Geist Pixel', var(--font-geist-sans), sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -96,11 +94,6 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -115,25 +108,71 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/*
+ * Design System — "Pixar Subtle"
+ *
+ * Palette: black + white + one warm accent. No grays for text.
+ * Typography: Geist Sans everywhere. Bold headings, medium body.
+ * Spacing: generous but not wasteful.
+ *
+ * Text hierarchy (use these classes):
+ *   .ds-heading   — section titles     (text-sm font-bold text-black)
+ *   .ds-body      — primary content    (text-sm font-medium text-black)
+ *   .ds-caption   — secondary/helper   (text-xs font-medium text-black/60)
+ *   .ds-label     — small labels       (text-xs font-semibold text-black)
+ *
+ * Surfaces:
+ *   bg-white, border-black/10, ring-black/10
+ *   Hover states: bg-black/5
+ *
+ * Buttons:
+ *   .ds-btn-primary   — black bg, white text, bold
+ *   .ds-btn-secondary — transparent, black text, hover bg-black/5
+ *
+ * Accent: yellow-500 for credits icon only. Nothing else colored.
+ */
+
+.ds-heading {
+  @apply text-xl font-normal text-black font-pixel;
+}
+.ds-body {
+  @apply text-sm font-medium text-black;
+}
+.ds-caption {
+  @apply text-xs font-medium text-black/60;
+}
+.ds-label {
+  @apply text-xs font-semibold text-black;
+}
+.ds-btn-primary {
+  @apply rounded-xl bg-black px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-black/80 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed;
+}
+.ds-btn-secondary {
+  @apply rounded-xl px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-black/5 disabled:opacity-50;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   html, body {
-    @apply bg-black text-foreground;
-    /* Extend content under iOS safe areas */
+    @apply text-foreground;
+    background: #ffffff;
     padding: 0;
     margin: 0;
-    /* Prevent iOS rubber-banding / bounce scroll */
-    overflow: hidden;
-    position: fixed;
-    width: 100%;
-    height: 100dvh;
     overscroll-behavior: none;
   }
+
+  /* Lock scroll on mobile only — desktop needs scroll when zoomed */
+  @media (max-width: 767px) {
+    html, body {
+      overflow: hidden;
+      position: fixed;
+      width: 100%;
+      height: 100dvh;
+    }
+  }
 }
-
-
 
 /* Hide scrollbar */
 .scrollbar-none {
@@ -144,10 +183,10 @@
   display: none;
 }
 
-/* Dark scrollbar styling */
+/* Neutral scrollbar styling */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgb(64 64 64) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -160,12 +199,12 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: rgb(64 64 64);
+  background-color: rgba(0, 0, 0, 0.15);
   border-radius: 3px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background-color: rgb(82 82 82);
+  background-color: rgba(0, 0, 0, 0.25);
 }
 
 /* Shimmer animation for indeterminate progress bar */

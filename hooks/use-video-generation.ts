@@ -133,7 +133,10 @@ export function useVideoGeneration({
         generationId = id
 
         // 2. Trigger refresh so it appears in "My Videos" immediately
+        // Fire multiple times to beat SWR deduping (2s interval)
         window.dispatchEvent(new CustomEvent("refresh-generations"))
+        setTimeout(() => window.dispatchEvent(new CustomEvent("refresh-generations")), 500)
+        setTimeout(() => window.dispatchEvent(new CustomEvent("refresh-generations")), 2100)
 
         // 3. Get the video (waits for processing if still in progress)
         const video = await getVideo()

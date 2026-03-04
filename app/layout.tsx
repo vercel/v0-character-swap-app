@@ -1,12 +1,15 @@
 import React from "react"
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import localFont from "next/font/local"
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/components/auth-provider'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const geistPixel = localFont({
+  src: "../public/fonts/GeistPixelBETA-Circle.otf",
+  variable: "--font-geist-pixel",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
   title: 'v0 Face Swap',
@@ -32,7 +35,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport = {
-  themeColor: '#000000',
+  themeColor: '#ffffff',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -46,8 +49,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`font-sans antialiased`}>
+    <html lang="en" className={geistPixel.variable}>
+      <body className={`${geistPixel.className} antialiased`}>
         <AuthProvider>
           {children}
         </AuthProvider>
