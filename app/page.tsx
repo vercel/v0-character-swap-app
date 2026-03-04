@@ -625,11 +625,11 @@ export default function Home() {
               </div>
             </div>
           </div>
-        ) : (recordedVideoUrl && showPreview) ? (
+        ) : (recordedVideoUrl && showPreview && selectedCharacter) ? (
           <div className="relative flex h-full w-full items-center justify-center bg-black">
             {/* Back to character selection */}
             <button
-              onClick={() => { setSelectedCharacter(null); setConfirmedCharacter(false); setShowPreview(false) }}
+              onClick={() => { setSelectedCharacter(null); setConfirmedCharacter(false) }}
               className="absolute left-4 top-4 z-30 flex items-center gap-1.5 rounded-full bg-black/50 px-3.5 py-2 backdrop-blur-sm transition-colors hover:bg-black/70 active:bg-black/80"
             >
               <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
