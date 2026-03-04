@@ -6,6 +6,20 @@ import { useCredits } from "@/hooks/use-credits"
 import { GenerationsPanel } from "@/components/generations-panel"
 import { Coins, LogOut } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
+import useSWR from "swr"
+
+function thumbUrl(src: string): string {
+  return `/_next/image?url=${encodeURIComponent(src)}&w=256&q=75`
+}
+
+const fetcher = (url: string) => fetch(url).then(res => res.json())
+
+interface ShowcaseVideo {
+  video_url: string
+  character_image_url: string | null
+  character_name: string | null
+  aspect_ratio: string
+}
 
 interface SidebarStripProps {
   onSelectVideo: (videoUrl: string, sourceVideoUrl: string | null, sourceAspectRatio: "9:16" | "16:9" | "fill", generatedAspectRatio: "9:16" | "16:9" | "fill") => void
@@ -18,6 +32,14 @@ export function SidebarStrip({ onSelectVideo, onSelectError, onBuyCredits }: Sid
   const { balance, creditsLoading, error: creditsError } = useCredits()
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Showcase videos for all users (approved community submissions)
+  const { data: showcaseData } = useSWR<{ generations: ShowcaseVideo[] }>(
+    "/api/generations/showcase",
+    fetcher,
+    { dedupingInterval: 60000 }
+  )
+  const showcaseVideos = showcaseData?.generations || []
 
   useEffect(() => {
     if (!showMenu) return
@@ -95,11 +117,57 @@ export function SidebarStrip({ onSelectVideo, onSelectError, onBuyCredits }: Sid
 
       {/* Generation thumbnails — vertical scroll */}
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5">
+        {/* User's own generations */}
         <GenerationsPanel
           onSelectVideo={onSelectVideo}
           onSelectError={onSelectError}
           variant="sidebar"
         />
+
+        {/* Community showcase videos */}
+        {showcaseVideos.length > 0 && (
+          <div className="flex flex-col items-center gap-2 mt-2">
+            <span className="text-[9px] font-medium uppercase tracking-wider text-black/30">community</span>
+            {showcaseVideos.map((vid, i) => (
+              <button
+                key={i}
+                className="group relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-neutral-50 ring-1 ring-neutral-200"
+                onClick={() => onSelectVideo(vid.video_url, null, "fill", (vid.aspect_ratio as "9:16" | "16:9" | "fill") || "fill")}
+                onMouseEnter={(e) => {
+                  const video = e.currentTarget.querySelector("video")
+                  video?.play()
+                }}
+                onMouseLeave={(e) => {
+                  const video = e.currentTarget.querySelector("video")
+                  if (video) { video.pause(); video.currentTime = 0 }
+                }}
+              >
+                {vid.character_image_url && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={thumbUrl(vid.character_image_url)}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="lazy"
+                    draggable={false}
+                  />
+                )}
+                <video
+                  src={vid.video_url}
+                  className="relative h-full w-full object-cover"
+                  muted
+                  playsInline
+                  preload="none"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100">
+                  <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Bottom: Open in v0 */}
