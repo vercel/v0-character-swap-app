@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import { useRef, useEffect, useState, useCallback, Suspense } from "react"
+import { useRef, useEffect, useState, Suspense } from "react"
 import { CameraPreview } from "@/components/camera-preview"
 import { useVideo } from "@/providers/video-context"
 import { useCharacters } from "@/hooks/use-characters"

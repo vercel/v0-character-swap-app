@@ -31,7 +31,6 @@ export function SidebarStrip({ onBuyCredits }: SidebarStripProps) {
   return (
     <>
       {/* Desktop: vertical sidebar on the right */}
-      {/* Desktop: vertical sidebar on the right */}
       {authLoading ? (
         <div className="hidden h-full w-[72px] shrink-0 flex-col items-center border-l border-neutral-200 bg-white py-3 md:flex">
           <div className="h-10 w-10 animate-pulse rounded-full bg-neutral-100" />
@@ -83,7 +82,6 @@ export function SidebarStrip({ onBuyCredits }: SidebarStripProps) {
 
           <div className="min-h-0 flex-1 overflow-y-auto px-1.5">
             <GenerationsPanel
-
               variant="sidebar"
             />
           </div>
@@ -171,7 +169,6 @@ export function SidebarStrip({ onBuyCredits }: SidebarStripProps) {
 
           <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
             <GenerationsPanel
-
               variant="compact"
             />
           </div>

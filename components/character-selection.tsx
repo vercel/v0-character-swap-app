@@ -37,10 +37,7 @@ interface CharacterSelectionProps {
   onNext: () => void
   onHome?: () => void
   allCharacters: Character[]
-  customCharacters: Character[]
   onAddCustom: (character: Character) => void
-  onDeleteCustom?: (id: number) => void
-  onExpand?: (imageUrl: string, characterId: number, isCustom: boolean) => void
 }
 
 export function CharacterSelection({

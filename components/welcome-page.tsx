@@ -17,7 +17,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
     character_image_url: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/characters/1772643430646-character-W1YQ8gzFMYFGErIHZWK0S8bSOoBEVZ.jpg",
     character_name: "Firefighter",
   }
-  const isLoading = false
 
 
   return (
@@ -72,11 +71,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
               }}
               id="demo-container"
             >
-              {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="h-6 w-6 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-500" />
-                </div>
-              )}
 
               {demo && (
                 <>
