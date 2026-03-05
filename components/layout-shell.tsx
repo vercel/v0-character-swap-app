@@ -21,17 +21,20 @@ export function LayoutShell({ children }: { children: ReactNode }) {
   const viewer = useViewer()
 
   // Escape key closes viewer overlay
+  const viewerCloseRef = useRef(viewer.close)
+  viewerCloseRef.current = viewer.close
+  const isViewerOpen = !!viewer.data || !!viewer.error
   useEffect(() => {
-    if (!viewer.data && !viewer.error) return
+    if (!isViewerOpen) return
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault()
-        viewer.close()
+        viewerCloseRef.current()
       }
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [viewer.data, viewer.error, viewer.close])
+  }, [isViewerOpen])
 
   // Buy credits modal state
   const [showBuyOptions, setShowBuyOptions] = useState(false)

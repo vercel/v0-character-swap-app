@@ -54,6 +54,9 @@ const nextConfig = {
     qualities: [60, 75],
   },
   poweredByHeader: false,
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
 }
 
 export default withWorkflow(nextConfig)
