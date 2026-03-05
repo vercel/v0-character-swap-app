@@ -1,22 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
-
-function optimizedUrl(src: string, width: number): string {
-  if (src.startsWith("/") || !src.startsWith("http")) return src
-  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
-  if (cloudName && src.includes(".public.blob.vercel-storage.com")) {
-    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_${width},c_fill,g_north,f_webp,q_90/${encodeURIComponent(src)}`
-  }
-  return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=75`
-}
+import { useState } from "react"
 
 interface WelcomePageProps {
   onStart: () => void
-  characterSrcs?: string[]
 }
 
-export function WelcomePage({ onStart, characterSrcs = [] }: WelcomePageProps) {
+export function WelcomePage({ onStart }: WelcomePageProps) {
   const [demoPlaying, setDemoPlaying] = useState(false)
   const [showHowItWorks, setShowHowItWorks] = useState(false)
 
@@ -28,17 +18,6 @@ export function WelcomePage({ onStart, characterSrcs = [] }: WelcomePageProps) {
     character_name: "Firefighter",
   }
   const isLoading = false
-
-  // Prefetch carousel character images while user is on welcome page
-  // Uses same size (256) as carousel for cache hits
-  useEffect(() => {
-    characterSrcs.slice(0, 7).forEach(src => {
-      if (src && src.startsWith("http")) {
-        const img = new window.Image()
-        img.src = optimizedUrl(src, 640)
-      }
-    })
-  }, [characterSrcs])
 
 
   return (

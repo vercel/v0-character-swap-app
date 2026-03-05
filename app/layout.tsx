@@ -3,6 +3,8 @@ import type { Metadata } from 'next'
 import localFont from "next/font/local"
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/components/auth-provider'
+import { VideoProvider } from '@/providers/video-context'
+import { LayoutShell } from '@/components/layout-shell'
 import './globals.css'
 
 const geistPixel = localFont({
@@ -52,7 +54,11 @@ export default function RootLayout({
     <html lang="en" className={geistPixel.variable}>
       <body className={`${geistPixel.className} antialiased`}>
         <AuthProvider>
-          {children}
+          <VideoProvider>
+            <LayoutShell>
+              {children}
+            </LayoutShell>
+          </VideoProvider>
         </AuthProvider>
         <Analytics />
       </body>

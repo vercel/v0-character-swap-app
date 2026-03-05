@@ -124,13 +124,13 @@ export function CharacterSelection({
   return (
     <div className="relative flex h-full w-full flex-col bg-white">
       {/* Logo */}
-      <button onClick={onHome} className="absolute left-6 top-5 z-10 hidden items-center gap-2 transition-opacity hover:opacity-60 md:flex">
+      <a href="/" className="absolute left-6 top-5 z-10 hidden items-center gap-2 transition-opacity hover:opacity-60 md:flex">
         <svg className="h-4 w-auto text-black" viewBox="0 0 252 120" fill="currentColor">
           <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
           <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
         </svg>
         <span className="text-2xl font-pixel text-black">FaceSwap</span>
-      </button>
+      </a>
 
       {/* Content centered vertically */}
       <div className="flex flex-1 flex-col items-center justify-center">
