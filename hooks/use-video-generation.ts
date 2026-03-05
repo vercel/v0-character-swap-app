@@ -98,7 +98,21 @@ export function useVideoGeneration({
       let generationId: number | null = null
       
       try {
-        // Quick validation first
+        // 0. Optimistic update — show in sidebar INSTANTLY before any async work
+        window.dispatchEvent(new CustomEvent("optimistic-generation", {
+          detail: {
+            id: -Date.now(), // temporary negative ID
+            character_name: character.name,
+            character_image_url: character.src,
+            aspect_ratio: aspectRatio,
+            status: "uploading",
+            created_at: new Date().toISOString(),
+            video_url: null,
+            source_video_url: null,
+          }
+        }))
+
+        // Validate image dimensions (Kling requires ≥340px)
         try {
           const dimensions = await validateImageDimensions(character.src)
           if (dimensions.width < MIN_IMAGE_DIMENSION || dimensions.height < MIN_IMAGE_DIMENSION) {
@@ -112,20 +126,6 @@ export function useVideoGeneration({
             throw dimError
           }
         }
-
-        // 0. Optimistic update — show in sidebar instantly before DB write
-        window.dispatchEvent(new CustomEvent("optimistic-generation", {
-          detail: {
-            id: -Date.now(), // temporary negative ID
-            character_name: character.name,
-            character_image_url: character.src,
-            aspect_ratio: aspectRatio,
-            status: "uploading",
-            created_at: new Date().toISOString(),
-            video_url: null,
-            source_video_url: null,
-          }
-        }))
 
         // 1. Create pending generation in DB immediately
         const pendingResponse = await fetch("/api/generations", {
