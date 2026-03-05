@@ -31,16 +31,7 @@ function GenerateContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const charId = searchParams.get("char") ? Number(searchParams.get("char")) : null
-
-  // Result/error from sidebar selection (passed as URL params)
-  const resultParam = searchParams.get("result")
-  const sourceParam = searchParams.get("source")
-  const sourceARParam = (searchParams.get("sourceAR") || "fill") as "9:16" | "16:9" | "fill"
-  const genARParam = (searchParams.get("genAR") || "fill") as "9:16" | "16:9" | "fill"
-  const errorParam = searchParams.get("error")
-  const errorCharName = searchParams.get("charName")
-  const errorCharImg = searchParams.get("charImg")
-  const errorAt = searchParams.get("at")
+  const viewId = searchParams.get("v") ? Number(searchParams.get("v")) : null // viewing a generation by ID
 
   const { user, isLoading: authLoading, login } = useAuth()
   const { allCharacters, selectedCharacter, setSelectedCharacter, trackCharacterUsage, customCharacters, addCustomCharacter, isReady: charactersReady } = useCharacters({ user, authLoading })
@@ -61,7 +52,7 @@ function GenerateContent() {
 
   // Restore video from sessionStorage (after login redirect)
   useEffect(() => {
-    if (recordedVideo) {
+    if (viewId || recordedVideo) {
       setSessionRestored(true)
       return
     }
@@ -71,13 +62,41 @@ function GenerateContent() {
         setPendingAutoSubmit(true)
       }
     })
-  }, [recordedVideo, restoreFromSession])
+  }, [viewId, recordedVideo, restoreFromSession])
 
   // State
-  const [resultUrl, setResultUrl] = useState<string | null>(resultParam)
-  const [sourceVideoUrl, setSourceVideoUrl] = useState<string | null>(sourceParam)
-  const [sourceVideoAspectRatio, setSourceVideoAspectRatio] = useState<"9:16" | "16:9" | "fill">(sourceARParam)
-  const [generatedVideoAspectRatio, setGeneratedVideoAspectRatio] = useState<"9:16" | "16:9" | "fill">(genARParam)
+  const [resultUrl, setResultUrl] = useState<string | null>(null)
+  const [sourceVideoUrl, setSourceVideoUrl] = useState<string | null>(null)
+  const [sourceVideoAspectRatio, setSourceVideoAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
+  const [generatedVideoAspectRatio, setGeneratedVideoAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
+
+  // Fetch generation data when viewing by ID (?v=48)
+  const fetchedViewId = useRef<number | null>(null)
+  useEffect(() => {
+    if (!viewId || fetchedViewId.current === viewId) return
+    fetchedViewId.current = viewId
+    fetch(`/api/generations/${viewId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(gen => {
+        if (!gen) { router.replace("/pick"); return }
+        if (gen.status === "completed" && gen.video_url) {
+          setResultUrl(gen.video_url)
+          setSourceVideoUrl(gen.source_video_url || null)
+          setSourceVideoAspectRatio(gen.source_video_aspect_ratio || "fill")
+          setGeneratedVideoAspectRatio(gen.aspect_ratio || "fill")
+        } else if (gen.status === "failed" || gen.status === "cancelled") {
+          setSelectedError({
+            message: gen.error_message || "Generation failed",
+            characterName: gen.character_name || null,
+            characterImageUrl: gen.character_image_url || null,
+            createdAt: gen.created_at || "",
+          })
+        } else {
+          // Still processing — stay on loading state
+        }
+      })
+      .catch(() => router.replace("/pick"))
+  }, [viewId, router])
   const [showSuccess, setShowSuccess] = useState(false)
   const [showPip, setShowPip] = useState(true)
   const [isPlaying, setIsPlaying] = useState(true)
@@ -86,9 +105,7 @@ function GenerateContent() {
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const [sendEmailNotification, setSendEmailNotification] = useState(false)
   const [errorToast, setErrorToast] = useState<string | null>(null)
-  const [selectedError, setSelectedError] = useState<{ message: string; characterName: string | null; characterImageUrl: string | null; createdAt: string } | null>(
-    errorParam ? { message: errorParam, characterName: errorCharName, characterImageUrl: errorCharImg, createdAt: errorAt || "" } : null
-  )
+  const [selectedError, setSelectedError] = useState<{ message: string; characterName: string | null; characterImageUrl: string | null; createdAt: string } | null>(null)
   const [pendingAutoSubmit, setPendingAutoSubmit] = useState(false)
 
   const mainVideoRef = useRef<HTMLVideoElement>(null)
@@ -107,10 +124,10 @@ function GenerateContent() {
   // Redirect to /pick if no video and no result (wait for session restore first)
   useEffect(() => {
     if (!sessionRestored) return
-    if (!resultParam && !recordedVideo && !recordedVideoUrl) {
+    if (!viewId && !recordedVideo && !recordedVideoUrl) {
       router.replace("/pick")
     }
-  }, [sessionRestored, resultParam, recordedVideo, recordedVideoUrl, router])
+  }, [sessionRestored, viewId, recordedVideo, recordedVideoUrl, router])
 
   // Video download
   const pipAspectRatio = sourceVideoUrl ? sourceVideoAspectRatio : recordedAspectRatio
@@ -176,13 +193,13 @@ function GenerateContent() {
   // Skip if pendingAutoSubmit — that path handles its own submission after login
   const hasTriggered = useRef(false)
   useEffect(() => {
-    if (hasTriggered.current || pendingAutoSubmit || resultParam || !recordedVideo || !character) return
+    if (hasTriggered.current || pendingAutoSubmit || viewId || !recordedVideo || !character) return
     hasTriggered.current = true
     getCharacterAspectRatio(character.src).then(characterAspectRatio => {
       trackCharacterUsage(character.id)
       processVideo(getVideoForUpload, character, sendEmailNotification, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio, waitForUpload)
     })
-  }, [pendingAutoSubmit, resultParam, recordedVideo, character, processVideo, uploadedVideoUrl, recordedAspectRatio, getVideoForUpload, trackCharacterUsage, sendEmailNotification, waitForUpload])
+  }, [pendingAutoSubmit, viewId, recordedVideo, character, processVideo, uploadedVideoUrl, recordedAspectRatio, getVideoForUpload, trackCharacterUsage, sendEmailNotification, waitForUpload])
 
   const handleReset = useCallback(() => {
     clearRecording()
@@ -281,7 +298,7 @@ function GenerateContent() {
           <p className="text-sm leading-relaxed text-black/50">{selectedError.message}</p>
         </div>
         <button
-          onClick={() => setSelectedError(null)}
+          onClick={() => router.push("/pick")}
           className="rounded-lg bg-black px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
         >
           try again
@@ -294,6 +311,15 @@ function GenerateContent() {
   if (resultUrl) {
     return (
       <div className="relative h-full w-full bg-black">
+        {/* Close button */}
+        <button
+          onClick={() => router.push("/pick")}
+          className="absolute left-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
         <video
           key={resultUrl}
           ref={mainVideoRef}

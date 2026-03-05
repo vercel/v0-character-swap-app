@@ -76,8 +76,8 @@ interface Generation {
 }
 
 interface GenerationsPanelProps {
-  onSelectVideo?: (videoUrl: string, sourceVideoUrl: string | null, sourceAspectRatio: "9:16" | "16:9" | "fill", generatedAspectRatio: "9:16" | "16:9" | "fill") => void
-  onSelectError?: (error: { message: string; characterName: string | null; characterImageUrl: string | null; createdAt: string }) => void
+  onSelectVideo?: (generationId: number) => void
+  onSelectError?: (generationId: number) => void
   className?: string
   variant?: "default" | "compact" | "sidebar"
 }
@@ -295,7 +295,7 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
             {/* Thumbnail or status indicator */}
             {gen.status === "completed" && gen.video_url ? (
               <button
-                onClick={() => onSelectVideo?.(gen.video_url!, gen.source_video_url, gen.source_video_aspect_ratio || "fill", gen.aspect_ratio || "fill")}
+                onClick={() => onSelectVideo?.(gen.id)}
                 className="relative h-full w-full"
                 onMouseEnter={() => {
                   // Prefetch both videos so they open instantly on click
@@ -336,12 +336,7 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
             ) : gen.status === "failed" || gen.status === "cancelled" ? (
               <button
                 className="h-full w-full"
-                onClick={() => onSelectError?.({
-                  message: gen.error?.summary ?? gen.error?.message ?? gen.error_message ?? "Generation failed",
-                  characterName: gen.character_name,
-                  characterImageUrl: gen.character_image_url,
-                  createdAt: gen.created_at,
-                })}
+                onClick={() => onSelectError?.(gen.id)}
               >
                 <FailedGeneration gen={gen} />
               </button>

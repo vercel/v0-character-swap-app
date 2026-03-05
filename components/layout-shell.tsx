@@ -2,22 +2,11 @@
 
 import { useState, useCallback, type ReactNode } from "react"
 import { SidebarStrip } from "@/components/sidebar-strip"
-import { useAuth } from "@/components/auth-provider"
 import { useCredits } from "@/hooks/use-credits"
 import { useRouter } from "next/navigation"
 
-// Convert a Vercel Blob video URL to MP4 via Cloudinary (for cross-browser playback)
-function toMp4Url(url: string | null): string | null {
-  if (!url) return null
-  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
-  if (!cloudName) return url
-  if (!url.includes(".public.blob.vercel-storage.com")) return url
-  return `https://res.cloudinary.com/${cloudName}/video/fetch/f_mp4,vc_h264,ac_aac/${encodeURIComponent(url)}`
-}
-
 export function LayoutShell({ children }: { children: ReactNode }) {
   const router = useRouter()
-  const { user } = useAuth()
   const { balance, creditsLoading, error: creditsError, refresh: refreshCredits } = useCredits()
 
   // Buy credits modal state
@@ -67,23 +56,8 @@ export function LayoutShell({ children }: { children: ReactNode }) {
 
       {/* Sidebar Strip */}
       <SidebarStrip
-        onSelectVideo={(url, sourceUrl, sourceAR, genAR) => {
-          // Navigate to generate page with the selected video
-          const params = new URLSearchParams()
-          params.set("result", url)
-          if (sourceUrl) params.set("source", sourceUrl)
-          params.set("sourceAR", sourceAR)
-          params.set("genAR", genAR)
-          router.push(`/generate?${params.toString()}`)
-        }}
-        onSelectError={(error) => {
-          const params = new URLSearchParams()
-          params.set("error", error.message)
-          if (error.characterName) params.set("charName", error.characterName)
-          if (error.characterImageUrl) params.set("charImg", error.characterImageUrl)
-          params.set("at", error.createdAt)
-          router.push(`/generate?${params.toString()}`)
-        }}
+        onSelectVideo={(generationId) => router.push(`/generate?v=${generationId}`)}
+        onSelectError={(generationId) => router.push(`/generate?v=${generationId}`)}
         onBuyCredits={() => { setShowBuyOptions(true); setPurchaseError(null); setBuyAmount("") }}
       />
 

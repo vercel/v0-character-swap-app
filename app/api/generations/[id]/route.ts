@@ -2,6 +2,41 @@ import { NextResponse } from "next/server"
 import { verifySession } from "@/lib/auth"
 import { sql, updateGenerationFailed } from "@/lib/db"
 
+// Fetch a single generation by ID
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await verifySession()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { id } = await params
+    const generationId = parseInt(id, 10)
+    if (isNaN(generationId)) {
+      return NextResponse.json({ error: "Invalid generation ID" }, { status: 400 })
+    }
+
+    const rows = await sql`
+      SELECT id, video_url, source_video_url, character_name, character_image_url,
+             aspect_ratio, source_video_aspect_ratio, status, error_message, created_at
+      FROM generations
+      WHERE id = ${generationId} AND user_id = ${session.user.id}
+    `
+
+    if (rows.length === 0) {
+      return NextResponse.json({ error: "Generation not found" }, { status: 404 })
+    }
+
+    return NextResponse.json(rows[0])
+  } catch (error) {
+    console.error("Failed to fetch generation:", error)
+    return NextResponse.json({ error: "Failed to fetch generation" }, { status: 500 })
+  }
+}
+
 // Update generation status (e.g., mark as failed)
 export async function PATCH(
   request: Request,

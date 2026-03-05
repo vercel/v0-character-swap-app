@@ -8,8 +8,8 @@ import { Coins, LogOut } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 
 interface SidebarStripProps {
-  onSelectVideo: (videoUrl: string, sourceVideoUrl: string | null, sourceAspectRatio: "9:16" | "16:9" | "fill", generatedAspectRatio: "9:16" | "16:9" | "fill") => void
-  onSelectError: (error: { message: string; characterName: string | null; characterImageUrl: string | null; createdAt: string }) => void
+  onSelectVideo: (generationId: number) => void
+  onSelectError: (generationId: number) => void
   onBuyCredits: () => void
 }
 
