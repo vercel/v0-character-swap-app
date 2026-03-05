@@ -4,6 +4,7 @@ import localFont from "next/font/local"
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/components/auth-provider'
 import { VideoProvider } from '@/providers/video-context'
+import { ViewerProvider } from '@/providers/viewer-context'
 import { LayoutShell } from '@/components/layout-shell'
 import './globals.css'
 
@@ -55,9 +56,11 @@ export default function RootLayout({
       <body className={`${geistPixel.className} antialiased`}>
         <AuthProvider>
           <VideoProvider>
-            <LayoutShell>
-              {children}
-            </LayoutShell>
+            <ViewerProvider>
+              <LayoutShell>
+                {children}
+              </LayoutShell>
+            </ViewerProvider>
           </VideoProvider>
         </AuthProvider>
         <Analytics />

@@ -8,12 +8,10 @@ import { Coins, LogOut } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 
 interface SidebarStripProps {
-  onSelectVideo: (generationId: number) => void
-  onSelectError: (generationId: number) => void
   onBuyCredits: () => void
 }
 
-export function SidebarStrip({ onSelectVideo, onSelectError, onBuyCredits }: SidebarStripProps) {
+export function SidebarStrip({ onBuyCredits }: SidebarStripProps) {
   const { user, isLoading: authLoading, login, logout } = useAuth()
   const { balance, creditsLoading, error: creditsError } = useCredits()
   const [showMenu, setShowMenu] = useState(false)
@@ -85,8 +83,7 @@ export function SidebarStrip({ onSelectVideo, onSelectError, onBuyCredits }: Sid
 
           <div className="min-h-0 flex-1 overflow-y-auto px-1.5">
             <GenerationsPanel
-              onSelectVideo={onSelectVideo}
-              onSelectError={onSelectError}
+
               variant="sidebar"
             />
           </div>
@@ -174,8 +171,7 @@ export function SidebarStrip({ onSelectVideo, onSelectError, onBuyCredits }: Sid
 
           <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
             <GenerationsPanel
-              onSelectVideo={onSelectVideo}
-              onSelectError={onSelectError}
+
               variant="compact"
             />
           </div>

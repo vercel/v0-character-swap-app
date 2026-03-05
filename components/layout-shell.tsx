@@ -1,13 +1,24 @@
 "use client"
 
-import { useState, useCallback, type ReactNode } from "react"
+import { useState, useCallback, useRef, type ReactNode } from "react"
 import { SidebarStrip } from "@/components/sidebar-strip"
 import { useCredits } from "@/hooks/use-credits"
-import { useRouter } from "next/navigation"
+import { useViewer } from "@/providers/viewer-context"
+import { useVideoDownload } from "@/hooks/use-video-download"
+import { useCloudinaryPrewarm } from "@/hooks/use-cloudinary-prewarm"
+import { cn } from "@/lib/utils"
+
+function toMp4Url(url: string | null): string | null {
+  if (!url) return null
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  if (!cloudName) return url
+  if (!url.includes(".public.blob.vercel-storage.com")) return url
+  return `https://res.cloudinary.com/${cloudName}/video/fetch/f_mp4,vc_h264,ac_aac/${encodeURIComponent(url)}`
+}
 
 export function LayoutShell({ children }: { children: ReactNode }) {
-  const router = useRouter()
   const { balance, creditsLoading, error: creditsError, refresh: refreshCredits } = useCredits()
+  const viewer = useViewer()
 
   // Buy credits modal state
   const [showBuyOptions, setShowBuyOptions] = useState(false)
@@ -56,10 +67,43 @@ export function LayoutShell({ children }: { children: ReactNode }) {
 
       {/* Sidebar Strip */}
       <SidebarStrip
-        onSelectVideo={(generationId) => router.push(`/generate?v=${generationId}`)}
-        onSelectError={(generationId) => router.push(`/generate?v=${generationId}`)}
         onBuyCredits={() => { setShowBuyOptions(true); setPurchaseError(null); setBuyAmount("") }}
       />
+
+      {/* Video Viewer Overlay */}
+      {viewer.data && <VideoOverlay />}
+
+      {/* Error Viewer Overlay */}
+      {viewer.error && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-white">
+          <button
+            onClick={viewer.close}
+            className="absolute left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-black/10 text-black transition-colors hover:bg-black/20"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <div className="flex flex-col items-center gap-5 px-8">
+            {viewer.error.characterImageUrl && (
+              <div className="h-20 w-20 overflow-hidden rounded-xl bg-neutral-100 ring-1 ring-neutral-200">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={viewer.error.characterImageUrl} alt="" className="h-full w-full object-cover object-top" />
+              </div>
+            )}
+            <div className="max-w-xs text-center">
+              <p className="mb-3 text-xl font-pixel text-black">Generation Failed</p>
+              <p className="text-sm leading-relaxed text-black/50">{viewer.error.message}</p>
+            </div>
+            <button
+              onClick={viewer.close}
+              className="rounded-lg bg-black px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
+            >
+              close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Buy Credits Modal */}
       {showBuyOptions && (
@@ -133,5 +177,235 @@ export function LayoutShell({ children }: { children: ReactNode }) {
         </div>
       )}
     </main>
+  )
+}
+
+/** Fullscreen video player overlay — lives at layout level, no URL change */
+function VideoOverlay() {
+  const { data, close } = useViewer()
+  const mainVideoRef = useRef<HTMLVideoElement>(null)
+  const pipVideoRef = useRef<HTMLVideoElement>(null)
+
+  const [showPip, setShowPip] = useState(true)
+  const [videoProgress, setVideoProgress] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(true)
+
+  if (!data) return null
+
+  const { videoUrl, sourceVideoUrl, sourceAspectRatio, characterName, characterImageUrl } = data
+  const pipSrc = toMp4Url(sourceVideoUrl) || sourceVideoUrl
+  const hasPipSource = !!sourceVideoUrl
+
+  const pipAspectRatio = sourceAspectRatio
+
+  return (
+    <VideoOverlayPlayer
+      videoUrl={videoUrl}
+      pipSrc={pipSrc}
+      hasPipSource={hasPipSource}
+      showPip={showPip}
+      setShowPip={setShowPip}
+      pipAspectRatio={pipAspectRatio}
+      characterName={characterName}
+      characterImageUrl={characterImageUrl}
+      onClose={close}
+      mainVideoRef={mainVideoRef}
+      pipVideoRef={pipVideoRef}
+      videoProgress={videoProgress}
+      setVideoProgress={setVideoProgress}
+      isPlaying={isPlaying}
+      setIsPlaying={setIsPlaying}
+    />
+  )
+}
+
+function VideoOverlayPlayer({
+  videoUrl,
+  pipSrc,
+  hasPipSource,
+  showPip,
+  setShowPip,
+  pipAspectRatio,
+  characterName,
+  characterImageUrl,
+  onClose,
+  mainVideoRef,
+  pipVideoRef,
+  videoProgress,
+  setVideoProgress,
+  isPlaying,
+  setIsPlaying,
+}: {
+  videoUrl: string
+  pipSrc: string | null
+  hasPipSource: boolean
+  showPip: boolean
+  setShowPip: (v: boolean) => void
+  pipAspectRatio: "9:16" | "16:9" | "fill"
+  characterName: string | null
+  characterImageUrl: string | null
+  onClose: () => void
+  mainVideoRef: React.RefObject<HTMLVideoElement | null>
+  pipVideoRef: React.RefObject<HTMLVideoElement | null>
+  videoProgress: number
+  setVideoProgress: (v: number) => void
+  isPlaying: boolean
+  setIsPlaying: (v: boolean) => void
+}) {
+  const { isDownloading, downloadProgress, handleDownload } = useVideoDownload({
+    resultUrl: videoUrl,
+    pipVideoUrl: pipSrc,
+    showPip,
+    pipAspectRatio,
+    characterName,
+  })
+
+  useCloudinaryPrewarm({
+    resultUrl: videoUrl,
+    pipVideoUrl: pipSrc,
+    showPip,
+  })
+
+  return (
+    <div className="fixed inset-0 z-40 bg-black">
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        className="absolute left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+      >
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
+      <video
+        key={videoUrl}
+        ref={mainVideoRef}
+        src={videoUrl}
+        muted
+        loop
+        playsInline
+        preload="auto"
+        poster={characterImageUrl
+          ? (characterImageUrl.startsWith("http")
+            ? `/_next/image?url=${encodeURIComponent(characterImageUrl)}&w=640&q=75`
+            : characterImageUrl)
+          : undefined}
+        className="h-full w-full cursor-pointer object-contain md:object-cover"
+        onClick={(e) => {
+          const v = e.currentTarget
+          if (v.paused) v.play(); else v.pause()
+        }}
+        onLoadedData={(e) => {
+          e.currentTarget.muted = false
+          e.currentTarget.play()
+        }}
+        onPlay={() => {
+          setIsPlaying(true)
+          const pip = pipVideoRef.current
+          if (pip) {
+            pip.currentTime = mainVideoRef.current?.currentTime || 0
+            pip.play()
+          }
+        }}
+        onPause={() => { setIsPlaying(false); pipVideoRef.current?.pause() }}
+        onSeeked={() => {
+          if (pipVideoRef.current && mainVideoRef.current) {
+            pipVideoRef.current.currentTime = mainVideoRef.current.currentTime
+          }
+        }}
+        onTimeUpdate={(e) => {
+          const v = e.currentTarget
+          if (v.duration) setVideoProgress(v.currentTime / v.duration)
+          const pip = pipVideoRef.current
+          if (pip && v) {
+            const diff = Math.abs(pip.currentTime - v.currentTime)
+            if (diff > 0.15) pip.currentTime = v.currentTime
+          }
+        }}
+      />
+
+      {/* PiP video — always mounted when source exists, visibility toggled via CSS */}
+      {hasPipSource && (
+        <div className={cn(
+          "absolute bottom-20 right-4 overflow-hidden rounded-lg border-2 border-black/20 shadow-lg transition-opacity",
+          showPip ? "opacity-100" : "pointer-events-none opacity-0",
+          pipAspectRatio === "9:16" && "aspect-[9/16] h-28 md:h-40",
+          pipAspectRatio !== "9:16" && "aspect-video w-28 md:w-48"
+        )}>
+          <video
+            ref={pipVideoRef}
+            src={pipSrc || ""}
+            muted loop playsInline preload="auto"
+            className="h-full w-full object-cover"
+            onLoadedData={() => {
+              const main = mainVideoRef.current
+              const pip = pipVideoRef.current
+              if (main && pip && main.readyState >= 2) {
+                pip.currentTime = main.currentTime
+                pip.play()
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {/* Controls */}
+      <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-3 bg-gradient-to-t from-black/70 via-black/40 to-transparent px-4 pb-4 pt-10">
+        <div
+          className="h-1 w-full cursor-pointer rounded-full bg-white/20"
+          onClick={(e) => {
+            if (!mainVideoRef.current) return
+            const rect = e.currentTarget.getBoundingClientRect()
+            const pct = (e.clientX - rect.left) / rect.width
+            mainVideoRef.current.currentTime = pct * mainVideoRef.current.duration
+          }}
+        >
+          <div className="h-full rounded-full bg-white" style={{ width: `${videoProgress * 100}%` }} />
+        </div>
+        <div className="flex items-center justify-center gap-2.5">
+          <button
+            disabled={isDownloading}
+            onClick={handleDownload}
+            className="flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm transition-all hover:bg-white/25 active:scale-95 disabled:opacity-70"
+          >
+            {isDownloading ? (
+              <>
+                <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                {Math.round(downloadProgress * 100)}%
+              </>
+            ) : (
+              <>
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                download
+              </>
+            )}
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-full bg-white/15 px-4 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm transition-all hover:bg-white/25 active:scale-95"
+          >
+            close
+          </button>
+          {hasPipSource && (
+            <button
+              onClick={() => setShowPip(!showPip)}
+              className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm transition-all hover:bg-white/25 active:scale-95"
+            >
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <rect x="12" y="10" width="8" height="5" rx="1" />
+              </svg>
+              pip
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }

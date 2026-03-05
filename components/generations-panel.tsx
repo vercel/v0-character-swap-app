@@ -10,6 +10,7 @@ function thumbUrl(src: string): string {
 import { FailedGeneration } from "@/components/failed-generation"
 import { GenerationProgress } from "@/components/generation-progress"
 import { useAuth } from "@/components/auth-provider"
+import { useViewer } from "@/providers/viewer-context"
 
 // Request notification permission
 async function requestNotificationPermission(): Promise<boolean> {
@@ -76,16 +77,15 @@ interface Generation {
 }
 
 interface GenerationsPanelProps {
-  onSelectVideo?: (generationId: number) => void
-  onSelectError?: (generationId: number) => void
   className?: string
   variant?: "default" | "compact" | "sidebar"
 }
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
-export function GenerationsPanel({ onSelectVideo, onSelectError, className = "", variant = "default" }: GenerationsPanelProps) {
+export function GenerationsPanel({ className = "", variant = "default" }: GenerationsPanelProps) {
   const { user } = useAuth()
+  const { viewVideo, viewError } = useViewer()
   const prevGenerationsRef = useRef<Generation[]>([])
   const hasRequestedPermission = useRef(false)
 
@@ -295,7 +295,14 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
             {/* Thumbnail or status indicator */}
             {gen.status === "completed" && gen.video_url ? (
               <button
-                onClick={() => onSelectVideo?.(gen.id)}
+                onClick={() => viewVideo({
+                  videoUrl: gen.video_url!,
+                  sourceVideoUrl: gen.source_video_url || null,
+                  sourceAspectRatio: (gen as any).source_video_aspect_ratio || "fill",
+                  generatedAspectRatio: gen.aspect_ratio || "fill",
+                  characterName: gen.character_name,
+                  characterImageUrl: gen.character_image_url,
+                })}
                 className="relative h-full w-full"
                 onMouseEnter={() => {
                   // Prefetch both videos so they open instantly on click
@@ -336,7 +343,11 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
             ) : gen.status === "failed" || gen.status === "cancelled" ? (
               <button
                 className="h-full w-full"
-                onClick={() => onSelectError?.(gen.id)}
+                onClick={() => viewError({
+                  message: gen.error?.summary ?? gen.error?.message ?? gen.error_message ?? "Generation failed",
+                  characterName: gen.character_name,
+                  characterImageUrl: gen.character_image_url,
+                })}
               >
                 <FailedGeneration gen={gen} />
               </button>
