@@ -123,6 +123,14 @@ function RecordContent() {
               </div>
             )}
             <div className="flex flex-col items-center gap-2.5">
+              {!isUploading && (
+                <button
+                  onClick={() => { setShowPreview(false); clearRecording() }}
+                  className="flex h-10 items-center gap-1.5 rounded-full bg-white/10 px-5 text-sm font-medium text-white/70 backdrop-blur-sm transition-all hover:bg-white/20 hover:text-white active:scale-95"
+                >
+                  Retake video
+                </button>
+              )}
               <button
                 onClick={() => {
                   if (previewVideoRef.current) {
@@ -143,14 +151,6 @@ function RecordContent() {
                   "Generate cartoon video"
                 )}
               </button>
-              {!isUploading && (
-                <button
-                  onClick={() => { setShowPreview(false); clearRecording() }}
-                  className="flex h-10 items-center gap-1.5 rounded-full bg-white/10 px-5 text-sm font-medium text-white/70 backdrop-blur-sm transition-all hover:bg-white/20 hover:text-white active:scale-95"
-                >
-                  Retake video
-                </button>
-              )}
             </div>
           </div>
         </div>
