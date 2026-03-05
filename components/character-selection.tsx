@@ -13,7 +13,7 @@ function optimizedUrl(src: string, width: number): string {
   // Use Cloudinary CDN for Blob images (global edge cache, no server processing)
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
   if (cloudName && src.includes(".public.blob.vercel-storage.com")) {
-    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_${width},c_fill,g_north,f_webp,q_80/${encodeURIComponent(src)}`
+    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_${width},c_fill,g_north,f_webp,q_90/${encodeURIComponent(src)}`
   }
   return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=75`
 }
@@ -215,18 +215,7 @@ export function CharacterSelection({
                       draggable={false}
                       loading={isVisible ? "eager" : "lazy"}
                       fetchPriority={isVisible ? "high" : "auto"}
-                      onLoad={(e) => {
-                        const img = e.currentTarget
-                        const entry = performance.getEntriesByName(img.src).pop() as PerformanceResourceTiming | undefined
-                        const cached = entry ? entry.transferSize === 0 : "unknown"
-                        const duration = entry ? Math.round(entry.duration) : "?"
-                        const size = entry ? Math.round(entry.encodedBodySize / 1024) : "?"
-                        console.log(`[img] ${char.name} | ${duration}ms | ${size}KB | cached=${cached} | visible=${isVisible} | ${img.src.slice(0, 80)}...`)
-                      }}
-                      onError={(e) => {
-                        console.error(`[img] FAILED: ${char.name} | ${e.currentTarget.src.slice(0, 80)}`)
-                        e.currentTarget.src = char.src
-                      }}
+                      onError={(e) => { e.currentTarget.src = char.src }}
                     />
                     {/* Video loads ONLY on hover */}
                     {videoUrl && (

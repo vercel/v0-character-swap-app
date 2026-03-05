@@ -6,7 +6,7 @@ function optimizedUrl(src: string, width: number): string {
   if (src.startsWith("/") || !src.startsWith("http")) return src
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
   if (cloudName && src.includes(".public.blob.vercel-storage.com")) {
-    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_${width},c_fill,g_north,f_webp,q_80/${encodeURIComponent(src)}`
+    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_${width},c_fill,g_north,f_webp,q_90/${encodeURIComponent(src)}`
   }
   return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=75`
 }
