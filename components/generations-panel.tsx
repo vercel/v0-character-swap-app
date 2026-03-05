@@ -61,6 +61,7 @@ interface Generation {
   character_name: string | null
   character_image_url: string | null
   aspect_ratio: "9:16" | "16:9" | "fill"
+  source_video_aspect_ratio: "9:16" | "16:9" | "fill"
   status: "uploading" | "pending" | "processing" | "completed" | "failed" | "cancelled"
   created_at: string
   completed_at: string | null
@@ -298,7 +299,7 @@ export function GenerationsPanel({ className = "", variant = "default" }: Genera
                 onClick={() => viewVideo({
                   videoUrl: gen.video_url!,
                   sourceVideoUrl: gen.source_video_url || null,
-                  sourceAspectRatio: (gen as any).source_video_aspect_ratio || "fill",
+                  sourceAspectRatio: gen.source_video_aspect_ratio || "fill",
                   generatedAspectRatio: gen.aspect_ratio || "fill",
                   characterName: gen.character_name,
                   characterImageUrl: gen.character_image_url,

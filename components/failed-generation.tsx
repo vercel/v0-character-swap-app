@@ -7,7 +7,7 @@ interface Generation {
   video_url: string | null
   character_name: string | null
   character_image_url: string | null
-  status: "pending" | "processing" | "completed" | "failed" | "cancelled"
+  status: "uploading" | "pending" | "processing" | "completed" | "failed" | "cancelled"
   created_at: string
   completed_at: string | null
   error_message: string | null

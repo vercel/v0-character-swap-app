@@ -193,7 +193,7 @@ export function LayoutShell({ children }: { children: ReactNode }) {
   )
 }
 
-/** Fullscreen video player overlay — lives at layout level, no URL change */
+/** Fullscreen video player overlay — reads from ViewerContext, owns all player state */
 function VideoOverlay() {
   const { data, close } = useViewer()
   const mainVideoRef = useRef<HTMLVideoElement>(null)
@@ -201,78 +201,19 @@ function VideoOverlay() {
 
   const [showPip, setShowPip] = useState(true)
   const [videoProgress, setVideoProgress] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(true)
 
   if (!data) return null
 
   const { videoUrl, sourceVideoUrl, sourceAspectRatio, characterName, characterImageUrl } = data
   const pipSrc = toMp4Url(sourceVideoUrl) || sourceVideoUrl
   const hasPipSource = !!sourceVideoUrl
-
   const pipAspectRatio = sourceAspectRatio
 
-  return (
-    <VideoOverlayPlayer
-      videoUrl={videoUrl}
-      pipSrc={pipSrc}
-      pipRawUrl={sourceVideoUrl}
-      hasPipSource={hasPipSource}
-      showPip={showPip}
-      setShowPip={setShowPip}
-      pipAspectRatio={pipAspectRatio}
-      characterName={characterName}
-      characterImageUrl={characterImageUrl}
-      onClose={close}
-      mainVideoRef={mainVideoRef}
-      pipVideoRef={pipVideoRef}
-      videoProgress={videoProgress}
-      setVideoProgress={setVideoProgress}
-      isPlaying={isPlaying}
-      setIsPlaying={setIsPlaying}
-    />
-  )
-}
-
-function VideoOverlayPlayer({
-  videoUrl,
-  pipSrc,
-  pipRawUrl,
-  hasPipSource,
-  showPip,
-  setShowPip,
-  pipAspectRatio,
-  characterName,
-  characterImageUrl,
-  onClose,
-  mainVideoRef,
-  pipVideoRef,
-  videoProgress,
-  setVideoProgress,
-  isPlaying,
-  setIsPlaying,
-}: {
-  videoUrl: string
-  pipSrc: string | null
-  pipRawUrl: string | null
-  hasPipSource: boolean
-  showPip: boolean
-  setShowPip: (v: boolean) => void
-  pipAspectRatio: "9:16" | "16:9" | "fill"
-  characterName: string | null
-  characterImageUrl: string | null
-  onClose: () => void
-  mainVideoRef: React.RefObject<HTMLVideoElement | null>
-  pipVideoRef: React.RefObject<HTMLVideoElement | null>
-  videoProgress: number
-  setVideoProgress: (v: number) => void
-  isPlaying: boolean
-  setIsPlaying: (v: boolean) => void
-}) {
   // Download uses raw blob URL (Cloudinary API validates blob URLs)
   // Playback uses pipSrc (Cloudinary-converted MP4 for cross-browser)
   const { isDownloading, downloadProgress, handleDownload } = useVideoDownload({
     resultUrl: videoUrl,
-    pipVideoUrl: pipRawUrl,
+    pipVideoUrl: sourceVideoUrl,
     showPip,
     pipAspectRatio,
     characterName,
@@ -280,7 +221,7 @@ function VideoOverlayPlayer({
 
   useCloudinaryPrewarm({
     resultUrl: videoUrl,
-    pipVideoUrl: pipRawUrl,
+    pipVideoUrl: sourceVideoUrl,
     showPip,
   })
 
@@ -288,7 +229,7 @@ function VideoOverlayPlayer({
     <div className="absolute inset-0 z-40 bg-black">
       {/* Close button */}
       <button
-        onClick={onClose}
+        onClick={close}
         className="absolute left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -319,14 +260,13 @@ function VideoOverlayPlayer({
           e.currentTarget.play()
         }}
         onPlay={() => {
-          setIsPlaying(true)
           const pip = pipVideoRef.current
           if (pip) {
             pip.currentTime = mainVideoRef.current?.currentTime || 0
             pip.play()
           }
         }}
-        onPause={() => { setIsPlaying(false); pipVideoRef.current?.pause() }}
+        onPause={() => { pipVideoRef.current?.pause() }}
         onSeeked={() => {
           if (pipVideoRef.current && mainVideoRef.current) {
             pipVideoRef.current.currentTime = mainVideoRef.current.currentTime
@@ -405,7 +345,7 @@ function VideoOverlayPlayer({
             )}
           </button>
           <button
-            onClick={onClose}
+            onClick={close}
             className="rounded-full bg-white/15 px-4 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm transition-all hover:bg-white/25 active:scale-95"
           >
             close
