@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef, type ReactNode } from "react"
+import { useState, useCallback, useRef, useEffect, type ReactNode } from "react"
 import { SidebarStrip } from "@/components/sidebar-strip"
 import { useCredits } from "@/hooks/use-credits"
 import { useViewer } from "@/providers/viewer-context"
@@ -19,6 +19,19 @@ function toMp4Url(url: string | null): string | null {
 export function LayoutShell({ children }: { children: ReactNode }) {
   const { balance, creditsLoading, error: creditsError, refresh: refreshCredits } = useCredits()
   const viewer = useViewer()
+
+  // Escape key closes viewer overlay
+  useEffect(() => {
+    if (!viewer.data && !viewer.error) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        viewer.close()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [viewer.data, viewer.error, viewer.close])
 
   // Buy credits modal state
   const [showBuyOptions, setShowBuyOptions] = useState(false)
@@ -61,21 +74,15 @@ export function LayoutShell({ children }: { children: ReactNode }) {
   return (
     <main className="relative flex h-[100dvh] flex-row overflow-hidden bg-white">
       {/* Main content area */}
-      <div className="flex flex-1 flex-col items-center justify-center overflow-hidden">
+      <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden">
         {children}
-      </div>
 
-      {/* Sidebar Strip */}
-      <SidebarStrip
-        onBuyCredits={() => { setShowBuyOptions(true); setPurchaseError(null); setBuyAmount("") }}
-      />
+        {/* Video Viewer Overlay — inside content area so sidebar stays visible */}
+        {viewer.data && <VideoOverlay />}
 
-      {/* Video Viewer Overlay */}
-      {viewer.data && <VideoOverlay />}
-
-      {/* Error Viewer Overlay */}
-      {viewer.error && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-white">
+        {/* Error Viewer Overlay */}
+        {viewer.error && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-white">
           <button
             onClick={viewer.close}
             className="absolute left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-black/10 text-black transition-colors hover:bg-black/20"
@@ -104,6 +111,12 @@ export function LayoutShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       )}
+      </div>
+
+      {/* Sidebar Strip */}
+      <SidebarStrip
+        onBuyCredits={() => { setShowBuyOptions(true); setPurchaseError(null); setBuyAmount("") }}
+      />
 
       {/* Buy Credits Modal */}
       {showBuyOptions && (
@@ -267,7 +280,7 @@ function VideoOverlayPlayer({
   })
 
   return (
-    <div className="fixed inset-0 z-40 bg-black">
+    <div className="absolute inset-0 z-40 bg-black">
       {/* Close button */}
       <button
         onClick={onClose}
