@@ -258,7 +258,7 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
           // Determine thumbnail width based on aspect ratio
           const isLandscape = gen.aspect_ratio === "16:9"
           const thumbnailClass = variant === "compact"
-            ? isLandscape ? "h-12 w-16" : "h-12 w-9"
+            ? isLandscape ? "h-11 w-[60px]" : "h-11 w-8"
             : variant === "sidebar"
               ? "h-12 w-12" // Square thumbnails for thin sidebar
               : isLandscape
@@ -298,6 +298,7 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
                 )}
                 <video
                   src={gen.video_url}
+                  poster={gen.character_image_url ? thumbUrl(gen.character_image_url) : undefined}
                   className="relative h-full w-full object-cover"
                   muted
                   playsInline

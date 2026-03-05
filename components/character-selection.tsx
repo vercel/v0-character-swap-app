@@ -9,9 +9,20 @@ const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 function optimizedUrl(src: string, width: number): string {
   if (src.startsWith("/")) return src
-  // Don't optimize data: URLs, blob: URLs, or non-http URLs
   if (!src.startsWith("http")) return src
+  // Use Cloudinary CDN for Blob images (global edge cache, no server processing)
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  if (cloudName && src.includes(".public.blob.vercel-storage.com")) {
+    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_${width},c_fill,g_north,f_auto,q_auto/${encodeURIComponent(src)}`
+  }
   return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=75`
+}
+
+// Generate a video poster via Cloudinary (first frame, tiny)
+function videoFrameUrl(videoUrl: string): string | null {
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  if (!cloudName || !videoUrl.includes(".public.blob.vercel-storage.com")) return null
+  return `https://res.cloudinary.com/${cloudName}/video/fetch/w_320,h_480,c_fill,so_1,f_jpg,q_60/${encodeURIComponent(videoUrl)}`
 }
 
 interface GenerationVideo {
@@ -88,6 +99,21 @@ export function CharacterSelection({
     return () => window.removeEventListener("wheel", handleWheel)
   }, [])
 
+  // Preload first 7 character images immediately via <link rel="preload">
+  useEffect(() => {
+    dedupedCharacters.slice(0, 7).forEach(char => {
+      if (!char.src.startsWith("http")) return
+      const url = optimizedUrl(char.src, 384)
+      // Avoid duplicates
+      if (document.querySelector(`link[href="${url}"]`)) return
+      const link = document.createElement("link")
+      link.rel = "preload"
+      link.as = "image"
+      link.href = url
+      document.head.appendChild(link)
+    })
+  }, [dedupedCharacters])
+
   const scroll = (direction: "left" | "right") => {
     const el = scrollRef.current
     if (!el) return
@@ -98,24 +124,36 @@ export function CharacterSelection({
   return (
     <div className="relative flex h-full w-full flex-col bg-white">
       {/* Logo */}
-      <button onClick={onHome} className="absolute left-6 top-5 z-10 hidden text-2xl font-pixel text-black transition-opacity hover:opacity-60 md:block">v0 FaceSwap</button>
+      <button onClick={onHome} className="absolute left-6 top-5 z-10 hidden items-center gap-2 transition-opacity hover:opacity-60 md:flex">
+        <svg className="h-4 w-auto text-black" viewBox="0 0 252 120" fill="currentColor">
+          <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
+          <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
+        </svg>
+        <span className="text-2xl font-pixel text-black">FaceSwap</span>
+      </button>
 
       {/* Content centered vertically */}
       <div className="flex flex-1 flex-col items-center justify-center">
         {/* Title */}
         <div className="mb-6 text-center md:mb-8">
-          <h1 className="mb-1 text-2xl font-pixel text-black md:hidden">v0 FaceSwap</h1>
+          <div className="mb-1 flex items-center justify-center gap-2 md:hidden">
+            <svg className="h-4 w-auto text-black" viewBox="0 0 252 120" fill="currentColor">
+              <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
+              <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
+            </svg>
+            <span className="text-2xl font-pixel text-black">FaceSwap</span>
+          </div>
           <h2 className="text-xl font-bold text-black md:text-2xl">Choose a character</h2>
           <p className="mt-1 text-sm text-black/40">or prompt your own</p>
         </div>
 
         {/* Horizontal carousel */}
-        <div className="relative mx-auto w-full max-w-5xl px-12 md:px-16">
+        <div className="relative mx-auto w-full max-w-5xl">
           {/* Left arrow */}
           {canScrollLeft && (
             <button
               onClick={() => scroll("left")}
-              className="absolute left-1 top-1/2 z-20 flex h-10 w-10 -translate-y-[calc(50%+16px)] items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/10 transition-all hover:shadow-xl active:scale-95 md:left-3"
+              className="absolute left-2 top-1/2 z-20 flex h-10 w-10 -translate-y-[calc(50%+16px)] items-center justify-center rounded-full bg-white/90 shadow-lg ring-1 ring-black/10 backdrop-blur-sm transition-all hover:bg-white hover:shadow-xl active:scale-95 md:left-4"
             >
               <svg className="h-5 w-5 text-black/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -127,7 +165,7 @@ export function CharacterSelection({
           {canScrollRight && (
             <button
               onClick={() => scroll("right")}
-              className="absolute right-1 top-1/2 z-20 flex h-10 w-10 -translate-y-[calc(50%+16px)] items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/10 transition-all hover:shadow-xl active:scale-95 md:right-3"
+              className="absolute right-2 top-1/2 z-20 flex h-10 w-10 -translate-y-[calc(50%+16px)] items-center justify-center rounded-full bg-white/90 shadow-lg ring-1 ring-black/10 backdrop-blur-sm transition-all hover:bg-white hover:shadow-xl active:scale-95 md:right-4"
             >
               <svg className="h-5 w-5 text-black/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -135,20 +173,25 @@ export function CharacterSelection({
             </button>
           )}
 
-          {/* Left/right fade */}
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-white via-white/70 to-transparent md:w-32" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-white via-white/70 to-transparent md:w-32" />
+          {/* Left/right fade — only when there's overflow in that direction */}
+          {canScrollLeft && (
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-white to-transparent md:w-16" />
+          )}
+          {canScrollRight && (
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-white to-transparent md:w-16" />
+          )}
 
           {/* Scroll container */}
           <div
             ref={scrollRef}
-            className="flex gap-3 overflow-x-auto px-1 py-1 pb-2 md:gap-4"
+            className="flex gap-3 overflow-x-auto px-6 py-1 pb-2 md:gap-4 md:px-8"
             style={{ scrollbarWidth: "none" }}
             onScroll={updateScrollButtons}
           >
-            {dedupedCharacters.map((char) => {
+            {dedupedCharacters.map((char, index) => {
               const isSelected = selectedId === char.id
               const videoUrl = videoByName.get(char.name)
+              const isVisible = index < 7 // first ~7 are visible without scrolling
 
               return (
                 <button
@@ -170,12 +213,15 @@ export function CharacterSelection({
                       alt={char.name}
                       className="h-full w-full object-cover object-top"
                       draggable={false}
+                      loading={isVisible ? "eager" : "lazy"}
+                      fetchPriority={isVisible ? "high" : "auto"}
                       onError={(e) => { e.currentTarget.src = char.src }}
                     />
                     {/* Video loads ONLY on hover */}
                     {videoUrl && (
                       <video
                         className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                        poster={videoFrameUrl(videoUrl) || undefined}
                         muted
                         loop
                         playsInline

@@ -55,6 +55,7 @@ export default function Home() {
   const [selectedError, setSelectedError] = useState<{ message: string; characterName: string | null; characterImageUrl: string | null; createdAt: string } | null>(null)
   const [confirmedCharacter, setConfirmedCharacter] = useState(false)
   const [showWelcome, setShowWelcome] = useState(true)
+  const [showSuccess, setShowSuccess] = useState(false)
   const [pendingAutoSubmit, setPendingAutoSubmit] = useState(false)
   // Detected aspect ratio of the generated video (from character image)
   const [generatedVideoAspectRatio, setGeneratedVideoAspectRatio] = useState<"9:16" | "16:9" | "fill">("fill")
@@ -71,7 +72,6 @@ export default function Home() {
     id: number
     isCustom: boolean
   } | null>(null)
-  const [videoShared, setVideoShared] = useState(false)
 
   // Video refs for sync
   const mainVideoRef = useRef<HTMLVideoElement>(null)
@@ -165,10 +165,7 @@ export default function Home() {
     user,
     onLoginRequired: () => setShowLoginModal(true),
     onSuccess: () => {
-      // Don't clear recording - allow user to generate with another character
-      setSelectedCharacter(null)
-      setConfirmedCharacter(false)
-      setResultUrl(null)
+      setShowSuccess(true)
     },
     onError: (message) => {
       setErrorToast(message)
@@ -179,6 +176,10 @@ export default function Home() {
   // Initialize and restore session state
   useEffect(() => {
     setMounted(true)
+
+    // Read hash to skip welcome if navigating directly to a step
+    const hash = window.location.hash.replace("#", "")
+    if (hash) setShowWelcome(false)
 
     const savedCharacter = sessionStorage.getItem(STORAGE_KEYS.PENDING_CHARACTER)
     if (savedCharacter) {
@@ -295,7 +296,7 @@ export default function Home() {
     setSelectedGeneratedVideo(null)
     setGeneratedVideoAspectRatio("fill")
     setSelectedError(null)
-    setVideoShared(false)
+    setShowSuccess(false)
   }, [clearRecording, setSelectedCharacter])
 
   // Handle Escape key — use refs for stable listener (no re-registration)
@@ -396,12 +397,6 @@ export default function Home() {
   }, [currentStep, showWelcome])
 
   useEffect(() => {
-    // Restore state from hash on mount
-    const hash = window.location.hash.replace("#", "")
-    if (hash === "pick") {
-      setShowWelcome(false)
-    }
-
     const handlePopState = () => {
       const hash = window.location.hash.replace("#", "")
       if (!hash) {
@@ -437,7 +432,78 @@ export default function Home() {
     <main className="relative flex h-[100dvh] flex-row overflow-hidden bg-white">
       {/* Main Preview Area — fullscreen step content */}
       <div className="flex flex-1 flex-col items-center justify-center overflow-hidden">
-        {selectedError ? (
+        {showSuccess ? (
+          /* Success screen — video playing in background with overlay */
+          <div className="relative flex h-full w-full items-center justify-center">
+            {/* Video background */}
+            {recordedVideoUrl && (
+              <video
+                src={recordedVideoUrl}
+                className="absolute inset-0 h-full w-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+              />
+            )}
+            {/* Dark overlay */}
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+            {/* Content */}
+            <div className="relative z-10 flex flex-col items-center gap-5 px-8">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/20 backdrop-blur-sm">
+                <svg className="h-10 w-10 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-2xl font-bold text-white">Video is generating!</p>
+                <p className="text-center text-sm text-white/50">
+                  Using <span className="text-white/70">Kling Motion Control</span> via{" "}
+                  <a
+                    href="https://vercel.com/ai-gateway"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white/70 underline underline-offset-2 hover:text-white"
+                  >
+                    AI Gateway
+                  </a>
+                </p>
+              </div>
+              <div className="flex flex-col items-center gap-3 pt-4">
+                <button
+                  onClick={handleReset}
+                  className="flex h-12 w-72 items-center justify-center gap-2 rounded-xl bg-white text-[15px] font-semibold text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-[0.98]"
+                >
+                  Create new video
+                </button>
+                <button
+                  onClick={() => {
+                    // Keep recording, clear character, go to character selection
+                    setSelectedCharacter(null)
+                    setConfirmedCharacter(false)
+                    setShowSuccess(false)
+                    setResultUrl(null)
+                  }}
+                  className="flex h-11 w-72 items-center justify-center gap-2 rounded-xl bg-white/15 text-sm font-medium text-white/70 backdrop-blur-sm transition-all hover:bg-white/20 hover:text-white active:scale-[0.98]"
+                >
+                  Try another character
+                </button>
+                <a
+                  href="https://v0.app/templates/face-swap-template-1Nu0E0eAo9q"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-11 w-72 items-center justify-center gap-2.5 rounded-xl bg-white/10 text-sm font-medium text-white/50 backdrop-blur-sm transition-all hover:bg-white/15 hover:text-white/70 active:scale-[0.98]"
+                >
+                  Make my own FaceSwap with
+                  <svg className="h-3 w-auto" viewBox="0 0 252 120" fill="currentColor">
+                    <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
+                    <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </div>
+        ) : selectedError ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-8">
             {selectedError.characterImageUrl && (
               <div className="h-20 w-20 overflow-hidden rounded-xl bg-neutral-100 ring-1 ring-neutral-200">
@@ -463,13 +529,19 @@ export default function Home() {
         ) : resultUrl ? (
           <div className="relative h-full w-full bg-black">
             <video
+              key={resultUrl}
               ref={mainVideoRef}
               src={resultUrl}
               muted
               loop
               playsInline
               preload="auto"
-              poster={allCharacters.find(c => c.id === selectedCharacter)?.src || undefined}
+              poster={(() => {
+                const src = allCharacters.find(c => c.id === selectedCharacter)?.src
+                if (!src) return undefined
+                if (!src.startsWith("http")) return src
+                return `/_next/image?url=${encodeURIComponent(src)}&w=640&q=75`
+              })()}
               className="h-full w-full cursor-pointer object-contain md:object-cover"
               onClick={(e) => {
                 const v = e.currentTarget
@@ -527,6 +599,7 @@ export default function Home() {
                 pipAspectRatio !== "9:16" && "aspect-video w-28 md:w-48"
               )}>
                 <video
+                  key={sourceVideoUrl || recordedVideoUrl}
                   ref={pipVideoRef}
                   src={toMp4Url(sourceVideoUrl) || recordedVideoUrl || ""}
                   muted
@@ -595,42 +668,6 @@ export default function Home() {
                 >
                   new video
                 </button>
-                {resultUrl && (
-                  <button
-                    disabled={videoShared}
-                    onClick={async () => {
-                      const char = allCharacters.find(c => c.id === selectedCharacter)
-                      await fetch("/api/submit-video", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          videoUrl: resultUrl,
-                          characterImageUrl: char?.src || null,
-                          characterName: char?.name || null,
-                        }),
-                      })
-                      setVideoShared(true)
-                    }}
-                    title={videoShared ? "Submitted for community review" : "Submit this video to the community gallery for others to see"}
-                    className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm transition-all hover:bg-white/25 active:scale-95 disabled:opacity-50"
-                  >
-                    {videoShared ? (
-                      <>
-                        <svg className="h-3 w-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        shared!
-                      </>
-                    ) : (
-                      <>
-                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                        </svg>
-                        share to community
-                      </>
-                    )}
-                  </button>
-                )}
                 {(sourceVideoUrl || recordedVideoUrl) && (
                   <button
                     onClick={() => setShowPip(!showPip)}
@@ -728,38 +765,54 @@ export default function Home() {
                     </div>
                   </>
                 ) : (
-                  /* No character — just generated, offer next actions */
+                  /* Success screen — generation started */
                   <>
-                    <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 backdrop-blur-sm">
-                      <svg className="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20 backdrop-blur-sm">
+                      <svg className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
-                      <span className="text-sm font-medium text-white">Generating your video...</span>
                     </div>
-                    <p className="text-center text-xs text-white/40">
-                      Generating with <span className="text-white/60">Kling Motion Control</span> via{" "}
+                    <div className="flex flex-col items-center gap-1.5">
+                      <p className="text-xl font-bold text-white">Video is generating!</p>
+                      <p className="text-center text-sm text-white/50">
+                        Using <span className="text-white/70">Kling Motion Control</span> via{" "}
+                        <a
+                          href="https://vercel.com/ai-gateway"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-white/70 underline underline-offset-2 hover:text-white"
+                        >
+                          AI Gateway
+                        </a>
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-center gap-2.5 pt-2">
+                      <button
+                        onClick={handleReset}
+                        className="flex h-12 w-64 items-center justify-center gap-2 rounded-xl bg-white text-[15px] font-semibold text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-[0.98]"
+                      >
+                        Create new video
+                      </button>
                       <a
-                        href="https://vercel.com/ai-gateway"
+                        href="https://v0.app/templates/face-swap-template-1Nu0E0eAo9q"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-white/60 underline underline-offset-2 hover:text-white/80"
+                        className="flex h-11 w-64 items-center justify-center gap-2 rounded-xl bg-white/10 text-sm font-medium text-white/80 backdrop-blur-sm transition-all hover:bg-white/20 active:scale-[0.98]"
                       >
-                        AI Gateway
+                        <svg className="h-3.5 w-auto" viewBox="0 0 252 120" fill="currentColor">
+                          <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
+                          <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
+                        </svg>
+                        Make my own FaceSwap with v0
                       </a>
-                    </p>
-                    <button
-                      onClick={handleReset}
-                      className="flex h-12 items-center gap-2.5 rounded-full bg-white px-7 text-[15px] font-bold text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-95"
-                    >
-                      Generate a new video
-                    </button>
+                    </div>
                   </>
                 )}
               </div>
             </div>
           </div>
-        ) : (currentStep === 1 && showWelcome) ? (
-          /* Welcome landing page */
+        ) : (!mounted || (currentStep === 1 && showWelcome)) ? (
+          /* Welcome landing page (also shown pre-mount to avoid hydration mismatch) */
           <WelcomePage onStart={() => setShowWelcome(false)} characterSrcs={allCharacters.map(c => c.src)} />
         ) : currentStep === 1 ? (
           /* Step 1: Choose character */

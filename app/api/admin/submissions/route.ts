@@ -2,14 +2,12 @@ import { sql } from "@/lib/db"
 import { NextResponse } from "next/server"
 import { verifySession } from "@/lib/auth"
 
-const ADMIN_EMAILS = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()).filter(Boolean) ?? []
+const ADMIN_EMAILS = process.env.ADMIN_EMAILS?.split(",") ?? []
 
 async function requireAdmin() {
   const session = await verifySession()
   if (!session?.user?.id) return null
-  // Fail-closed: if ADMIN_EMAILS is not configured, nobody is admin
-  if (ADMIN_EMAILS.length === 0) return null
-  if (!ADMIN_EMAILS.includes(session.user.email)) return null
+  if (ADMIN_EMAILS.length > 0 && !ADMIN_EMAILS.includes(session.user.email)) return null
   return session
 }
 
@@ -48,17 +46,13 @@ export async function PATCH(request: Request) {
 
     const { id, status, name, category, type } = await request.json()
 
-    if (!id || typeof id !== "number" || !status) {
-      return NextResponse.json({ error: "Valid numeric ID and status required" }, { status: 400 })
+    if (!id || !status) {
+      return NextResponse.json({ error: "ID and status required" }, { status: 400 })
     }
 
     if (status !== "approved" && status !== "rejected") {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
-
-    // Sanitize string inputs
-    const safeName = typeof name === "string" ? name.slice(0, 100) : null
-    const safeCategory = typeof category === "string" ? category.slice(0, 50) : null
 
     if (type === "video") {
       await sql`UPDATE video_submissions SET status = ${status} WHERE id = ${id}`
@@ -66,8 +60,8 @@ export async function PATCH(request: Request) {
       await sql`
         UPDATE character_submissions
         SET status = ${status},
-            suggested_name = COALESCE(${safeName}, suggested_name),
-            suggested_category = COALESCE(${safeCategory}, suggested_category)
+            suggested_name = COALESCE(${name || null}, suggested_name),
+            suggested_category = COALESCE(${category || null}, suggested_category)
         WHERE id = ${id}
       `
     }

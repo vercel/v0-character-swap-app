@@ -10,20 +10,20 @@ export const maxDuration = 800
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify session server-side
+    // Verify session server-side — never trust userId from client
     const session = await getSession()
-    if (!session?.userId) {
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { error: "Authentication required" },
+        { error: "User must be logged in" },
         { status: 401 }
       )
     }
 
     const body = await request.json()
     const { generationId: existingGenerationId, videoUrl, characterImageUrl, characterName, sendEmail } = body
-    const userId = session.userId
-    const userName = session.name || undefined
-    const userEmail = session.email || undefined
+    const userId = session.user.id
+    const userName = session.user.name || undefined
+    const userEmail = session.user.email || undefined
 
     if (!videoUrl || !characterImageUrl) {
       return NextResponse.json(
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     await updateGenerationRunId(generationId, `direct-${generationId}`)
 
-    // TEMP: use project-level OIDC (session already verified above)
+    const userApiKey = undefined // TEMP: use project-level OIDC
 
     console.log(`[GenerateDirect] Starting direct generation ${generationId} (no workflow)`)
 

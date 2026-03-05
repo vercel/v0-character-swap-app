@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import type { Character, User, ReferenceImage } from "@/lib/types"
 import { CUSTOM_CHARACTER_ID_OFFSET, DEFAULT_CHARACTERS } from "@/lib/constants"
 
@@ -20,34 +20,10 @@ interface UseCharactersReturn {
   isReady: boolean
 }
 
-const COMMUNITY_ID_OFFSET = 5000
-
 export function useCharacters({ user, authLoading = false }: UseCharactersOptions): UseCharactersReturn {
   const [customCharacters, setCustomCharacters] = useState<Character[]>([])
-  const [communityCharacters, setCommunityCharacters] = useState<Character[]>([])
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null)
   const [customLoaded, setCustomLoaded] = useState(false)
-  const [communityLoaded, setCommunityLoaded] = useState(false)
-  const communityFetched = useRef(false)
-
-  // Load community-approved characters (once, immediately)
-  useEffect(() => {
-    if (communityFetched.current) return
-    communityFetched.current = true
-    fetch("/api/approved-characters")
-      .then(res => res.json())
-      .then(data => {
-        if (data.characters) {
-          setCommunityCharacters(data.characters.map((c: { id: number; src: string; name: string }) => ({
-            id: COMMUNITY_ID_OFFSET + c.id,
-            src: c.src,
-            name: c.name || "Community",
-          })))
-        }
-      })
-      .catch(() => {})
-      .finally(() => setCommunityLoaded(true))
-  }, [])
 
   // Load user's reference images from database
   useEffect(() => {
@@ -131,11 +107,8 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
     }).catch(console.error)
   }, [])
 
-  // All characters in one pass — no reflow
-  const allCharacters = [...DEFAULT_CHARACTERS, ...communityCharacters, ...customCharacters]
-
-  // Only ready when both community and custom are loaded
-  const isReady = communityLoaded && customLoaded
+  const allCharacters = [...DEFAULT_CHARACTERS, ...customCharacters]
+  const isReady = customLoaded
 
   return {
     customCharacters,

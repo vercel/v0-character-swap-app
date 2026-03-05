@@ -66,8 +66,6 @@ export function CharacterGrid({
   const [generationProgress, setGenerationProgress] = useState(0)
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [showHowItWorks, setShowHowItWorks] = useState(false)
-  const [sharePrompt, setSharePrompt] = useState<{ url: string; name: string } | null>(null)
-  const [shareSubmitted, setShareSubmitted] = useState(false)
 
   // Deduplicate by image URL — custom characters override defaults with same image
   const seen = new Set<string>()
@@ -123,9 +121,6 @@ export function CharacterGrid({
         const newId = Math.max(...displayCharacters.map(c => c.id), 0) + 1
         onAddCustom({ id: newId, src: finalUrl, name: charName })
         setPrompt("")
-        // Offer to share to community
-        setSharePrompt({ url: finalUrl, name: charName })
-        setShareSubmitted(false)
       }
     } catch (error) {
       console.error("Failed to generate:", error)
@@ -301,48 +296,6 @@ export function CharacterGrid({
                 </button>
               </div>
             )}
-          </div>
-        )}
-
-        {/* Share to community prompt */}
-        {sharePrompt && !shareSubmitted && (
-          <div className="mt-2 flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={sharePrompt.url} alt="" className="h-9 w-9 rounded-lg object-cover" />
-            <div className="flex-1">
-              <p className="text-xs font-medium text-black">Share to community?</p>
-              <p className="text-[10px] text-black/40">Others can use your cartoon</p>
-            </div>
-            <button
-              onClick={async () => {
-                await fetch("/api/submit-character", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ imageUrl: sharePrompt.url, name: sharePrompt.name }),
-                })
-                setShareSubmitted(true)
-                setTimeout(() => setSharePrompt(null), 2000)
-              }}
-              className="rounded-lg bg-black px-3 py-1.5 text-[11px] font-medium text-white hover:bg-gray-800"
-            >
-              Share
-            </button>
-            <button
-              onClick={() => setSharePrompt(null)}
-              className="text-black/30 hover:text-black"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
-        {shareSubmitted && (
-          <div className="mt-2 flex items-center gap-2 rounded-xl bg-green-50 px-3 py-2.5 text-xs text-green-700">
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-            Submitted for review — thanks!
           </div>
         )}
 

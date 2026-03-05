@@ -21,9 +21,9 @@ export const MIN_IMAGE_DIMENSION = 340 // pixels - KlingAI minimum
 export const DEFAULT_CHARACTERS: Character[] = [
   { id: 1, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/firefighter.png", name: "Firefighter" },
   { id: 2, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/vampire-girl.png", name: "Vampire Girl" },
-  { id: 3, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/hacker-grandma.png", name: "Hacker Grandma" },
-  { id: 4, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/alien-chef.png", name: "Alien Chef" },
   { id: 5, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/disco-robot.png", name: "Disco Robot" },
+  { id: 4, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/alien-chef.png", name: "Alien Chef" },
+  { id: 3, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/hacker-grandma.png", name: "Hacker Grandma" },
   { id: 6, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/grumpy-wizard.png", name: "Grumpy Wizard" },
   { id: 7, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/knight-princess.png", name: "Knight Princess" },
   { id: 8, src: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/default-characters/space-pirate.png", name: "Space Pirate" },

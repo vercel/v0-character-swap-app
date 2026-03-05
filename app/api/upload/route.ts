@@ -1,6 +1,5 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client"
 import { type NextRequest, NextResponse } from "next/server"
-import { verifySession } from "@/lib/auth"
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as HandleUploadBody
@@ -10,11 +9,6 @@ export async function POST(request: NextRequest) {
       body,
       request,
       onBeforeGenerateToken: async () => {
-        // Verify user is authenticated before allowing uploads
-        const session = await verifySession()
-        if (!session?.user?.id) {
-          throw new Error("Authentication required")
-        }
         // Allow video and image uploads
         // Include various video formats for cross-browser compatibility
         return {

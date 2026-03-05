@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import useSWR from "swr"
-
-const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 function optimizedUrl(src: string, width: number): string {
   if (src.startsWith("/") || !src.startsWith("http")) return src
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  if (cloudName && src.includes(".public.blob.vercel-storage.com")) {
+    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_${width},c_fill,g_north,f_auto,q_auto/${encodeURIComponent(src)}`
+  }
   return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=75`
 }
 
@@ -17,17 +18,21 @@ interface WelcomePageProps {
 
 export function WelcomePage({ onStart, characterSrcs = [] }: WelcomePageProps) {
   const [demoPlaying, setDemoPlaying] = useState(false)
+  const [showHowItWorks, setShowHowItWorks] = useState(false)
 
-  const { data: showcaseData, isLoading } = useSWR<{ generations: { video_url: string; source_video_url: string | null; character_image_url: string | null; character_name: string | null }[] }>(
-    "/api/generations/showcase",
-    fetcher,
-    { dedupingInterval: 60000 }
-  )
-  const demo = showcaseData?.generations?.[0] || null
+  // Hardcoded demo — always the same video
+  const demo = {
+    video_url: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/generations/21-1772643743115.mp4",
+    source_video_url: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/videos/1772643422835-recording-cfKTyEBFxWaTSDktsZXxJIpeu9KZrS.mp4",
+    character_image_url: "https://7zjbnnvanyvles15.public.blob.vercel-storage.com/characters/1772643430646-character-W1YQ8gzFMYFGErIHZWK0S8bSOoBEVZ.jpg",
+    character_name: "Firefighter",
+  }
+  const isLoading = false
 
   // Prefetch carousel character images while user is on welcome page
+  // Uses same size (256) as carousel for cache hits
   useEffect(() => {
-    characterSrcs.forEach(src => {
+    characterSrcs.slice(0, 7).forEach(src => {
       if (src && src.startsWith("http")) {
         const img = new window.Image()
         img.src = optimizedUrl(src, 384)
@@ -35,37 +40,34 @@ export function WelcomePage({ onStart, characterSrcs = [] }: WelcomePageProps) {
     })
   }, [characterSrcs])
 
-  // Prefetch showcase videos (for carousel hover previews)
-  useEffect(() => {
-    if (!showcaseData?.generations) return
-    showcaseData.generations.forEach(g => {
-      if (g.video_url) {
-        // Preload just metadata (enough to show first frame fast)
-        const link = document.createElement("link")
-        link.rel = "preload"
-        link.as = "video"
-        link.href = g.video_url
-        // Only keep a few to not waste bandwidth
-        document.head.appendChild(link)
-      }
-    })
-  }, [showcaseData])
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-y-auto bg-white">
       {/* Logo */}
-      <h1 className="absolute left-6 top-5 z-10 hidden text-2xl font-pixel text-black md:block">v0 FaceSwap</h1>
+      <div className="absolute left-6 top-5 z-10 hidden items-center gap-2 md:flex">
+        <svg className="h-4 w-auto text-black" viewBox="0 0 252 120" fill="currentColor">
+          <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
+          <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
+        </svg>
+        <span className="text-2xl font-pixel text-black">FaceSwap</span>
+      </div>
 
       {/* Content */}
       <div className="flex flex-1 flex-col items-center justify-center px-5 pb-20 md:pb-6">
         <div className="w-full max-w-md text-center">
           {/* Title */}
-          <h1 className="mb-2 text-2xl font-pixel text-black md:hidden">v0 FaceSwap</h1>
+          <div className="mb-2 flex items-center justify-center gap-2 md:hidden">
+            <svg className="h-4 w-auto text-black" viewBox="0 0 252 120" fill="currentColor">
+              <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
+              <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
+            </svg>
+            <span className="text-2xl font-pixel text-black">FaceSwap</span>
+          </div>
           <h2 className="mb-2 text-2xl font-bold text-black md:text-3xl">
             Turn yourself into a cartoon
           </h2>
-          <p className="mb-6 text-[15px] leading-relaxed text-black/45 md:mb-8">
-            Record a short video and AI will animate any cartoon character as you. Your expressions, your movements, their style.
+          <p className="mb-6 text-[15px] leading-relaxed text-black/65 md:mb-8">
+            Record a short video and AI will animate any cartoon character as you.<br />Your expressions, your movements, their unique style.
           </p>
 
           {/* Demo video placeholder (always reserves space) */}
@@ -102,6 +104,7 @@ export function WelcomePage({ onStart, characterSrcs = [] }: WelcomePageProps) {
                   <video
                     data-main
                     src={demo.video_url}
+                    poster={`/_next/image?url=${encodeURIComponent(demo.character_image_url!)}&w=640&q=75`}
                     className="h-full w-full object-cover"
                     muted
                     loop
@@ -157,17 +160,17 @@ export function WelcomePage({ onStart, characterSrcs = [] }: WelcomePageProps) {
           <div className="mb-6 flex items-center justify-center gap-3 md:mb-8 md:gap-4">
             <div className="flex flex-col items-center gap-1">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-xs font-bold text-white">1</span>
-              <span className="text-[11px] text-black/50">Pick a cartoon</span>
+              <span className="text-[11px] text-black/65">Pick a cartoon</span>
             </div>
             <svg className="h-3 w-3 shrink-0 text-black/15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
             <div className="flex flex-col items-center gap-1">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/10 text-xs font-bold text-black/40">2</span>
-              <span className="text-[11px] text-black/50">Record yourself</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/10 text-xs font-bold text-black/70">2</span>
+              <span className="text-[11px] text-black/65">Record yourself</span>
             </div>
             <svg className="h-3 w-3 shrink-0 text-black/15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
             <div className="flex flex-col items-center gap-1">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/10 text-xs font-bold text-black/40">3</span>
-              <span className="text-[11px] text-black/50">AI transforms you</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/10 text-xs font-bold text-black/70">3</span>
+              <span className="text-[11px] text-black/65">AI transforms you</span>
             </div>
           </div>
 
@@ -182,31 +185,134 @@ export function WelcomePage({ onStart, characterSrcs = [] }: WelcomePageProps) {
             </svg>
           </button>
 
-          {/* Powered by */}
+          {/* Links */}
           <div className="mt-6 flex items-center justify-center gap-4">
-            <a
-              href="https://vercel.com/ai-gateway"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-full bg-neutral-100 px-3.5 py-2 text-[13px] font-medium text-black/60 transition-colors hover:bg-neutral-200 hover:text-black"
+            <button
+              onClick={() => setShowHowItWorks(true)}
+              className="text-sm text-black/60 underline underline-offset-2 transition-colors hover:text-black"
             >
-              Powered by AI Gateway
-            </a>
+              How it works
+            </button>
+            <span className="text-black/20">·</span>
             <a
               href="https://v0.app/templates/face-swap-template-1Nu0E0eAo9q"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-full bg-neutral-100 px-3.5 py-2 text-[13px] font-medium text-black/60 transition-colors hover:bg-neutral-200 hover:text-black"
+              className="flex items-center gap-1.5 text-sm text-black/60 transition-colors hover:text-black"
             >
-              <svg className="h-3.5 w-auto" viewBox="0 0 252 120" fill="currentColor">
+              <span className="underline underline-offset-2">Open in</span>
+              <svg className="h-3 w-auto" viewBox="0 0 252 120" fill="currentColor">
                 <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
                 <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
               </svg>
-              Open in v0
             </a>
           </div>
         </div>
       </div>
+
+      {/* How it works modal */}
+      {showHowItWorks && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          onClick={() => setShowHowItWorks(false)}
+          onKeyDown={(e) => { if (e.key === "Escape") setShowHowItWorks(false) }}
+          tabIndex={0}
+          ref={(el) => el?.focus()}
+        >
+          <div
+            className="relative max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowHowItWorks(false)}
+              className="absolute right-4 top-4 text-black/60 transition-colors hover:text-black"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <h2 className="mb-5 text-xl font-bold text-black">How it works</h2>
+
+            <div className="space-y-4 text-[14px] leading-relaxed text-black/60">
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-black/50">recording</p>
+                <p>
+                  You record a short video in your browser. The recording is uploaded to{" "}
+                  <a href="https://vercel.com/docs/storage/vercel-blob" target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2 hover:text-black/60">Vercel Blob</a>
+                  {" "}in the background while you pick a character.
+                </p>
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-black/50">character generation</p>
+                <p>
+                  Default characters are pre-made illustrations. Custom characters are generated with{" "}
+                  <a href="https://sdk.vercel.ai" target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2 hover:text-black/60">AI SDK</a>
+                  {" "}using Nano Banana Pro through{" "}
+                  <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2 hover:text-black/60">AI Gateway</a>.
+                </p>
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-black/50">video generation</p>
+                <p>
+                  <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2 hover:text-black/60">AI Gateway</a>
+                  {" "}routes the request to Kling Motion Control (klingai/kling-v2.6-motion-control). The model analyzes your facial landmarks, expressions, and head pose frame-by-frame, then transfers that motion onto the character image.
+                </p>
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-black/50">orchestration</p>
+                <p>
+                  A{" "}
+                  <a href="https://useworkflow.dev/" target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2 hover:text-black/60">Vercel Workflow</a>
+                  {" "}handles the full pipeline: convert the video, call AI Gateway, save the result to{" "}
+                  <a href="https://vercel.com/docs/storage/vercel-blob" target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2 hover:text-black/60">Blob</a>
+                  , update{" "}
+                  <a href="https://neon.tech" target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2 hover:text-black/60">Neon Postgres</a>
+                  , and send an email notification. Workflows are durable: they survive serverless timeouts, browser closes, and network disconnections.
+                </p>
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-black/50">download</p>
+                <p>
+                  Downloads are composited server-side via Cloudinary: the generated video with a picture-in-picture overlay of your original recording.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 border-t border-neutral-100 pt-4 text-[12px] text-black/60">
+                <span>Built with</span>
+                <a href="https://nextjs.org" target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2 hover:text-black/60">Next.js</a>
+                <span>+</span>
+                <a href="https://sdk.vercel.ai" target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2 hover:text-black/60">AI SDK</a>
+                <span>+</span>
+                <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2 hover:text-black/60">AI Gateway</a>
+                <span>+</span>
+                <a href="https://useworkflow.dev/" target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2 hover:text-black/60">Workflow</a>
+                <span>+</span>
+                <a href="https://v0.app" target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2 hover:text-black/60">v0</a>
+                <span>+</span>
+                <a href="https://vercel.com" target="_blank" rel="noopener noreferrer" className="text-black underline underline-offset-2 hover:text-black/60">Vercel</a>
+              </div>
+
+              <a
+                href="https://v0.app/templates/face-swap-template-1Nu0E0eAo9q"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 rounded-xl bg-black px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+              >
+                Open in
+                <svg className="h-3.5 w-auto" viewBox="0 0 252 120" fill="currentColor">
+                  <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
+                  <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

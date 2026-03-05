@@ -9,19 +9,18 @@ export async function POST(request: NextRequest) {
   try {
     // Verify session server-side — never trust userId from client
     const session = await getSession()
-    if (!session?.userId) {
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { error: "Authentication required" },
+        { error: "User must be logged in" },
         { status: 401 }
       )
     }
 
     const body = await request.json()
     const { generationId: existingGenerationId, videoUrl, characterImageUrl, characterName, sourceVideoAspectRatio, sendEmail } = body
-    // Use verified session data, not client-provided userId/email
-    const userId = session.userId
-    const userName = session.name || undefined
-    const userEmail = session.email || undefined
+    const userId = session.user.id
+    const userName = session.user.name || undefined
+    const userEmail = session.user.email || undefined
 
     if (!videoUrl || !characterImageUrl) {
       return NextResponse.json(
@@ -51,7 +50,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // TEMP: use project-level OIDC (session already verified above)
+    // Read the user's AI Gateway API key (if authenticated)
+    const session = await getSession()
+    const userApiKey = undefined // TEMP: use project-level OIDC
 
     // Start the durable workflow via the Workflow SDK
     // Each step runs on its own request, avoiding the 5-minute serverless timeout
