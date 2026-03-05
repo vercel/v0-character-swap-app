@@ -50,9 +50,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Read the user's AI Gateway API key (if authenticated)
-    const session = await getSession()
-    const userApiKey = undefined // TEMP: use project-level OIDC
+    // TEMP: use project-level OIDC (session already verified above)
 
     // Start the durable workflow via the Workflow SDK
     // Each step runs on its own request, avoiding the 5-minute serverless timeout
