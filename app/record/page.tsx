@@ -1,34 +1,89 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import { useRef, useEffect, useState, Suspense } from "react"
+import { useRef, useEffect, useState, useCallback, Suspense } from "react"
 import Image from "next/image"
 import { CameraPreview } from "@/components/camera-preview"
 import { useVideo } from "@/providers/video-context"
 import { useCharacters } from "@/hooks/use-characters"
+import { useVideoGeneration } from "@/hooks/use-video-generation"
 import { useAuth } from "@/components/auth-provider"
+import { detectImageAspectRatio } from "@/lib/utils"
 
 function RecordContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const charId = searchParams.get("char") ? Number(searchParams.get("char")) : null
 
-  const { user, isLoading: authLoading } = useAuth()
-  const { allCharacters } = useCharacters({ user, authLoading })
+  const { user, isLoading: authLoading, login } = useAuth()
+  const { allCharacters, trackCharacterUsage } = useCharacters({ user, authLoading })
   const {
     recordedVideo,
     recordedVideoUrl,
+    uploadedVideoUrl,
+    recordedAspectRatio,
     isUploading,
     showPreview,
     setShowPreview,
     handleVideoRecorded,
     clearRecording,
+    getVideoForUpload,
+    waitForUpload,
+    saveToSession,
   } = useVideo()
+
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [errorToast, setErrorToast] = useState<string | null>(null)
+
+  const { processVideo } = useVideoGeneration({
+    user,
+    onLoginRequired: () => setShowLoginModal(true),
+    onSuccess: () => {
+      // Generation submitted — go back to pick
+      router.push("/pick")
+    },
+    onError: (message) => {
+      setErrorToast(message)
+      setTimeout(() => setErrorToast(null), 5000)
+    },
+  })
 
   const previewVideoRef = useRef<HTMLVideoElement>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
 
   const character = charId ? allCharacters.find(c => c.id === charId) : null
+
+  const handleGenerate = useCallback(async () => {
+    if (!recordedVideo || !character) return
+    if (previewVideoRef.current) {
+      previewVideoRef.current.pause()
+      previewVideoRef.current.muted = true
+    }
+    trackCharacterUsage(character.id)
+    const ratio = await detectImageAspectRatio(character.src)
+    const characterAspectRatio = (ratio === "9:16" || ratio === "3:4") ? "9:16" as const
+      : (ratio === "16:9" || ratio === "4:3") ? "16:9" as const
+      : "fill" as const
+    processVideo(getVideoForUpload, character, false, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio, waitForUpload)
+    // Navigate immediately — don't wait for processVideo async work
+    router.push("/pick")
+  }, [recordedVideo, character, trackCharacterUsage, processVideo, getVideoForUpload, uploadedVideoUrl, recordedAspectRatio, waitForUpload, router])
+
+  const handleLoginAndContinue = useCallback(async () => {
+    setIsLoggingIn(true)
+    if (charId) {
+      const char = allCharacters.find(c => c.id === charId)
+      if (char) {
+        sessionStorage.setItem("pendingCharacterData", JSON.stringify({ src: char.src, name: char.name }))
+      }
+    }
+    if (recordedVideo) {
+      await saveToSession(recordedVideo, charId)
+    }
+    sessionStorage.setItem("loginReturnUrl", `/generate?char=${charId}`)
+    login()
+  }, [recordedVideo, charId, allCharacters, saveToSession, login])
 
   // Redirect to /pick if no character selected
   useEffect(() => {
@@ -132,13 +187,7 @@ function RecordContent() {
                 </button>
               )}
               <button
-                onClick={() => {
-                  if (previewVideoRef.current) {
-                    previewVideoRef.current.pause()
-                    previewVideoRef.current.muted = true
-                  }
-                  router.push(`/generate?char=${charId}`)
-                }}
+                onClick={handleGenerate}
                 disabled={!recordedVideo || isUploading}
                 className="flex h-12 items-center gap-2.5 rounded-full bg-white px-7 text-[15px] font-bold text-black shadow-lg transition-all hover:bg-neutral-100 active:scale-95 disabled:opacity-50"
               >
@@ -154,6 +203,56 @@ function RecordContent() {
             </div>
           </div>
         </div>
+
+        {/* Login Modal */}
+        {showLoginModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+            <div className="mx-4 w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 shadow-xl">
+              <h2 className="mb-2 text-lg font-semibold text-black">Sign in to generate</h2>
+              <p className="mb-6 text-sm text-black/70">
+                Create an account to generate your video. Your recording and character selection will be saved.
+              </p>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={handleLoginAndContinue}
+                  disabled={isLoggingIn}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 active:scale-[0.98] disabled:opacity-70"
+                >
+                  {isLoggingIn ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4" viewBox="0 0 76 65" fill="currentColor">
+                        <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
+                      </svg>
+                      Continue with Vercel
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowLoginModal(false)}
+                  disabled={isLoggingIn}
+                  className="rounded-xl px-4 py-3 text-sm text-black/50 transition-colors hover:text-black disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Toast */}
+        {errorToast && (
+          <div className="fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-lg bg-red-900 px-4 py-2 shadow-lg">
+            <p className="text-sm font-medium text-white">{errorToast}</p>
+          </div>
+        )}
       </div>
     )
   }
