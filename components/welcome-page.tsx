@@ -6,7 +6,7 @@ function optimizedUrl(src: string, width: number): string {
   if (src.startsWith("/") || !src.startsWith("http")) return src
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
   if (cloudName && src.includes(".public.blob.vercel-storage.com")) {
-    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_${width},c_fill,g_north,f_auto,q_auto/${encodeURIComponent(src)}`
+    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_${width},c_fill,g_north,f_webp,q_80/${encodeURIComponent(src)}`
   }
   return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=75`
 }
@@ -35,7 +35,7 @@ export function WelcomePage({ onStart, characterSrcs = [] }: WelcomePageProps) {
     characterSrcs.slice(0, 7).forEach(src => {
       if (src && src.startsWith("http")) {
         const img = new window.Image()
-        img.src = optimizedUrl(src, 384)
+        img.src = optimizedUrl(src, 640)
       }
     })
   }, [characterSrcs])
@@ -63,7 +63,7 @@ export function WelcomePage({ onStart, characterSrcs = [] }: WelcomePageProps) {
             </svg>
             <span className="text-2xl font-pixel text-black">FaceSwap</span>
           </div>
-          <h2 className="mb-2 text-2xl font-bold text-black md:text-3xl">
+          <h2 className="mb-2 text-2xl text-black md:text-3xl">
             Turn yourself into a cartoon
           </h2>
           <p className="mb-6 text-[15px] leading-relaxed text-black/65 md:mb-8">
