@@ -215,6 +215,7 @@ function VideoOverlay() {
     <VideoOverlayPlayer
       videoUrl={videoUrl}
       pipSrc={pipSrc}
+      pipRawUrl={sourceVideoUrl}
       hasPipSource={hasPipSource}
       showPip={showPip}
       setShowPip={setShowPip}
@@ -235,6 +236,7 @@ function VideoOverlay() {
 function VideoOverlayPlayer({
   videoUrl,
   pipSrc,
+  pipRawUrl,
   hasPipSource,
   showPip,
   setShowPip,
@@ -251,6 +253,7 @@ function VideoOverlayPlayer({
 }: {
   videoUrl: string
   pipSrc: string | null
+  pipRawUrl: string | null
   hasPipSource: boolean
   showPip: boolean
   setShowPip: (v: boolean) => void
@@ -265,9 +268,11 @@ function VideoOverlayPlayer({
   isPlaying: boolean
   setIsPlaying: (v: boolean) => void
 }) {
+  // Download uses raw blob URL (Cloudinary API validates blob URLs)
+  // Playback uses pipSrc (Cloudinary-converted MP4 for cross-browser)
   const { isDownloading, downloadProgress, handleDownload } = useVideoDownload({
     resultUrl: videoUrl,
-    pipVideoUrl: pipSrc,
+    pipVideoUrl: pipRawUrl,
     showPip,
     pipAspectRatio,
     characterName,
@@ -275,7 +280,7 @@ function VideoOverlayPlayer({
 
   useCloudinaryPrewarm({
     resultUrl: videoUrl,
-    pipVideoUrl: pipSrc,
+    pipVideoUrl: pipRawUrl,
     showPip,
   })
 
