@@ -113,6 +113,20 @@ export function useVideoGeneration({
           }
         }
 
+        // 0. Optimistic update — show in sidebar instantly before DB write
+        window.dispatchEvent(new CustomEvent("optimistic-generation", {
+          detail: {
+            id: -Date.now(), // temporary negative ID
+            character_name: character.name,
+            character_image_url: character.src,
+            aspect_ratio: aspectRatio,
+            status: "uploading",
+            created_at: new Date().toISOString(),
+            video_url: null,
+            source_video_url: null,
+          }
+        }))
+
         // 1. Create pending generation in DB immediately
         const pendingResponse = await fetch("/api/generations", {
           method: "POST",

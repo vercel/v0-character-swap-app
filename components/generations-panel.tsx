@@ -157,6 +157,24 @@ export function GenerationsPanel({ onSelectVideo, onSelectError, className = "",
     return () => window.removeEventListener("refresh-generations", handleRefresh)
   }, [mutate])
 
+  // Listen for optimistic generation — inject into SWR cache immediately
+  useEffect(() => {
+    const handleOptimistic = (e: CustomEvent) => {
+      const gen = e.detail as Generation
+      mutate(
+        (current: { generations: Generation[] } | undefined) => {
+          if (!current) return { generations: [gen] }
+          // Prepend optimistic generation (avoid duplicates)
+          if (current.generations.some(g => g.id === gen.id)) return current
+          return { generations: [gen, ...current.generations] }
+        },
+        { revalidate: false }
+      )
+    }
+    window.addEventListener("optimistic-generation", handleOptimistic as EventListener)
+    return () => window.removeEventListener("optimistic-generation", handleOptimistic as EventListener)
+  }, [mutate])
+
   // Delete/Cancel a generation (optimistic update)
   const handleDelete = async (generationId: number, e?: React.MouseEvent) => {
     e?.stopPropagation()
