@@ -351,7 +351,7 @@ export function CharacterSelection({
               {isGenerating ? (
                 <div className="space-y-2">
                   <p className="text-sm text-black/70">
-                    Generating with{" "}
+                    Creating with <span className="font-medium text-black">Nano Banana Pro</span> via{" "}
                     <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="font-medium text-black underline underline-offset-2 hover:text-black/60">AI Gateway</a>
                   </p>
                   <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-200">
