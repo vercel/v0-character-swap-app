@@ -56,6 +56,11 @@ function RecordContent() {
 
   const handleGenerate = useCallback(async () => {
     if (!recordedVideo || !character) return
+    // If not logged in, processVideo will show login modal — don't navigate
+    if (!user) {
+      processVideo(getVideoForUpload, character, false, uploadedVideoUrl, "fill", recordedAspectRatio, waitForUpload)
+      return
+    }
     if (previewVideoRef.current) {
       previewVideoRef.current.pause()
       previewVideoRef.current.muted = true
@@ -66,9 +71,8 @@ function RecordContent() {
       : (ratio === "16:9" || ratio === "4:3") ? "16:9" as const
       : "fill" as const
     processVideo(getVideoForUpload, character, false, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio, waitForUpload)
-    // Navigate immediately — don't wait for processVideo async work
     router.push("/pick")
-  }, [recordedVideo, character, trackCharacterUsage, processVideo, getVideoForUpload, uploadedVideoUrl, recordedAspectRatio, waitForUpload, router])
+  }, [user, recordedVideo, character, trackCharacterUsage, processVideo, getVideoForUpload, uploadedVideoUrl, recordedAspectRatio, waitForUpload, router])
 
   const handleLoginAndContinue = useCallback(async () => {
     setIsLoggingIn(true)
