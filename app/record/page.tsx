@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import { useRef, useEffect, useState, Suspense } from "react"
+import Image from "next/image"
 import { CameraPreview } from "@/components/camera-preview"
 import { useVideo } from "@/providers/video-context"
 import { useCharacters } from "@/hooks/use-characters"
@@ -115,9 +116,8 @@ function RecordContent() {
           <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-6 pb-24 pt-12 md:pb-8">
             {character && (
               <div className="flex items-center gap-2.5">
-                <div className="h-10 w-10 overflow-hidden rounded-lg ring-2 ring-white/30">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={character.src} alt={character.name} className="h-full w-full object-cover object-top" />
+                <div className="relative h-10 w-10 overflow-hidden rounded-lg ring-2 ring-white/30">
+                  <Image src={character.src} alt={character.name} fill className="object-cover object-top" sizes="40px" />
                 </div>
                 <span className="text-sm text-white/70">{character.name}</span>
               </div>
