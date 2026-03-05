@@ -38,8 +38,8 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode,
-          width: 1280,
-          height: 720,
+          width: { ideal: 1280, min: 340 },
+          height: { ideal: 720, min: 340 },
         },
         audio: true,
       })
@@ -91,8 +91,9 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
     // Create a canvas to capture mirrored video
     const video = videoRef.current
     const canvas = document.createElement("canvas")
-    canvas.width = video.videoWidth || 1280
-    canvas.height = video.videoHeight || 720
+    // Ensure canvas is at least 340px on each side (Kling minimum)
+    canvas.width = Math.max(video.videoWidth || 1280, 340)
+    canvas.height = Math.max(video.videoHeight || 720, 340)
     const ctx = canvas.getContext("2d")
     
     // Draw frames to canvas — mirror only for front camera (selfie)

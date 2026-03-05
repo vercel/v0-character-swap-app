@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState, useCallback, useEffect } from "react"
+import { upload } from "@vercel/blob/client"
 import { cn } from "@/lib/utils"
 import type { Character } from "@/lib/types"
 import useSWR from "swr"
@@ -48,10 +49,76 @@ export function CharacterSelection({
   onNext,
   onHome,
   allCharacters,
+  onAddCustom,
 }: CharacterSelectionProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
+
+  // AI character generation state
+  const [showCreateInput, setShowCreateInput] = useState(false)
+  const [prompt, setPrompt] = useState("")
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generationProgress, setGenerationProgress] = useState(0)
+  const [generateError, setGenerateError] = useState<string | null>(null)
+
+  const handleGenerate = useCallback(async () => {
+    if (!prompt.trim() || isGenerating) return
+    setIsGenerating(true)
+    setGenerationProgress(0)
+    setGenerateError(null)
+
+    const duration = 20000
+    const startTime = Date.now()
+    const progressInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime
+      setGenerationProgress(Math.min((elapsed / duration) * 95, 95))
+    }, 100)
+
+    try {
+      const response = await fetch("/api/generate-character", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: prompt.trim() }),
+      })
+      const data = await response.json()
+      clearInterval(progressInterval)
+      setGenerationProgress(100)
+
+      if (data.imageUrl) {
+        let finalUrl = data.imageUrl
+        try {
+          if (data.imageUrl.startsWith("data:")) {
+            const res = await fetch(data.imageUrl)
+            const blob = await res.blob()
+            const uploaded = await upload(`reference-images/${Date.now()}-generated.png`, blob, {
+              access: "public",
+              handleUploadUrl: "/api/upload",
+            })
+            finalUrl = uploaded.url
+          }
+        } catch {
+          // Use original URL if upload fails
+        }
+        const charName = prompt.trim().slice(0, 20)
+        const newId = Math.max(...allCharacters.map(c => c.id), 0) + 1
+        onAddCustom({ id: newId, src: finalUrl, name: charName })
+        onSelect(newId)
+        setPrompt("")
+        setShowCreateInput(false)
+      } else {
+        setGenerateError(data.error || "Failed to generate character")
+      }
+    } catch {
+      clearInterval(progressInterval)
+      setGenerateError("Failed to generate character. Please try again.")
+    } finally {
+      setTimeout(() => {
+        setIsGenerating(false)
+        setGenerationProgress(0)
+      }, 300)
+    }
+  }, [prompt, isGenerating, allCharacters, onAddCustom, onSelect])
 
   // Fetch generation videos for previews
   const { data } = useSWR<{ generations: GenerationVideo[] }>(
@@ -255,8 +322,85 @@ export function CharacterSelection({
                 </button>
               )
             })}
+
+            {/* Create with AI card */}
+            <button
+              onClick={() => {
+                setShowCreateInput(true)
+                setTimeout(() => document.getElementById("ai-prompt-input")?.focus(), 100)
+              }}
+              className="group flex shrink-0 flex-col items-center gap-2"
+            >
+              <div className="flex h-[160px] w-[110px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50 transition-all duration-200 hover:border-neutral-400 hover:bg-neutral-100 md:h-[220px] md:w-[155px]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/5">
+                  <svg className="h-6 w-6 text-black/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                </div>
+                <span className="text-xs font-medium text-black/40">Create with AI</span>
+              </div>
+              <span className="text-[13px] text-black/30 md:text-sm">Custom</span>
+            </button>
           </div>
         </div>
+
+        {/* AI prompt input — below carousel */}
+        {(showCreateInput || isGenerating) && (
+          <div className="mx-auto mt-4 w-full max-w-md px-6">
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50/50 p-3">
+              {isGenerating ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-black/70">
+                    Generating with{" "}
+                    <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="font-medium text-black underline underline-offset-2 hover:text-black/60">AI Gateway</a>
+                  </p>
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-200">
+                    <div
+                      className="h-full bg-black transition-all duration-100 ease-linear"
+                      style={{ width: `${generationProgress}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    id="ai-prompt-input"
+                    type="text"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); handleGenerate() }
+                      if (e.key === "Escape") { setShowCreateInput(false); setPrompt("") }
+                    }}
+                    placeholder="e.g. a pirate cat with an eyepatch"
+                    className="h-9 flex-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-black placeholder-neutral-400 outline-none transition-all focus:border-neutral-400 focus:ring-1 focus:ring-black/10"
+                  />
+                  <button
+                    onClick={handleGenerate}
+                    disabled={!prompt.trim()}
+                    className="flex h-9 items-center justify-center rounded-lg bg-black px-3.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-30"
+                  >
+                    go
+                  </button>
+                  <button
+                    onClick={() => { setShowCreateInput(false); setPrompt("") }}
+                    className="text-black/30 hover:text-black"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
+            {generateError && (
+              <div className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">
+                {generateError}
+                <button onClick={() => setGenerateError(null)} className="ml-2 text-red-400 hover:text-red-300">dismiss</button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Next button */}
         <div className="mt-6 w-full max-w-xs px-5 pb-20 md:mt-8 md:pb-4">

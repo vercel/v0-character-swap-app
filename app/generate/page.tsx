@@ -134,6 +134,18 @@ function GenerateContent() {
     router.push("/")
   }, [clearRecording, router])
 
+  // Escape key → go home
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        handleReset()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [handleReset])
+
   const handleLoginAndContinue = useCallback(async () => {
     setIsLoggingIn(true)
     if (charId) {
