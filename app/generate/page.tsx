@@ -9,15 +9,7 @@ import { useAuth } from "@/components/auth-provider"
 import { useCharacters } from "@/hooks/use-characters"
 import { useVideoGeneration } from "@/hooks/use-video-generation"
 import { useViewer } from "@/providers/viewer-context"
-import { detectImageAspectRatio } from "@/lib/utils"
 import { computeProgress, fetchMedianDuration, _cachedMedian } from "@/components/generation-progress"
-
-async function getCharacterAspectRatio(src: string): Promise<"9:16" | "16:9" | "fill"> {
-  const ratio = await detectImageAspectRatio(src)
-  if (ratio === "9:16" || ratio === "3:4") return "9:16"
-  if (ratio === "16:9" || ratio === "4:3") return "16:9"
-  return "fill"
-}
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
@@ -330,6 +322,8 @@ function AutoSubmitContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const charId = searchParams.get("char") ? Number(searchParams.get("char")) : null
+  const arParam = searchParams.get("ar")
+  const selectedAR: "9:16" | "16:9" | "fill" = arParam === "9:16" ? "9:16" : arParam === "1:1" ? "fill" : "16:9"
 
   const { user, isLoading: authLoading } = useAuth()
   const { allCharacters, selectedCharacter, setSelectedCharacter, customCharacters, addCustomCharacter, isReady: charactersReady } = useCharacters({ user, authLoading })
@@ -408,9 +402,13 @@ function AutoSubmitContent() {
     }
     if (!char) return
     setPendingAutoSubmit(false)
-    getCharacterAspectRatio(char.src).then(characterAspectRatio => {
-      processVideo(getVideoForUpload, char!, false, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio, waitForUpload)
-    })
+    // Use the aspect ratio from URL param, and pick the matching source image
+    const arKey = arParam === "9:16" ? "9:16" : arParam === "1:1" ? "1:1" : "16:9"
+    const charWithSource = {
+      ...char,
+      src: char.sources?.[arKey as keyof typeof char.sources] || char.src,
+    }
+    processVideo(getVideoForUpload, charWithSource, false, uploadedVideoUrl, selectedAR, recordedAspectRatio, waitForUpload)
   }, [pendingAutoSubmit, user, recordedVideo, charId, allCharacters, customCharacters, setSelectedCharacter, processVideo, uploadedVideoUrl, getVideoForUpload, recordedAspectRatio, waitForUpload])
 
   return (
