@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateImage, generateText } from "ai"
 import { createGateway } from "@ai-sdk/gateway"
+import { getSession } from "@/lib/auth"
 
 export const maxDuration = 120
 
@@ -31,8 +32,11 @@ const REFRAME_PROMPT = (aspectRatio: string) =>
 async function generateVariant(
   originalDataUrl: string,
   aspectRatio: string,
+  apiKey?: string,
 ): Promise<string> {
-  const gateway = createGateway({ apiKey: process.env.AI_GATEWAY_API_KEY! })
+  const gateway = createGateway({
+    ...(apiKey ? { apiKey } : {}),
+  })
   const model = gateway("google/gemini-2.5-flash-image")
 
   const result = await generateText({
@@ -61,6 +65,14 @@ async function generateVariant(
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getSession()
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Sign in to generate characters" },
+        { status: 401 }
+      )
+    }
+
     const { prompt } = await request.json()
 
     if (!prompt) {
@@ -70,9 +82,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Step 1: Generate the original in 16:9 with Grok
+    // Step 1: Generate the original in 16:9 with Grok (uses user's gateway key or OIDC fallback)
+    const gateway = createGateway({
+      ...(session.apiKey ? { apiKey: session.apiKey } : {}),
+    })
     const { image } = await generateImage({
-      model: "xai/grok-imagine-image",
+      model: gateway.imageModel("xai/grok-imagine-image"),
       prompt: PROMPT_TEMPLATE(prompt.trim()),
       aspectRatio: "16:9",
     })
@@ -80,8 +95,8 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Use Gemini to reframe into 9:16 and 1:1 (in parallel)
     const [portrait, square] = await Promise.all([
-      generateVariant(originalDataUrl, "9:16"),
-      generateVariant(originalDataUrl, "1:1"),
+      generateVariant(originalDataUrl, "9:16", session.apiKey),
+      generateVariant(originalDataUrl, "1:1", session.apiKey),
     ])
 
     const sources: Record<string, string> = {
