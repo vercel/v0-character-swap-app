@@ -36,13 +36,13 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
       {/* Content */}
       <div className="flex flex-1 flex-col items-center justify-center px-5 pb-20 md:pb-6">
         <div className="w-full max-w-xl text-center">
-          {/* Title */}
-          <div className="mb-4 flex items-center justify-center gap-2.5 md:hidden">
-            <svg className="h-5 w-auto text-black" viewBox="0 0 252 120" fill="currentColor">
+          {/* Logo — mobile only, above everything */}
+          <div className="-mt-4 mb-5 flex items-center justify-center gap-3 md:hidden">
+            <svg className="h-7 w-auto text-black" viewBox="0 0 252 120" fill="currentColor">
               <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
               <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
             </svg>
-            <span className="text-3xl font-pixel text-black">FaceSwap</span>
+            <span className="text-4xl font-pixel text-black">FaceSwap</span>
           </div>
           <h2 className="mb-6 text-2xl text-black md:mb-8 md:text-3xl">
             Turn yourself into a cartoon
@@ -76,11 +76,19 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
 
               {demo && (
                 <>
+                  {/* Poster image — always visible immediately */}
+                  {demo.character_image_url && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={`/_next/image?url=${encodeURIComponent(demo.character_image_url)}&w=640&q=75`}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  )}
                   <video
                     data-main
                     src={demo.video_url}
-                    poster={`/_next/image?url=${encodeURIComponent(demo.character_image_url!)}&w=640&q=75`}
-                    className={`h-full w-full object-cover transition-opacity ${demosReady ? "opacity-100" : "opacity-0"}`}
+                    className={`relative h-full w-full object-cover transition-opacity ${demosReady ? "opacity-100" : "opacity-0"}`}
                     muted
                     loop
                     playsInline
