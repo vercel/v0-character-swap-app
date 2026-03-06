@@ -132,16 +132,29 @@ export function SidebarStrip({ onBuyCredits }: SidebarStripProps) {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-neutral-200 bg-white/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-sm md:hidden">
         <div className="flex h-14 items-center gap-2 px-3">
           {user ? (
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full"
-            >
-              {user.avatar ? (
-                <Image src={user.avatar} alt={user.name || ""} width={32} height={32} className="rounded-full" />
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-black/10" />
+            <div className="relative shrink-0" ref={menuRef}>
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full"
+              >
+                {user.avatar ? (
+                  <Image src={user.avatar} alt={user.name || ""} width={32} height={32} className="rounded-full" />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-black/10" />
+                )}
+              </button>
+              {showMenu && (
+                <div className="absolute bottom-full left-0 z-50 mb-2 min-w-[120px] rounded-lg border border-black/10 bg-white py-1 shadow-sm">
+                  <button
+                    onClick={() => { setShowMenu(false); logout() }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-black/70 transition-colors hover:bg-black/5 hover:text-black"
+                  >
+                    <LogOut className="h-3 w-3" />
+                    sign out
+                  </button>
+                </div>
               )}
-            </button>
+            </div>
           ) : !authLoading ? (
             <button
               onClick={login}
@@ -167,10 +180,13 @@ export function SidebarStrip({ onBuyCredits }: SidebarStripProps) {
 
           <div className="h-6 w-px shrink-0 bg-neutral-200" />
 
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
-            <GenerationsPanel
-              variant="compact"
-            />
+          <div className="relative min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              <GenerationsPanel
+                variant="compact"
+              />
+            </div>
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent" />
           </div>
 
           <a
