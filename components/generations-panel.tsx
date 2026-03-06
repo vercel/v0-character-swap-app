@@ -293,7 +293,7 @@ export function GenerationsPanel({ className = "", variant = "default" }: Genera
         variant === "compact"
           ? "-mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
           : variant === "sidebar"
-            ? "flex flex-col items-center gap-2"
+            ? "flex flex-col items-center gap-2 px-2 py-1"
             : "-mx-2 flex gap-2.5 overflow-x-auto px-2 pb-2 pt-3"
       }>
         {displayGenerations.map((gen) => {

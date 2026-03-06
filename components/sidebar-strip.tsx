@@ -80,7 +80,7 @@ export function SidebarStrip({ onBuyCredits }: SidebarStripProps) {
 
           <div className="mx-2 mb-3 h-px w-8 bg-neutral-200" />
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-1.5">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-2">
             <GenerationsPanel
               variant="sidebar"
             />
