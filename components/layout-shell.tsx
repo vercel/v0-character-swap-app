@@ -215,7 +215,7 @@ function VideoOverlay() {
 
   if (!data) return null
 
-  const { videoUrl, sourceVideoUrl, sourceAspectRatio, characterName, characterImageUrl } = data
+  const { videoUrl, sourceVideoUrl, sourceAspectRatio, generatedAspectRatio, characterName, characterImageUrl } = data
   const pipSrc = toMp4Url(sourceVideoUrl) || sourceVideoUrl
 
   if (pipSrc !== prevPipSrcRef.current) {
@@ -328,7 +328,9 @@ function VideoOverlay() {
             : characterImageUrl)
           : undefined}
         className={cn(
-          "h-full w-full cursor-pointer object-cover md:object-contain transition-opacity duration-200",
+          "h-full w-full cursor-pointer transition-opacity duration-200",
+          // Mobile: 9:16 fills screen (cover), others fit to width (contain). Desktop: always contain.
+          generatedAspectRatio === "9:16" ? "object-cover md:object-contain" : "object-contain",
           bothReady || !hasPipSource ? "opacity-100" : "opacity-0"
         )}
         onClick={() => {
