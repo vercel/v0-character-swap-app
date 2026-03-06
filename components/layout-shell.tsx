@@ -204,9 +204,13 @@ function VideoOverlay() {
 
   const [showPip, setShowPip] = useState(true)
   const [videoProgress, setVideoProgress] = useState(0)
-  const [pipReady, setPipReady] = useState(false)
+  const [bothReady, setBothReady] = useState(false)
+  const progressBarRef = useRef<HTMLDivElement>(null)
+  const isDraggingRef = useRef(false)
+  const mainReadyRef = useRef(false)
+  const pipReadyRef = useRef(false)
 
-  // Reset pipReady when a different video opens
+  // Reset ready state when a different video opens
   const prevPipSrcRef = useRef<string | null>(null)
 
   if (!data) return null
@@ -216,10 +220,71 @@ function VideoOverlay() {
 
   if (pipSrc !== prevPipSrcRef.current) {
     prevPipSrcRef.current = pipSrc
-    if (pipReady) setPipReady(false)
+    mainReadyRef.current = false
+    pipReadyRef.current = false
+    if (bothReady) setBothReady(false)
   }
   const hasPipSource = !!sourceVideoUrl
   const pipAspectRatio = sourceAspectRatio
+
+  // Start both videos simultaneously once both have loaded
+  const tryStartBoth = useCallback(() => {
+    if (!mainVideoRef.current) return
+    if (hasPipSource && !pipReadyRef.current) return
+    if (!mainReadyRef.current) return
+    const main = mainVideoRef.current
+    const pip = pipVideoRef.current
+    main.currentTime = 0
+    if (pip) pip.currentTime = 0
+    main.muted = false
+    main.play()
+    if (pip) pip.play()
+    setBothReady(true)
+  }, [hasPipSource])
+
+  // Spacebar to toggle play/pause
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        e.preventDefault()
+        const main = mainVideoRef.current
+        if (!main) return
+        if (main.paused) { main.play(); pipVideoRef.current?.play() }
+        else { main.pause(); pipVideoRef.current?.pause() }
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
+
+  // Drag to seek on progress bar (mouse + touch)
+  const seekToPosition = useCallback((clientX: number) => {
+    const bar = progressBarRef.current
+    const main = mainVideoRef.current
+    if (!bar || !main || !main.duration) return
+    const rect = bar.getBoundingClientRect()
+    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    main.currentTime = pct * main.duration
+  }, [])
+
+  useEffect(() => {
+    const bar = progressBarRef.current
+    if (!bar) return
+    const onMouseMove = (e: MouseEvent) => { if (isDraggingRef.current) seekToPosition(e.clientX) }
+    const onMouseUp = () => { isDraggingRef.current = false }
+    const onTouchMove = (e: TouchEvent) => { if (isDraggingRef.current && e.touches[0]) seekToPosition(e.touches[0].clientX) }
+    const onTouchEnd = () => { isDraggingRef.current = false }
+    window.addEventListener("mousemove", onMouseMove)
+    window.addEventListener("mouseup", onMouseUp)
+    window.addEventListener("touchmove", onTouchMove)
+    window.addEventListener("touchend", onTouchEnd)
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove)
+      window.removeEventListener("mouseup", onMouseUp)
+      window.removeEventListener("touchmove", onTouchMove)
+      window.removeEventListener("touchend", onTouchEnd)
+    }
+  }, [seekToPosition])
 
   // Download uses raw blob URL (Cloudinary API validates blob URLs)
   // Playback uses pipSrc (Cloudinary-converted MP4 for cross-browser)
@@ -262,23 +327,20 @@ function VideoOverlay() {
             ? `/_next/image?url=${encodeURIComponent(characterImageUrl)}&w=640&q=75`
             : characterImageUrl)
           : undefined}
-        className="h-full w-full cursor-pointer object-cover md:object-contain"
-        onClick={(e) => {
-          const v = e.currentTarget
-          if (v.paused) v.play(); else v.pause()
+        className={cn(
+          "h-full w-full cursor-pointer object-cover md:object-contain transition-opacity duration-200",
+          bothReady || !hasPipSource ? "opacity-100" : "opacity-0"
+        )}
+        onClick={() => {
+          const main = mainVideoRef.current
+          if (!main) return
+          if (main.paused) { main.play(); pipVideoRef.current?.play() }
+          else { main.pause(); pipVideoRef.current?.pause() }
         }}
-        onLoadedData={(e) => {
-          e.currentTarget.muted = false
-          e.currentTarget.play()
+        onLoadedData={() => {
+          mainReadyRef.current = true
+          tryStartBoth()
         }}
-        onPlay={() => {
-          const pip = pipVideoRef.current
-          if (pip) {
-            pip.currentTime = mainVideoRef.current?.currentTime || 0
-            pip.play()
-          }
-        }}
-        onPause={() => { pipVideoRef.current?.pause() }}
         onSeeked={() => {
           if (pipVideoRef.current && mainVideoRef.current) {
             pipVideoRef.current.currentTime = mainVideoRef.current.currentTime
@@ -286,7 +348,7 @@ function VideoOverlay() {
         }}
         onTimeUpdate={(e) => {
           const v = e.currentTarget
-          if (v.duration) setVideoProgress(v.currentTime / v.duration)
+          if (v.duration && !isDraggingRef.current) setVideoProgress(v.currentTime / v.duration)
           const pip = pipVideoRef.current
           if (pip && v) {
             const diff = Math.abs(pip.currentTime - v.currentTime)
@@ -295,11 +357,11 @@ function VideoOverlay() {
         }}
       />
 
-      {/* PiP video — always mounted when source exists, visibility toggled via CSS */}
+      {/* PiP video — always mounted when source exists, both reveal together */}
       {hasPipSource && (
         <div className={cn(
-          "absolute bottom-20 right-4 overflow-hidden rounded-lg border-2 border-black/20 shadow-lg transition-opacity duration-300",
-          showPip && pipReady ? "opacity-100" : "pointer-events-none opacity-0",
+          "absolute bottom-20 right-4 overflow-hidden rounded-lg border-2 border-black/20 shadow-lg transition-opacity duration-200",
+          showPip && bothReady ? "opacity-100" : "pointer-events-none opacity-0",
           pipAspectRatio === "9:16" && "aspect-[9/16] h-28 md:h-40",
           pipAspectRatio !== "9:16" && "aspect-video w-28 md:w-48"
         )}>
@@ -309,13 +371,8 @@ function VideoOverlay() {
             muted loop playsInline preload="auto"
             className="h-full w-full object-cover"
             onLoadedData={() => {
-              setPipReady(true)
-              const main = mainVideoRef.current
-              const pip = pipVideoRef.current
-              if (main && pip) {
-                pip.currentTime = main.currentTime
-                if (!main.paused) pip.play()
-              }
+              pipReadyRef.current = true
+              tryStartBoth()
             }}
           />
         </div>
@@ -324,15 +381,13 @@ function VideoOverlay() {
       {/* Controls */}
       <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-3 bg-gradient-to-t from-black/70 via-black/40 to-transparent px-4 pb-4 pt-10">
         <div
-          className="h-1 w-full cursor-pointer rounded-full bg-white/20"
-          onClick={(e) => {
-            if (!mainVideoRef.current) return
-            const rect = e.currentTarget.getBoundingClientRect()
-            const pct = (e.clientX - rect.left) / rect.width
-            mainVideoRef.current.currentTime = pct * mainVideoRef.current.duration
-          }}
+          ref={progressBarRef}
+          className="h-2 w-full cursor-pointer rounded-full bg-white/20 touch-none"
+          onMouseDown={(e) => { isDraggingRef.current = true; seekToPosition(e.clientX) }}
+          onTouchStart={(e) => { isDraggingRef.current = true; if (e.touches[0]) seekToPosition(e.touches[0].clientX) }}
+          onClick={(e) => seekToPosition(e.clientX)}
         >
-          <div className="h-full rounded-full bg-white" style={{ width: `${videoProgress * 100}%` }} />
+          <div className="pointer-events-none h-full rounded-full bg-white" style={{ width: `${videoProgress * 100}%` }} />
         </div>
         <div className="flex items-center justify-center gap-2.5">
           <button
