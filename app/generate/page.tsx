@@ -19,9 +19,10 @@ const chapters = [
     title: "Recording",
     content: (
       <>
-        You record a short video in your browser. The recording is uploaded to{" "}
+        The browser's MediaRecorder API captures a short video clip directly on your device — no uploads until you're ready.
+        Once you pick a character, the recording is sent to{" "}
         <a href="https://vercel.com/docs/storage/vercel-blob" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-black">Vercel Blob</a>
-        {" "}in the background while you pick a character.
+        {" "}in the background so it's available for processing without blocking the UI.
       </>
     ),
   },
@@ -30,9 +31,12 @@ const chapters = [
     content: (
       <>
         Default characters are pre-made illustrations. Custom characters are generated with{" "}
+        <a href="https://x.ai" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-black">Grok</a>
+        {" "}via the{" "}
         <a href="https://sdk.vercel.ai" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-black">AI SDK</a>
-        {" "}using Grok through{" "}
-        <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-black">AI Gateway</a>.
+        {" "}through{" "}
+        <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-black">AI Gateway</a>
+        . A single 16:9 image is generated with a crop-safe composition, then served at different aspect ratios via Cloudinary so the same character works in portrait, landscape, and square.
       </>
     ),
   },
@@ -40,8 +44,11 @@ const chapters = [
     title: "Video generation",
     content: (
       <>
+        The{" "}
+        <a href="https://sdk.vercel.ai" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-black">AI SDK</a>
+        {" "}sends the request through{" "}
         <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-black">AI Gateway</a>
-        {" "}routes the request to Kling Motion Control. The model analyzes your facial landmarks, expressions, and head pose frame-by-frame, then transfers that motion onto the character image.
+        {" "}to Kling AI's Motion Control model. It analyzes facial landmarks, expressions, and head pose frame-by-frame from your recording, then transfers that motion onto the character image to produce the final video.
       </>
     ),
   },
@@ -50,8 +57,9 @@ const chapters = [
     content: (
       <>
         A{" "}
-        <a href="https://useworkflow.dev/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-black">Vercel Workflow</a>
-        {" "}handles the full pipeline: convert the video, call AI Gateway, save the result, and send an email notification. Workflows are durable — they survive serverless timeouts and browser closes.
+        <a href="https://vercel.com/docs/workflow" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-black">Vercel Workflow</a>
+        {" "}coordinates the entire pipeline: video conversion, AI Gateway calls, result storage, and email notification.
+        Workflows are durable — they survive serverless timeouts and browser closes, so your video keeps processing even if you leave the page.
       </>
     ),
   },
@@ -78,7 +86,7 @@ function OngoingGenerationView({ generationId }: { generationId: number }) {
   const router = useRouter()
   const { user } = useAuth()
   const { viewVideo } = useViewer()
-  const [openChapter, setOpenChapter] = useState<number | null>(null)
+  const [showHowItWorks, setShowHowItWorks] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const completedRef = useRef(false)
 
@@ -143,14 +151,20 @@ function OngoingGenerationView({ generationId }: { generationId: number }) {
     }
   }, [generation, viewVideo, router])
 
-  // Escape key → /pick
+  // Escape key → close modal or /pick
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") router.push("/pick")
+      if (e.key === "Escape") {
+        if (showHowItWorks) {
+          setShowHowItWorks(false)
+        } else {
+          router.push("/pick")
+        }
+      }
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [router])
+  }, [router, showHowItWorks])
 
   // Generation not found yet (still loading)
   if (!generation) {
@@ -240,63 +254,29 @@ function OngoingGenerationView({ generationId }: { generationId: number }) {
         <div className="mb-8">
           <p className="mb-3 text-xs font-medium uppercase tracking-wider text-black/40">While you wait</p>
           <div className="divide-y divide-neutral-100 rounded-xl border border-neutral-100">
-            {/* See how it works — accordion */}
-            <div>
-              <button
-                onClick={() => setOpenChapter(openChapter === -1 ? null : -1)}
-                className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-black/80 transition-colors hover:text-black"
-              >
-                See how it works
-                <svg
-                  className={`h-4 w-4 shrink-0 text-black/30 transition-transform ${openChapter === -1 ? "rotate-90" : ""}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-              {openChapter === -1 && (
-                <div className="space-y-1 px-4 pb-3">
-                  {chapters.map((chapter, i) => (
-                    <div key={i}>
-                      <button
-                        onClick={() => setOpenChapter(openChapter === i ? -1 : i)}
-                        className="flex w-full items-center justify-between py-2 text-left text-[13px] font-medium text-black/60 transition-colors hover:text-black/80"
-                      >
-                        {chapter.title}
-                        <svg
-                          className={`h-3.5 w-3.5 shrink-0 text-black/25 transition-transform ${openChapter === i ? "rotate-90" : ""}`}
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                      {openChapter === i && (
-                        <div className="pb-2 text-[13px] leading-relaxed text-black/50">
-                          {chapter.content}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* See how it works — opens modal */}
+            <button
+              onClick={() => setShowHowItWorks(true)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-black/80 transition-colors hover:text-black"
+            >
+              See how it works
+              <svg className="h-4 w-4 shrink-0 text-black/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
 
             {/* Build your own */}
             <a
-              href="https://vercel.com/templates/next.js/character-swap"
+              href="https://v0.app/templates/face-swap-template-1Nu0E0eAo9q"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-between px-4 py-3 text-sm font-medium text-black/80 transition-colors hover:text-black"
             >
               Build your own FaceSwap app
-              <svg className="h-4 w-4 shrink-0 text-black/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-4.5-6h6m0 0v6m0-6L9.75 14.25" />
+              {/* v0 logo */}
+              <svg className="h-3 w-auto shrink-0 text-black/30" viewBox="0 0 252 120" fill="currentColor">
+                <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
+                <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
               </svg>
             </a>
 
@@ -312,6 +292,59 @@ function OngoingGenerationView({ generationId }: { generationId: number }) {
             </button>
           </div>
         </div>
+
+        {/* How it works modal */}
+        {showHowItWorks && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setShowHowItWorks(false)}
+          >
+            <div
+              className="relative mx-4 w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close button */}
+              <button
+                onClick={() => setShowHowItWorks(false)}
+                className="absolute right-4 top-4 rounded-lg p-1 text-black/40 transition-colors hover:text-black"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <h2 className="mb-6 text-lg font-semibold text-black">How it works</h2>
+
+              <div className="space-y-5">
+                {chapters.map((chapter, i) => (
+                  <div key={i} className="flex gap-3.5">
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black/[0.06] text-xs font-semibold text-black/50">
+                      {i + 1}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="mb-1 text-sm font-medium text-black">{chapter.title}</p>
+                      <p className="text-[13px] leading-relaxed text-black/50">{chapter.content}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* OSS template + feedback */}
+              <div className="mt-6 border-t border-neutral-100 pt-5 space-y-3">
+                <p className="text-[13px] leading-relaxed text-black/50">
+                  This is an open-source template — you can{" "}
+                  <a href="https://v0.app/templates/face-swap-template-1Nu0E0eAo9q" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-black">fork it on v0</a>
+                  {" "}and prompt your way into your own app built on top of it.
+                </p>
+                <p className="text-[13px] leading-relaxed text-black/50">
+                  Got feedback? Reach out to{" "}
+                  <a href="https://x.com/estebansuarez" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-black">@estebansuarez</a>
+                  {" "}on X.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
