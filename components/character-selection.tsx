@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useCallback, useEffect, useMemo } from "react"
+import { useRef, useState, useCallback, useEffect, useMemo, useSyncExternalStore } from "react"
 import { upload } from "@vercel/blob/client"
 import { cn, type AspectRatio } from "@/lib/utils"
 import type { Character } from "@/lib/types"
@@ -81,12 +81,20 @@ export function CharacterSelection({
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
 
-  // Read device from data-device attribute (set by inline <script> before React hydrates)
-  // This avoids any flash — the script runs before first paint, so the value is ready.
-  const isDesktop = typeof document !== "undefined"
-    ? document.documentElement.dataset.device === "desktop"
-    : true // SSR fallback — most traffic is desktop
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>(isDesktop ? "16:9" : "9:16")
+  // Read device type — inline <script> in layout sets data-device before React hydrates
+  const isDesktop = useSyncExternalStore(
+    () => () => {},
+    () => document.documentElement.dataset.device === "desktop",
+    () => true,
+  )
+  const defaultRatio: AspectRatio = isDesktop ? "16:9" : "9:16"
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>(defaultRatio)
+  // Correct on mount if SSR guessed wrong (SSR defaults to desktop/16:9)
+  const didCorrectRef = useRef(false)
+  if (!didCorrectRef.current && aspectRatio !== defaultRatio) {
+    didCorrectRef.current = true
+    setAspectRatio(defaultRatio)
+  }
   const dims = CARD_DIMS[aspectRatio]
   const cardStyle = useMemo(() => ({
     width: isDesktop ? dims.w[1] : dims.w[0],
