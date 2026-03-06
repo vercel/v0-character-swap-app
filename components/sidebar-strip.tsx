@@ -130,7 +130,7 @@ export function SidebarStrip({ onBuyCredits }: SidebarStripProps) {
 
       {/* Mobile: horizontal bar at the bottom */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-neutral-200 bg-white/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-sm md:hidden">
-        <div className="flex h-14 items-center gap-2 px-3">
+        <div className="flex h-14 items-center gap-3 px-4">
           {user ? (
             <div className="relative shrink-0" ref={menuRef}>
               <button

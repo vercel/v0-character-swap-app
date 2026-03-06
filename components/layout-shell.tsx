@@ -262,7 +262,7 @@ function VideoOverlay() {
             ? `/_next/image?url=${encodeURIComponent(characterImageUrl)}&w=640&q=75`
             : characterImageUrl)
           : undefined}
-        className="h-full w-full cursor-pointer object-contain"
+        className="h-full w-full cursor-pointer object-cover md:object-contain"
         onClick={(e) => {
           const v = e.currentTarget
           if (v.paused) v.play(); else v.pause()
