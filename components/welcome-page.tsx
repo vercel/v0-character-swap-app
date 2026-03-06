@@ -37,22 +37,16 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
       <div className="flex flex-1 flex-col items-center justify-center px-5 pb-20 md:pb-6">
         <div className="w-full max-w-xl text-center">
           {/* Title */}
-          <div className="mb-2 flex items-center justify-center gap-2 md:hidden">
-            <svg className="h-4 w-auto text-black" viewBox="0 0 252 120" fill="currentColor">
+          <div className="mb-4 flex items-center justify-center gap-2.5 md:hidden">
+            <svg className="h-5 w-auto text-black" viewBox="0 0 252 120" fill="currentColor">
               <path d="M96 86.0625V24H120V103.125C120 112.445 112.445 120 103.125 120C98.6751 120 94.2826 118.284 91.125 115.127L0 24H33.9375L96 86.0625Z" />
               <path d="M218.25 0C236.89 0 252 15.1104 252 33.75V96H228V41.0625L173.062 96H228V120H165.75C147.11 120 132 104.89 132 86.25V24H156V79.125L211.125 24H156V0H218.25Z" />
             </svg>
-            <span className="text-2xl font-pixel text-black">FaceSwap</span>
+            <span className="text-3xl font-pixel text-black">FaceSwap</span>
           </div>
-          <h2 className="mb-2 text-2xl text-black md:text-3xl">
+          <h2 className="mb-6 text-2xl text-black md:mb-8 md:text-3xl">
             Turn yourself into a cartoon
           </h2>
-          <p className="mb-1 text-[13px] leading-relaxed text-black md:text-[15px]">
-            Record a short video and AI will animate any cartoon character as you.
-          </p>
-          <p className="mb-6 text-[13px] leading-relaxed text-black md:mb-8 md:text-[15px]">
-            Your expressions, your movements, their unique style.
-          </p>
 
           {/* Demo video placeholder (always reserves space) */}
           <div className="mx-auto mb-6 w-full max-w-[420px] md:mb-8">
@@ -145,7 +139,7 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
             </div>
           </div>
 
-          {/* How it works */}
+          {/* Steps */}
           <div className="mb-6 flex items-center justify-center gap-3 md:mb-8 md:gap-4">
             <div className="flex flex-col items-center gap-1">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-xs font-bold text-white">1</span>
