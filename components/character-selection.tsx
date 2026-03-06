@@ -1,7 +1,6 @@
 "use client"
 
 import { useRef, useState, useCallback, useEffect, useMemo, useSyncExternalStore } from "react"
-import { upload } from "@vercel/blob/client"
 import { cn, type AspectRatio } from "@/lib/utils"
 import type { Character } from "@/lib/types"
 import useSWR from "swr"
@@ -116,7 +115,7 @@ export function CharacterSelection({
     setGenerationProgress(0)
     setGenerateError(null)
 
-    const duration = 45000 // 3 images generated in parallel
+    const duration = 60000
     const startTime = Date.now()
     const progressInterval = setInterval(() => {
       const elapsed = Date.now() - startTime
@@ -124,63 +123,50 @@ export function CharacterSelection({
     }, 100)
 
     try {
+      // Start the workflow
       const response = await fetch("/api/generate-character", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: prompt.trim() }),
       })
       const data = await response.json()
+      if (!response.ok || !data.runId) {
+        throw new Error(data.error || "Failed to start generation")
+      }
+
+      // Poll for result
+      const runId = data.runId
+      let result: { imageUrl: string; sources: { "9:16": string; "1:1": string; "16:9": string } } | null = null
+
+      while (!result) {
+        await new Promise(r => setTimeout(r, 2000))
+        const statusRes = await fetch(`/api/generate-character/status?runId=${runId}`)
+        const statusData = await statusRes.json()
+
+        if (statusData.status === "completed" && statusData.result) {
+          result = statusData.result
+        } else if (statusData.status === "failed") {
+          throw new Error(statusData.error || "Generation failed")
+        }
+        // else: still running, keep polling
+      }
+
       clearInterval(progressInterval)
       setGenerationProgress(100)
 
-      if (data.imageUrl) {
-        // Upload all aspect ratio images to blob storage in parallel
-        const uploadImage = async (dataUrl: string, suffix: string): Promise<string> => {
-          if (!dataUrl.startsWith("data:")) return dataUrl
-          const res = await fetch(dataUrl)
-          const blob = await res.blob()
-          const uploaded = await upload(`reference-images/${Date.now()}-${suffix}.png`, blob, {
-            access: "public",
-            handleUploadUrl: "/api/upload",
-          })
-          return uploaded.url
-        }
-
-        let finalUrl = data.imageUrl
-        let sources: { "9:16"?: string; "1:1"?: string; "16:9"?: string } | undefined
-
-        try {
-          if (data.sources) {
-            // Upload all 3 in parallel
-            const [url916, url11, url169] = await Promise.all([
-              data.sources["9:16"] ? uploadImage(data.sources["9:16"], "9x16") : Promise.resolve(undefined),
-              data.sources["1:1"] ? uploadImage(data.sources["1:1"], "1x1") : Promise.resolve(undefined),
-              data.sources["16:9"] ? uploadImage(data.sources["16:9"], "16x9") : Promise.resolve(undefined),
-            ])
-            sources = {}
-            if (url916) sources["9:16"] = url916
-            if (url11) sources["1:1"] = url11
-            if (url169) sources["16:9"] = url169
-            // Use 16:9 as the main src
-            finalUrl = url169 || url11 || url916 || finalUrl
-          } else {
-            finalUrl = await uploadImage(data.imageUrl, "generated")
-          }
-        } catch {
-          // Use original URL if upload fails
-        }
-
-        const charName = prompt.trim().slice(0, 20)
-        const newId = Math.max(...allCharacters.map(c => c.id), 0) + 1
-        onAddCustom({ id: newId, src: finalUrl, name: charName, sources })
-        onSelect(newId)
-        setPrompt("")
-      } else {
-        setGenerateError(data.error || "Failed to generate character")
-      }
-    } catch {
+      const charName = prompt.trim().slice(0, 20)
+      const newId = Math.max(...allCharacters.map(c => c.id), 0) + 1
+      onAddCustom({
+        id: newId,
+        src: result.imageUrl,
+        name: charName,
+        sources: result.sources,
+      })
+      onSelect(newId)
+      setPrompt("")
+    } catch (err) {
       clearInterval(progressInterval)
-      setGenerateError("Failed to generate character. Please try again.")
+      setGenerateError(err instanceof Error ? err.message : "Failed to generate character. Please try again.")
     } finally {
       setTimeout(() => {
         setIsGenerating(false)
