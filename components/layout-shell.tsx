@@ -330,7 +330,10 @@ function VideoOverlay() {
         className={cn(
           "h-full w-full cursor-pointer transition-opacity duration-200",
           // Mobile: 9:16 fills screen (cover), others fit to width (contain). Desktop: always contain.
-          generatedAspectRatio === "9:16" ? "object-cover md:object-contain" : "object-contain",
+          // Mobile: 9:16 fills screen. Desktop: 16:9 fills screen. Others: contain.
+          generatedAspectRatio === "9:16" ? "object-cover md:object-contain"
+            : generatedAspectRatio === "16:9" ? "object-contain md:object-cover"
+            : "object-contain",
           bothReady || !hasPipSource ? "opacity-100" : "opacity-0"
         )}
         onClick={() => {

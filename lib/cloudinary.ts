@@ -77,8 +77,9 @@ function buildCompositeTransformation(options: {
     validateBlobUrl(pipVideoUrl)
     const b64Url = base64UrlEncode(pipVideoUrl)
     const pipSize = pipAspectRatio === "9:16" ? "w_0.12" : "w_0.2"
+    // so_0 forces pip to start at frame 0, fl_layer_apply ensures full sync with main timeline
     transformations.push(
-      `l_video:fetch:${b64Url},${pipSize},fl_relative,ac_none,r_12,g_south_east,x_20,y_20`
+      `l_video:fetch:${b64Url},${pipSize},so_0,fl_relative,ac_none,r_12/fl_layer_apply,g_south_east,x_20,y_20`
     )
   }
 
