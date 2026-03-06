@@ -87,21 +87,21 @@ export function CharacterSelection({
     () => document.documentElement.dataset.device === "desktop",
     () => true,
   )
-  const defaultRatio: AspectRatio = isDesktop ? "16:9" : "9:16"
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>(defaultRatio)
-  // Correct on mount if SSR guessed wrong (SSR defaults to desktop/16:9)
-  const didCorrectRef = useRef(false)
-  if (!didCorrectRef.current && aspectRatio !== defaultRatio) {
-    didCorrectRef.current = true
-    setAspectRatio(defaultRatio)
-  }
-  const dims = CARD_DIMS[aspectRatio]
-  const cardStyle = useMemo(() => ({
-    width: isDesktop ? dims.w[1] : dims.w[0],
-    height: isDesktop ? dims.h[1] : dims.h[0],
-    transition: "width 250ms ease, height 250ms ease",
-    contain: "layout style" as const,
-  }), [dims, isDesktop])
+  // null = user hasn't picked yet → CSS handles sizing via data-device (zero flash)
+  const [userRatio, setUserRatio] = useState<AspectRatio | null>(null)
+  const aspectRatio: AspectRatio = userRatio ?? (isDesktop ? "16:9" : "9:16")
+  // When user hasn't picked, cardStyle is undefined → CSS class handles sizing
+  // When user picks, inline styles take over with transitions
+  const cardStyle = useMemo(() => {
+    if (userRatio === null) return undefined
+    const dims = CARD_DIMS[userRatio]
+    return {
+      width: isDesktop ? dims.w[1] : dims.w[0],
+      height: isDesktop ? dims.h[1] : dims.h[0],
+      transition: "width 250ms ease, height 250ms ease",
+      contain: "layout style" as const,
+    }
+  }, [userRatio, isDesktop])
 
   // AI character generation state
   const [showCreateInput, setShowCreateInput] = useState(false)
@@ -272,8 +272,22 @@ export function CharacterSelection({
     el.scrollBy({ left: direction === "left" ? -amount : amount, behavior: "smooth" })
   }
 
+  // CSS class for initial card sizing (before user picks) — no flash
+  const cardClass = userRatio === null ? "char-card" : undefined
+
   return (
     <div className="relative flex h-full w-full flex-col bg-white">
+      {/* CSS-driven initial card sizes — reads data-device set by inline script before paint */}
+      {userRatio === null && (
+        <style dangerouslySetInnerHTML={{ __html: [
+          // Desktop default: 16:9 cards
+          `[data-device="desktop"] .char-card { width:240px; height:135px; contain:layout style }`,
+          // Mobile default: 9:16 cards
+          `[data-device="mobile"] .char-card { width:101px; height:180px; contain:layout style }`,
+          // SSR fallback (no data-device yet): use desktop
+          `.char-card { width:240px; height:135px; contain:layout style }`,
+        ].join("\n") }} />
+      )}
       {/* Logo — top-left, same position on mobile and desktop */}
       <a href="/" className="absolute left-4 top-4 z-10 flex items-center gap-1.5 transition-opacity hover:opacity-60 md:left-6 md:top-5 md:gap-2">
         <svg className="h-3.5 w-auto text-black md:h-4" viewBox="0 0 252 120" fill="currentColor">
@@ -347,6 +361,7 @@ export function CharacterSelection({
                     style={cardStyle}
                     className={cn(
                       "relative overflow-hidden rounded-2xl bg-neutral-100",
+                      cardClass,
                       isSelected
                         ? "outline outline-[3px] outline-black shadow-lg"
                         : "ring-1 ring-black/10 hover:ring-black/20 hover:shadow-md"
@@ -437,6 +452,7 @@ export function CharacterSelection({
                       style={cardStyle}
                       className={cn(
                         "relative overflow-hidden rounded-2xl bg-neutral-100",
+                        cardClass,
                           isSelected
                           ? "outline outline-[3px] outline-black shadow-lg"
                           : "ring-1 ring-black/10 hover:ring-black/20 hover:shadow-md"
@@ -492,7 +508,7 @@ export function CharacterSelection({
             >
               <div
                 style={cardStyle}
-                className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50 hover:border-neutral-400 hover:bg-neutral-100"
+                className={cn("flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50 hover:border-neutral-400 hover:bg-neutral-100", cardClass)}
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/5">
                   <svg className="h-6 w-6 text-black/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -511,7 +527,7 @@ export function CharacterSelection({
           {ASPECT_RATIO_OPTIONS.map(({ value, label, icon }) => (
             <button
               key={value}
-              onClick={() => setAspectRatio(value)}
+              onClick={() => setUserRatio(value)}
               onMouseEnter={() => {
                 // Prefetch this ratio's images on hover so click feels instant
                 if (value === aspectRatio) return
