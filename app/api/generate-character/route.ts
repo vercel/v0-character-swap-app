@@ -1,5 +1,63 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { generateText } from "ai"
+import { generateImage, generateText } from "ai"
+import { createGateway } from "@ai-sdk/gateway"
+
+export const maxDuration = 120
+
+const PROMPT_TEMPLATE = (prompt: string) =>
+  `A Pixar-quality 3D animated character: ${prompt}.
+
+RENDERING:
+- Pixar/Disney 3D animation style — smooth rounded shapes, soft subsurface scattering on skin, big expressive eyes, slightly exaggerated proportions
+- Highly detailed skin textures with visible pores, fine peach fuzz, subtle freckles or blemishes for realism
+- Detailed fabric textures — visible stitching, wool fibers, leather grain, wrinkles in clothing
+- Fur and hair rendered strand-by-strand with realistic sheen and volume
+- Rich environmental background that matches the character's theme (e.g. kitchen for a chef, ocean for a pirate, forest for an elf) — NOT a plain gradient
+- Cinematic lighting with depth of field, rim lighting, and ambient occlusion
+- The overall image should look like a still frame from a Pixar feature film
+
+CHARACTER:
+- Clearly fictional cartoon character, never photorealistic or a real person
+- Full head and upper body visible, facing the viewer directly
+- Face completely unobstructed — no sunglasses, masks, or hair covering the face
+- Sharp focus on facial features with even, soft lighting`
+
+const REFRAME_PROMPT = (aspectRatio: string) =>
+  `Recreate this exact same character in the exact same Pixar 3D animation style, with the same face, same outfit, same colors, same pose, same lighting. Keep the character IDENTICAL — do not change any features. Only reframe/recompose the image to fit a ${aspectRatio} aspect ratio. Show head and upper body. Keep the background style consistent.`
+
+/**
+ * Generate a variant of the original image at a different aspect ratio using Gemini.
+ */
+async function generateVariant(
+  originalDataUrl: string,
+  aspectRatio: string,
+): Promise<string> {
+  const gateway = createGateway({ apiKey: process.env.AI_GATEWAY_API_KEY! })
+  const model = gateway("google/gemini-2.5-flash-image")
+
+  const result = await generateText({
+    model,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", image: originalDataUrl },
+          { type: "text", text: REFRAME_PROMPT(aspectRatio) },
+        ],
+      },
+    ],
+    providerOptions: {
+      google: {
+        responseModalities: ["IMAGE"],
+        imageConfig: { aspectRatio },
+      },
+    },
+  })
+
+  const imageFile = result.files?.find((f) => f.mediaType?.startsWith("image/"))
+  if (!imageFile) throw new Error(`No image generated for ${aspectRatio}`)
+  return `data:${imageFile.mediaType};base64,${imageFile.base64}`
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,40 +70,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Use project-level OIDC auth (env-based API key)
-    // Cartoon-only prompt — no photorealistic images or real people
-    const result = await generateText({
-      model: "google/gemini-3-pro-image",
-      prompt: `Create a cartoon character illustration of ${prompt}.
-
-STYLE REQUIREMENTS - MANDATORY:
-- Art style MUST be 3D animated in the style of Pixar/Disney — smooth, rounded shapes, soft subsurface scattering on skin, big expressive eyes, slightly exaggerated proportions
-- Render quality should look like a still frame from a Pixar movie
-- NEVER generate a photorealistic image or photograph
-- NEVER generate a real person, celebrity, politician, or any recognizable public figure
-- The character must be clearly fictional and illustrated
-- If the description sounds like a real person, create an original Pixar-style cartoon character inspired by the concept instead
-
-COMPOSITION REQUIREMENTS for face swap compatibility:
-- Full head and complete upper body (shoulders, chest, arms) clearly visible
-- Face looking directly at viewer, frontal view, no profile angles
-- Face completely unobstructed - no sunglasses, masks, hands covering face, or hair covering face
-- Even, soft lighting on face with no harsh shadows
-- Sharp focus on facial features
-- Simple illustrated or solid color background
-- Show as much of the character as the prompt implies — full body if described doing a full-body action or wearing a full outfit, upper body otherwise`,
+    // Step 1: Generate the original in 16:9 with Grok
+    const { image } = await generateImage({
+      model: "xai/grok-imagine-image",
+      prompt: PROMPT_TEMPLATE(prompt.trim()),
+      aspectRatio: "16:9",
     })
+    const originalDataUrl = `data:image/png;base64,${image.base64}`
 
-    const imageFile = result.files?.find((f) => f.mediaType?.startsWith("image/"))
+    // Step 2: Use Gemini to reframe into 9:16 and 1:1 (in parallel)
+    const [portrait, square] = await Promise.all([
+      generateVariant(originalDataUrl, "9:16"),
+      generateVariant(originalDataUrl, "1:1"),
+    ])
 
-    if (!imageFile) {
-      throw new Error("No image generated")
+    const sources: Record<string, string> = {
+      "16:9": originalDataUrl,
+      "9:16": portrait,
+      "1:1": square,
     }
 
-    const base64 = Buffer.from(imageFile.uint8Array).toString("base64")
-    const imageUrl = `data:${imageFile.mediaType};base64,${base64}`
-
-    return NextResponse.json({ imageUrl })
+    return NextResponse.json({
+      imageUrl: originalDataUrl,
+      sources,
+    })
   } catch (error: unknown) {
     console.error("Generate character error:", error)
     const errorMessage = error instanceof Error ? error.message : String(error)

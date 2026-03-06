@@ -103,7 +103,7 @@ export function LayoutShell({ children }: { children: ReactNode }) {
             )}
             <div className="max-w-xs text-center">
               <p className="mb-3 text-xl font-pixel text-black">Generation Failed</p>
-              <p className="text-sm leading-relaxed text-black/50">{viewer.error.message}</p>
+              <p className="text-sm leading-relaxed text-black/70">{viewer.error.message}</p>
             </div>
             <button
               onClick={viewer.close}
@@ -132,7 +132,7 @@ export function LayoutShell({ children }: { children: ReactNode }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="mb-1 text-lg font-semibold text-black">Buy Credits</h2>
-            <p className="mb-4 text-sm text-black/50">
+            <p className="mb-4 text-sm text-black/70">
               {!creditsLoading && !creditsError && (
                 <>Current balance: <span className="tabular-nums font-medium text-black">${Number.parseFloat(balance).toFixed(2)}</span></>
               )}
@@ -156,7 +156,7 @@ export function LayoutShell({ children }: { children: ReactNode }) {
               </div>
               <div className="flex gap-2">
                 <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-black/40">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-black/70">$</span>
                   <input
                     type="number"
                     min="1"
@@ -165,7 +165,7 @@ export function LayoutShell({ children }: { children: ReactNode }) {
                     value={buyAmount}
                     onChange={(e) => { setBuyAmount(e.target.value); setPurchaseError(null) }}
                     disabled={purchasing}
-                    className="w-full rounded-xl border border-neutral-200 bg-neutral-50 py-2.5 pl-7 pr-3 text-sm tabular-nums text-black placeholder:text-black/40 focus:border-neutral-400 focus:outline-none disabled:opacity-40"
+                    className="w-full rounded-xl border border-neutral-200 bg-neutral-50 py-2.5 pl-7 pr-3 text-sm tabular-nums text-black placeholder:text-black/70 focus:border-neutral-400 focus:outline-none disabled:opacity-40"
                   />
                 </div>
               </div>
@@ -176,7 +176,7 @@ export function LayoutShell({ children }: { children: ReactNode }) {
                 <button
                   onClick={() => { setShowBuyOptions(false); setBuyAmount(""); setPurchaseError(null) }}
                   disabled={purchasing}
-                  className="flex-1 rounded-xl px-4 py-2.5 text-sm text-black/50 transition-colors hover:text-black disabled:opacity-50"
+                  className="flex-1 rounded-xl px-4 py-2.5 text-sm text-black/70 transition-colors hover:text-black disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -204,11 +204,20 @@ function VideoOverlay() {
 
   const [showPip, setShowPip] = useState(true)
   const [videoProgress, setVideoProgress] = useState(0)
+  const [pipReady, setPipReady] = useState(false)
+
+  // Reset pipReady when a different video opens
+  const prevPipSrcRef = useRef<string | null>(null)
 
   if (!data) return null
 
   const { videoUrl, sourceVideoUrl, sourceAspectRatio, characterName, characterImageUrl } = data
   const pipSrc = toMp4Url(sourceVideoUrl) || sourceVideoUrl
+
+  if (pipSrc !== prevPipSrcRef.current) {
+    prevPipSrcRef.current = pipSrc
+    if (pipReady) setPipReady(false)
+  }
   const hasPipSource = !!sourceVideoUrl
   const pipAspectRatio = sourceAspectRatio
 
@@ -253,7 +262,7 @@ function VideoOverlay() {
             ? `/_next/image?url=${encodeURIComponent(characterImageUrl)}&w=640&q=75`
             : characterImageUrl)
           : undefined}
-        className="h-full w-full cursor-pointer object-contain md:object-cover"
+        className="h-full w-full cursor-pointer object-contain"
         onClick={(e) => {
           const v = e.currentTarget
           if (v.paused) v.play(); else v.pause()
@@ -289,8 +298,8 @@ function VideoOverlay() {
       {/* PiP video — always mounted when source exists, visibility toggled via CSS */}
       {hasPipSource && (
         <div className={cn(
-          "absolute bottom-20 right-4 overflow-hidden rounded-lg border-2 border-black/20 shadow-lg transition-opacity",
-          showPip ? "opacity-100" : "pointer-events-none opacity-0",
+          "absolute bottom-20 right-4 overflow-hidden rounded-lg border-2 border-black/20 shadow-lg transition-opacity duration-300",
+          showPip && pipReady ? "opacity-100" : "pointer-events-none opacity-0",
           pipAspectRatio === "9:16" && "aspect-[9/16] h-28 md:h-40",
           pipAspectRatio !== "9:16" && "aspect-video w-28 md:w-48"
         )}>
@@ -300,11 +309,12 @@ function VideoOverlay() {
             muted loop playsInline preload="auto"
             className="h-full w-full object-cover"
             onLoadedData={() => {
+              setPipReady(true)
               const main = mainVideoRef.current
               const pip = pipVideoRef.current
-              if (main && pip && main.readyState >= 2) {
+              if (main && pip) {
                 pip.currentTime = main.currentTime
-                pip.play()
+                if (!main.paused) pip.play()
               }
             }}
           />

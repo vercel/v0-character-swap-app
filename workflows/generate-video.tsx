@@ -369,9 +369,9 @@ async function sendCompletionEmail(email: string, videoUrl: string, characterNam
     const greeting = firstName ? `Hey ${firstName}!` : "Hey!"
 
     await resend.emails.send({
-      from: "v0 Face Swap <hello@v0faceswap.app>",
+      from: "v0 Face Swap <video@v0faceswap.app>",
       to: email,
-      subject: `Your face swap video is ready${characterName ? ` — ${characterName}` : ""}!`,
+      subject: `Your cartoon video is ready!`,
       text: [
         greeting,
         "",
@@ -379,10 +379,48 @@ async function sendCompletionEmail(email: string, videoUrl: string, characterNam
         "",
         `Check it out: ${appUrl}`,
         "",
-        "Build your own Face Swap app by cloning this v0 template: https://v0.app/templates/1Nu0E0eAo9q",
-        "",
         "— v0 Face Swap",
       ].join("\n"),
+      html: `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;">
+        <!-- Header -->
+        <tr><td style="background-color:#000000;padding:32px 40px;text-align:center;">
+          <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.3px;">v0 Face Swap</span>
+        </td></tr>
+        <!-- Body -->
+        <tr><td style="padding:40px;">
+          <p style="margin:0 0 20px;font-size:16px;line-height:1.5;color:#000000;">
+            ${greeting}
+          </p>
+          <p style="margin:0 0 24px;font-size:16px;line-height:1.5;color:#000000;">
+            Your ${characterName ? `<strong>${characterName}</strong> ` : ""}face swap video is ready.
+          </p>
+          <!-- CTA -->
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr><td align="center" style="padding:8px 0 32px;">
+              <a href="${appUrl}" style="display:inline-block;background-color:#000000;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 32px;border-radius:10px;">
+                View your video
+              </a>
+            </td></tr>
+          </table>
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="padding:20px 40px;background-color:#fafafa;border-top:1px solid #f0f0f0;text-align:center;">
+          <span style="font-size:12px;color:#999999;">
+            Built with Next.js + AI SDK + Vercel
+          </span>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim(),
     })
     console.log(`[Workflow Step] Email sent to ${email}`)
   } catch (error) {

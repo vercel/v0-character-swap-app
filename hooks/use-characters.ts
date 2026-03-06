@@ -40,6 +40,7 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
               src: img.image_url,
               dbId: img.id,
             }))
+            console.log("[use-characters] Loaded from DB:", loadedCharacters.map(c => `${c.id}:${c.name}`))
             setCustomCharacters(loadedCharacters)
           }
         })
@@ -65,11 +66,15 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
         })
         const data = await res.json()
         if (data.id) {
-          setCustomCharacters(prev => [...prev, {
-            ...character,
-            id: CUSTOM_CHARACTER_ID_OFFSET + data.id,
-            dbId: data.id,
-          }])
+          console.log("[use-characters] Added custom:", data.id, character.name)
+          setCustomCharacters(prev => {
+            console.log("[use-characters] prev state:", prev.map(c => `${c.id}:${c.name}`))
+            return [...prev, {
+              ...character,
+              id: CUSTOM_CHARACTER_ID_OFFSET + data.id,
+              dbId: data.id,
+            }]
+          })
           return
         }
       } catch (error) {
@@ -107,7 +112,16 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
     }).catch(console.error)
   }, [])
 
-  const allCharacters = [...DEFAULT_CHARACTERS, ...customCharacters]
+  // Dedup custom characters by dbId (DB reload can duplicate locally-added ones)
+  const seenDbIds = new Set<number>()
+  const dedupedCustom = customCharacters.filter(c => {
+    if (c.dbId) {
+      if (seenDbIds.has(c.dbId)) return false
+      seenDbIds.add(c.dbId)
+    }
+    return true
+  })
+  const allCharacters = [...DEFAULT_CHARACTERS, ...dedupedCustom]
   const isReady = customLoaded
 
   return {

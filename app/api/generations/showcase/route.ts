@@ -4,9 +4,9 @@ export async function GET() {
   try {
     // One video per character (most recent completed)
     const videos = await sql`
-      SELECT DISTINCT ON (character_name) video_url, character_image_url, character_name, source_video_url, 'fill' as aspect_ratio
+      SELECT DISTINCT ON (character_name) video_url, character_image_url, character_name, source_video_url, aspect_ratio
       FROM generations
-      WHERE status = 'completed' AND video_url IS NOT NULL AND character_name IS NOT NULL
+      WHERE status = 'completed' AND video_url IS NOT NULL AND character_name IS NOT NULL AND aspect_ratio = '16:9'
       ORDER BY character_name, completed_at DESC
     `
 

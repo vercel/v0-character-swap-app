@@ -18,6 +18,8 @@ export interface Character {
   src: string
   name: string
   dbId?: number // Database ID for custom/user-uploaded characters
+  /** Per-aspect-ratio images (AI-generated characters get all 3) */
+  sources?: { "9:16"?: string; "1:1"?: string; "16:9"?: string }
 }
 
 // ===========================================

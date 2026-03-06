@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { CharacterSelection } from "@/components/character-selection"
 import { useCharacters } from "@/hooks/use-characters"
 import { useAuth } from "@/components/auth-provider"
+import type { AspectRatio } from "@/lib/utils"
 
 export default function PickPage() {
   const router = useRouter()
@@ -12,6 +13,7 @@ export default function PickPage() {
     selectedCharacter,
     setSelectedCharacter,
     addCustomCharacter,
+    deleteCustomCharacter,
     allCharacters,
   } = useCharacters({ user, authLoading })
 
@@ -19,14 +21,15 @@ export default function PickPage() {
     <CharacterSelection
       selectedId={selectedCharacter}
       onSelect={setSelectedCharacter}
-      onNext={() => {
+      onNext={(aspectRatio: AspectRatio) => {
         if (selectedCharacter) {
-          router.push(`/record?char=${selectedCharacter}`)
+          router.push(`/record?char=${selectedCharacter}&ar=${encodeURIComponent(aspectRatio)}`)
         }
       }}
       onHome={() => router.push("/")}
       allCharacters={allCharacters}
       onAddCustom={addCustomCharacter}
+      onDeleteCustom={deleteCustomCharacter}
     />
   )
 }

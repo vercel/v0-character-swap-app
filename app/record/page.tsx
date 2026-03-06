@@ -8,12 +8,14 @@ import { useVideo } from "@/providers/video-context"
 import { useCharacters } from "@/hooks/use-characters"
 import { useVideoGeneration } from "@/hooks/use-video-generation"
 import { useAuth } from "@/components/auth-provider"
-import { detectImageAspectRatio } from "@/lib/utils"
+import { characterImageForAspectRatio, type AspectRatio } from "@/lib/utils"
 
 function RecordContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const charId = searchParams.get("char") ? Number(searchParams.get("char")) : null
+  const arParam = searchParams.get("ar")
+  const selectedAspectRatio: AspectRatio = (arParam === "9:16" || arParam === "1:1" || arParam === "16:9") ? arParam : "16:9"
 
   const { user, isLoading: authLoading, login } = useAuth()
   const { allCharacters, trackCharacterUsage } = useCharacters({ user, authLoading })
@@ -40,12 +42,14 @@ function RecordContent() {
     user,
     onLoginRequired: () => setShowLoginModal(true),
     onSuccess: () => {
-      // Generation submitted — go back to pick
-      router.push("/pick")
+      // onGenerationCreated handles navigation now
     },
     onError: (message) => {
       setErrorToast(message)
       setTimeout(() => setErrorToast(null), 5000)
+    },
+    onGenerationCreated: (id) => {
+      router.push(`/generate?id=${id}`)
     },
   })
 
@@ -54,25 +58,32 @@ function RecordContent() {
 
   const character = charId ? allCharacters.find(c => c.id === charId) : null
 
+  // Build a character with the Cloudinary-cropped image for the selected aspect ratio
+  const croppedCharacter = character ? {
+    ...character,
+    src: characterImageForAspectRatio(character.src, selectedAspectRatio, character.sources),
+  } : null
+
   const handleGenerate = useCallback(async () => {
-    if (!recordedVideo || !character) return
+    if (!recordedVideo || !croppedCharacter) return
+    // Request notification permission on user gesture (required by Safari)
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission()
+    }
+    // Map aspect ratio to the format processVideo expects
+    const klingAspectRatio = selectedAspectRatio === "1:1" ? "fill" as const : selectedAspectRatio
     // If not logged in, processVideo will show login modal — don't navigate
     if (!user) {
-      processVideo(getVideoForUpload, character, false, uploadedVideoUrl, "fill", recordedAspectRatio, waitForUpload)
+      processVideo(getVideoForUpload, croppedCharacter, true, uploadedVideoUrl, klingAspectRatio, recordedAspectRatio, waitForUpload)
       return
     }
     if (previewVideoRef.current) {
       previewVideoRef.current.pause()
       previewVideoRef.current.muted = true
     }
-    trackCharacterUsage(character.id)
-    const ratio = await detectImageAspectRatio(character.src)
-    const characterAspectRatio = (ratio === "9:16" || ratio === "3:4") ? "9:16" as const
-      : (ratio === "16:9" || ratio === "4:3") ? "16:9" as const
-      : "fill" as const
-    processVideo(getVideoForUpload, character, false, uploadedVideoUrl, characterAspectRatio, recordedAspectRatio, waitForUpload)
-    router.push("/pick")
-  }, [user, recordedVideo, character, trackCharacterUsage, processVideo, getVideoForUpload, uploadedVideoUrl, recordedAspectRatio, waitForUpload, router])
+    trackCharacterUsage(croppedCharacter.id)
+    processVideo(getVideoForUpload, croppedCharacter, true, uploadedVideoUrl, klingAspectRatio, recordedAspectRatio, waitForUpload)
+  }, [user, recordedVideo, croppedCharacter, selectedAspectRatio, trackCharacterUsage, processVideo, getVideoForUpload, uploadedVideoUrl, recordedAspectRatio, waitForUpload])
 
   const handleLoginAndContinue = useCallback(async () => {
     setIsLoggingIn(true)
@@ -85,7 +96,7 @@ function RecordContent() {
     if (recordedVideo) {
       await saveToSession(recordedVideo, charId)
     }
-    sessionStorage.setItem("loginReturnUrl", `/generate?char=${charId}`)
+    sessionStorage.setItem("loginReturnUrl", `/generate?char=${charId}&ar=${encodeURIComponent(selectedAspectRatio)}`)
     login()
   }, [recordedVideo, charId, allCharacters, saveToSession, login])
 
@@ -242,7 +253,7 @@ function RecordContent() {
                 <button
                   onClick={() => setShowLoginModal(false)}
                   disabled={isLoggingIn}
-                  className="rounded-xl px-4 py-3 text-sm text-black/50 transition-colors hover:text-black disabled:opacity-50"
+                  className="rounded-xl px-4 py-3 text-sm text-black/70 transition-colors hover:text-black disabled:opacity-50"
                 >
                   Cancel
                 </button>

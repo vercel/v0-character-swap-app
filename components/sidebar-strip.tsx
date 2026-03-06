@@ -68,9 +68,9 @@ export function SidebarStrip({ onBuyCredits }: SidebarStripProps) {
           >
             <Coins className="h-3.5 w-3.5 text-yellow-500" />
             {creditsLoading ? (
-              <span className="text-[10px] text-black/40">...</span>
+              <span className="text-[10px] text-black/70">...</span>
             ) : creditsError ? (
-              <span className="text-[10px] text-black/40">--</span>
+              <span className="text-[10px] text-black/70">--</span>
             ) : (
               <span className="text-[10px] tabular-nums text-black/60">
                 ${Number.parseFloat(balance).toFixed(0)}
@@ -91,7 +91,7 @@ export function SidebarStrip({ onBuyCredits }: SidebarStripProps) {
               href="https://v0.app/templates/face-swap-template-1Nu0E0eAo9q"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex flex-col items-center gap-1 text-black/30 transition-colors hover:text-black/60"
+              className="flex flex-col items-center gap-1 text-black/60 transition-colors hover:text-black/60"
               title="Open in v0"
             >
               <svg className="h-4 w-auto" viewBox="0 0 252 120" fill="currentColor">
@@ -115,7 +115,7 @@ export function SidebarStrip({ onBuyCredits }: SidebarStripProps) {
               href="https://v0.app/templates/face-swap-template-1Nu0E0eAo9q"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex flex-col items-center gap-1 text-black/30 transition-colors hover:text-black/60"
+              className="flex flex-col items-center gap-1 text-black/60 transition-colors hover:text-black/60"
               title="Open in v0"
             >
               <svg className="h-4 w-auto" viewBox="0 0 252 120" fill="currentColor">
@@ -177,7 +177,7 @@ export function SidebarStrip({ onBuyCredits }: SidebarStripProps) {
             href="https://v0.app/templates/face-swap-template-1Nu0E0eAo9q"
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 text-black/30 transition-colors hover:text-black/60"
+            className="shrink-0 text-black/60 transition-colors hover:text-black/60"
             title="Open in v0"
           >
             <svg className="h-3 w-auto" viewBox="0 0 252 120" fill="currentColor">

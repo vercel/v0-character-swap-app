@@ -1,56 +1,75 @@
 "use client"
 
 import React, { useEffect, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import useSWR from "swr"
 
 // Use Next.js image optimization for thumbnails
 function thumbUrl(src: string): string {
   return `/_next/image?url=${encodeURIComponent(src)}&w=256&q=75`
 }
+
+// Match the Cloudinary conversion used by the viewer overlay for PiP playback
+function toMp4Url(url: string | null): string | null {
+  if (!url) return null
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  if (!cloudName) return url
+  if (!url.includes(".public.blob.vercel-storage.com")) return url
+  return `https://res.cloudinary.com/${cloudName}/video/fetch/f_mp4,vc_h264,ac_aac/${encodeURIComponent(url)}`
+}
 import { FailedGeneration } from "@/components/failed-generation"
 import { GenerationProgress } from "@/components/generation-progress"
 import { useAuth } from "@/components/auth-provider"
 import { useViewer } from "@/providers/viewer-context"
 
-// Request notification permission
-async function requestNotificationPermission(): Promise<boolean> {
-  if (!("Notification" in window)) {
-    return false
+// Request notification permission — must be called from a user gesture (click)
+// Safari and iOS require this; Chrome is more lenient but best practice regardless
+function requestNotificationPermission(): void {
+  if (!("Notification" in window)) return
+  if (Notification.permission === "default") {
+    Notification.requestPermission()
   }
-
-  if (Notification.permission === "granted") {
-    return true
-  }
-
-  if (Notification.permission !== "denied") {
-    const permission = await Notification.requestPermission()
-    return permission === "granted"
-  }
-
-  return false
 }
 
 // Show notification when video is ready
 function showVideoReadyNotification(characterName: string | null) {
-  if (!("Notification" in window) || Notification.permission !== "granted") {
-    return
-  }
+  if (!("Notification" in window) || Notification.permission !== "granted") return
 
   const notification = new Notification("Video Ready!", {
     body: characterName
       ? `Your ${characterName} video is ready to view`
       : "Your video generation is complete",
-    icon: "/favicon.ico",
-    tag: "video-ready", // Prevents duplicate notifications
+    icon: "/icon-dark-32x32.png",
+    tag: "video-ready",
   })
 
-  // Auto-close after 5 seconds
   setTimeout(() => notification.close(), 5000)
-
-  // Focus window when clicked
   notification.onclick = () => {
     window.focus()
     notification.close()
+  }
+}
+
+// Play a short chime sound via Web Audio API (no file needed)
+function playCompletionSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const oscillator = ctx.createOscillator()
+    const gain = ctx.createGain()
+    oscillator.connect(gain)
+    gain.connect(ctx.destination)
+
+    // Two-tone chime: C5 → E5
+    oscillator.type = "sine"
+    oscillator.frequency.setValueAtTime(523, ctx.currentTime) // C5
+    oscillator.frequency.setValueAtTime(659, ctx.currentTime + 0.15) // E5
+    gain.gain.setValueAtTime(0.3, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4)
+
+    oscillator.start(ctx.currentTime)
+    oscillator.stop(ctx.currentTime + 0.4)
+  } catch {
+    // Silently fail if audio not available
   }
 }
 
@@ -85,6 +104,7 @@ interface GenerationsPanelProps {
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 export function GenerationsPanel({ className = "", variant = "default" }: GenerationsPanelProps) {
+  const router = useRouter()
   const { user } = useAuth()
   const { viewVideo, viewError } = useViewer()
   const prevGenerationsRef = useRef<Generation[]>([])
@@ -114,30 +134,32 @@ export function GenerationsPanel({ className = "", variant = "default" }: Genera
     })
   }, [generations])
 
-  // Request notification permission when there's a pending generation
+  // Request notification permission from user gesture (optimistic-generation fires on click)
   useEffect(() => {
-    if (hasPending && !hasRequestedPermission.current) {
-      hasRequestedPermission.current = true
-      requestNotificationPermission()
+    const handleOptimisticForPermission = () => {
+      if (!hasRequestedPermission.current) {
+        hasRequestedPermission.current = true
+        requestNotificationPermission()
+      }
     }
-  }, [hasPending])
+    window.addEventListener("optimistic-generation", handleOptimisticForPermission)
+    return () => window.removeEventListener("optimistic-generation", handleOptimisticForPermission)
+  }, [])
 
-  // Detect when a generation completes and show notification
+  // Detect when a generation completes → push notification + sound
   useEffect(() => {
     const prevGenerations = prevGenerationsRef.current
 
-    // Check if any generation just completed
     for (const gen of generations) {
       if (gen.status === "completed") {
         const prevGen = prevGenerations.find(p => p.id === gen.id)
         if (prevGen && prevGen.status !== "completed") {
-          // This generation just completed!
           showVideoReadyNotification(gen.character_name)
+          playCompletionSound()
         }
       }
     }
 
-    // Update ref for next comparison - make a copy to avoid reference issues
     prevGenerationsRef.current = [...generations]
   }, [generations])
 
@@ -204,7 +226,7 @@ export function GenerationsPanel({ className = "", variant = "default" }: Genera
         <p className="mb-2 text-xl font-pixel text-black">
           my videos
         </p>
-        <p className="text-sm text-black/40">
+        <p className="text-sm text-black/70">
           sign in to see your videos
         </p>
       </div>
@@ -240,7 +262,7 @@ export function GenerationsPanel({ className = "", variant = "default" }: Genera
         <p className="mb-2 text-xl font-pixel text-black">
           my videos
         </p>
-        <p className="text-sm text-black/40">
+        <p className="text-sm text-black/70">
           your generated videos will appear here
         </p>
       </div>
@@ -308,7 +330,9 @@ export function GenerationsPanel({ className = "", variant = "default" }: Genera
                 onMouseEnter={() => {
                   // Prefetch both videos so they open instantly on click
                   if (gen.video_url) fetch(gen.video_url, { mode: "cors" }).catch(() => {})
-                  if (gen.source_video_url) fetch(gen.source_video_url, { mode: "cors" }).catch(() => {})
+                  // Prefetch the Cloudinary-converted PiP URL (what the viewer actually loads)
+                  const pipUrl = toMp4Url(gen.source_video_url)
+                  if (pipUrl) fetch(pipUrl, { mode: "cors" }).catch(() => {})
                 }}
               >
                 {/* Optimized poster image underneath video */}
@@ -353,13 +377,21 @@ export function GenerationsPanel({ className = "", variant = "default" }: Genera
                 <FailedGeneration gen={gen} />
               </button>
             ) : (
-              // Processing/Pending state with progress indicator
-              <GenerationProgress
-                characterImageUrl={gen.character_image_url}
-                createdAt={gen.created_at}
-                status={gen.status as "uploading" | "pending" | "processing"}
-                onCancel={(e) => handleDelete(gen.id, e)}
-              />
+              // Processing/Pending state with progress indicator — clickable to open generation page
+              <div
+                className="h-full w-full cursor-pointer"
+                role="button"
+                tabIndex={0}
+                onClick={() => router.push(`/generate?id=${gen.id}`)}
+                onKeyDown={(e) => { if (e.key === "Enter") router.push(`/generate?id=${gen.id}`) }}
+              >
+                <GenerationProgress
+                  characterImageUrl={gen.character_image_url}
+                  createdAt={gen.created_at}
+                  status={gen.status as "uploading" | "pending" | "processing"}
+                  onCancel={(e) => handleDelete(gen.id, e)}
+                />
+              </div>
             )}
             </div>
 
@@ -367,7 +399,7 @@ export function GenerationsPanel({ className = "", variant = "default" }: Genera
             {showDeleteButton && (
               <button
                 onClick={(e) => handleDelete(gen.id, e)}
-                className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-100 text-black/50 opacity-0 shadow-md ring-1 ring-neutral-300 transition-all hover:bg-neutral-200 hover:text-black group-hover:opacity-100"
+                className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-100 text-black/70 opacity-0 shadow-md ring-1 ring-neutral-300 transition-all hover:bg-neutral-200 hover:text-black group-hover:opacity-100"
                 title="Delete video"
               >
                 <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

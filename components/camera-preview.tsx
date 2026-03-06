@@ -268,7 +268,7 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
   if (hasPermission === false) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-black/50">Camera access denied</p>
+        <p className="text-black/70">Camera access denied</p>
       </div>
     )
   }
@@ -300,21 +300,21 @@ export function CameraPreview({ onVideoRecorded, isProcessing, progress, progres
                 <h2 className="text-2xl font-bold text-black">
                   Record a short video
                 </h2>
-                <p className="text-sm text-black/50">
+                <p className="text-sm text-black/70">
                   We&apos;ll use AI to transform you into your cartoon — move naturally, make expressions!
                 </p>
               </div>
 
               <div className="flex flex-col gap-2.5 rounded-xl bg-black/5 p-3.5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-black/40">Tips</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-black/70">Tips</p>
                 <p className="text-sm leading-relaxed text-black">
-                  <span className="text-black/30">1.</span> Frame your <span className="font-semibold">head + upper body</span>
+                  <span className="text-black/70">1.</span> Frame your <span className="font-semibold">head + upper body</span>
                 </p>
                 <p className="text-sm leading-relaxed text-black">
-                  <span className="text-black/30">2.</span> Find <span className="font-semibold">good lighting</span> on your face
+                  <span className="text-black/70">2.</span> Find <span className="font-semibold">good lighting</span> on your face
                 </p>
                 <p className="text-sm leading-relaxed text-black">
-                  <span className="text-black/30">3.</span> Record <span className="font-semibold">{MIN_VIDEO_DURATION}-{MAX_VIDEO_DURATION} seconds</span> of movement
+                  <span className="text-black/70">3.</span> Record <span className="font-semibold">{MIN_VIDEO_DURATION}-{MAX_VIDEO_DURATION} seconds</span> of movement
                 </p>
               </div>
             </div>

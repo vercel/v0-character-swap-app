@@ -1,29 +1,18 @@
 "use client"
 
-import { useRef, useState, useCallback, useEffect } from "react"
+import { useRef, useState, useCallback, useEffect, useMemo } from "react"
 import { upload } from "@vercel/blob/client"
-import { cn } from "@/lib/utils"
+import { cn, type AspectRatio } from "@/lib/utils"
 import type { Character } from "@/lib/types"
 import useSWR from "swr"
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
-function optimizedUrl(src: string, width: number): string {
-  if (src.startsWith("/")) return src
-  if (!src.startsWith("http")) return src
-  // Use Cloudinary CDN for Blob images (global edge cache, no server processing)
-  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
-  if (cloudName && src.includes(".public.blob.vercel-storage.com")) {
-    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_${width},c_fill,g_north,f_webp,q_90/${encodeURIComponent(src)}`
-  }
-  return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=75`
-}
-
-// Generate a video poster via Cloudinary (first frame, tiny)
+// Generate a video poster via Cloudinary (first frame, preserves original aspect ratio)
 function videoFrameUrl(videoUrl: string): string | null {
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
   if (!cloudName || !videoUrl.includes(".public.blob.vercel-storage.com")) return null
-  return `https://res.cloudinary.com/${cloudName}/video/fetch/w_320,h_480,c_fill,so_1,f_jpg,q_60/${encodeURIComponent(videoUrl)}`
+  return `https://res.cloudinary.com/${cloudName}/video/fetch/w_480,c_limit,so_1,f_jpg,q_60/${encodeURIComponent(videoUrl)}`
 }
 
 interface GenerationVideo {
@@ -31,26 +20,80 @@ interface GenerationVideo {
   character_name: string | null
 }
 
+function optimizedUrl(src: string, width: number): string {
+  if (src.startsWith("/")) return src
+  if (!src.startsWith("http")) return src
+  // Use Cloudinary CDN for Blob images (global edge cache, no server processing)
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  if (cloudName && src.includes(".public.blob.vercel-storage.com")) {
+    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_${width},c_fill,g_north,f_webp,q_80/${encodeURIComponent(src)}`
+  }
+  return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=75`
+}
+
+/** Get the optimized image URL for a character at a given aspect ratio */
+function charImageUrl(char: Character, ar: AspectRatio): string {
+  const src = char.sources?.[ar] || char.src
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  if (cloudName && src.includes(".public.blob.vercel-storage.com")) {
+    // ?v=2 on the source URL makes Cloudinary treat it as a new resource, busting stale cache
+    const bustSrc = src + (src.includes("?") ? "&v=2" : "?v=2")
+    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_480,c_fill,g_north,f_webp,q_80/${encodeURIComponent(bustSrc)}`
+  }
+  return src
+}
+
+const ALL_RATIOS: AspectRatio[] = ["9:16", "1:1", "16:9"]
+
+
 interface CharacterSelectionProps {
   selectedId: number | null
   onSelect: (id: number) => void
-  onNext: () => void
+  onNext: (aspectRatio: AspectRatio) => void
   onHome?: () => void
   allCharacters: Character[]
   onAddCustom: (character: Character) => void
+  onDeleteCustom?: (id: number) => void
+}
+
+const ASPECT_RATIO_OPTIONS: { value: AspectRatio; label: string; icon: string }[] = [
+  { value: "9:16", label: "9:16", icon: "portrait" },
+  { value: "1:1", label: "1:1", icon: "square" },
+  { value: "16:9", label: "16:9", icon: "landscape" },
+]
+
+// Card pixel dimensions per aspect ratio [mobile, desktop]
+const CARD_DIMS: Record<AspectRatio, { w: [number, number]; h: [number, number] }> = {
+  "9:16": { w: [101, 135], h: [180, 240] },
+  "1:1":  { w: [140, 190], h: [140, 190] },
+  "16:9": { w: [180, 240], h: [101, 135] },
 }
 
 export function CharacterSelection({
   selectedId,
   onSelect,
   onNext,
-  onHome,
   allCharacters,
   onAddCustom,
+  onDeleteCustom,
 }: CharacterSelectionProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
+
+  // Read device from data-device attribute (set by inline <script> before React hydrates)
+  // This avoids any flash — the script runs before first paint, so the value is ready.
+  const isDesktop = typeof document !== "undefined"
+    ? document.documentElement.dataset.device === "desktop"
+    : true // SSR fallback — most traffic is desktop
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>(isDesktop ? "16:9" : "9:16")
+  const dims = CARD_DIMS[aspectRatio]
+  const cardStyle = useMemo(() => ({
+    width: isDesktop ? dims.w[1] : dims.w[0],
+    height: isDesktop ? dims.h[1] : dims.h[0],
+    transition: "width 250ms ease, height 250ms ease",
+    contain: "layout style" as const,
+  }), [dims, isDesktop])
 
   // AI character generation state
   const [showCreateInput, setShowCreateInput] = useState(false)
@@ -65,7 +108,7 @@ export function CharacterSelection({
     setGenerationProgress(0)
     setGenerateError(null)
 
-    const duration = 20000
+    const duration = 45000 // 3 images generated in parallel
     const startTime = Date.now()
     const progressInterval = setInterval(() => {
       const elapsed = Date.now() - startTime
@@ -83,26 +126,47 @@ export function CharacterSelection({
       setGenerationProgress(100)
 
       if (data.imageUrl) {
+        // Upload all aspect ratio images to blob storage in parallel
+        const uploadImage = async (dataUrl: string, suffix: string): Promise<string> => {
+          if (!dataUrl.startsWith("data:")) return dataUrl
+          const res = await fetch(dataUrl)
+          const blob = await res.blob()
+          const uploaded = await upload(`reference-images/${Date.now()}-${suffix}.png`, blob, {
+            access: "public",
+            handleUploadUrl: "/api/upload",
+          })
+          return uploaded.url
+        }
+
         let finalUrl = data.imageUrl
+        let sources: { "9:16"?: string; "1:1"?: string; "16:9"?: string } | undefined
+
         try {
-          if (data.imageUrl.startsWith("data:")) {
-            const res = await fetch(data.imageUrl)
-            const blob = await res.blob()
-            const uploaded = await upload(`reference-images/${Date.now()}-generated.png`, blob, {
-              access: "public",
-              handleUploadUrl: "/api/upload",
-            })
-            finalUrl = uploaded.url
+          if (data.sources) {
+            // Upload all 3 in parallel
+            const [url916, url11, url169] = await Promise.all([
+              data.sources["9:16"] ? uploadImage(data.sources["9:16"], "9x16") : Promise.resolve(undefined),
+              data.sources["1:1"] ? uploadImage(data.sources["1:1"], "1x1") : Promise.resolve(undefined),
+              data.sources["16:9"] ? uploadImage(data.sources["16:9"], "16x9") : Promise.resolve(undefined),
+            ])
+            sources = {}
+            if (url916) sources["9:16"] = url916
+            if (url11) sources["1:1"] = url11
+            if (url169) sources["16:9"] = url169
+            // Use 16:9 as the main src
+            finalUrl = url169 || url11 || url916 || finalUrl
+          } else {
+            finalUrl = await uploadImage(data.imageUrl, "generated")
           }
         } catch {
           // Use original URL if upload fails
         }
+
         const charName = prompt.trim().slice(0, 20)
         const newId = Math.max(...allCharacters.map(c => c.id), 0) + 1
-        onAddCustom({ id: newId, src: finalUrl, name: charName })
+        onAddCustom({ id: newId, src: finalUrl, name: charName, sources })
         onSelect(newId)
         setPrompt("")
-        setShowCreateInput(false)
       } else {
         setGenerateError(data.error || "Failed to generate character")
       }
@@ -133,48 +197,63 @@ export function CharacterSelection({
     }
   })
 
-  // Dedup characters by name
+  // Defaults: dedup by name, always shown, not deletable
+  // Custom: only show if NOT a duplicate of a default (same name + same image)
+  const CUSTOM_OFFSET = 1000
   const seenNames = new Set<string>()
-  const dedupedCharacters = allCharacters.filter(c => {
+  const dedupedCharacters = allCharacters.filter(c => c.id < CUSTOM_OFFSET).filter(c => {
     if (seenNames.has(c.name)) return false
     seenNames.add(c.name)
     return true
   })
+  const defaultNames = new Set(dedupedCharacters.map(c => c.name.toLowerCase()))
+  const customChars = allCharacters.filter(c => c.id >= CUSTOM_OFFSET).filter(c => !defaultNames.has(c.name.toLowerCase()))
 
+  const scrollRafRef = useRef(0)
   const updateScrollButtons = useCallback(() => {
-    const el = scrollRef.current
-    if (!el) return
-    setCanScrollLeft(el.scrollLeft > 10)
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10)
-  }, [])
-
-  // Forward vertical wheel events on the page to horizontal scroll on the carousel
-  useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
+    // Throttle to 1 update per frame — avoids re-rendering on every scroll pixel
+    if (scrollRafRef.current) return
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = 0
       const el = scrollRef.current
       if (!el) return
-      // If there's meaningful horizontal or vertical scroll delta, forward it
+      const left = el.scrollLeft > 10
+      const right = el.scrollLeft < el.scrollWidth - el.clientWidth - 10
+      // Only setState when values actually change
+      setCanScrollLeft(prev => prev !== left ? left : prev)
+      setCanScrollRight(prev => prev !== right ? right : prev)
+    })
+  }, [])
+
+  // Forward vertical wheel events on the carousel to horizontal scroll
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const handleWheel = (e: WheelEvent) => {
+      // Only intercept when the wheel is over the carousel itself
       const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
       if (delta === 0) return
       e.preventDefault()
       el.scrollLeft += delta
     }
-    window.addEventListener("wheel", handleWheel, { passive: false })
-    return () => window.removeEventListener("wheel", handleWheel)
+    // Attach to the scroll container, not the whole window
+    el.addEventListener("wheel", handleWheel, { passive: false })
+    return () => el.removeEventListener("wheel", handleWheel)
   }, [])
 
-  // Preload first 7 character images immediately via <link rel="preload">
+  // Preload first 7 characters in ALL 3 aspect ratios — switching feels instant
   useEffect(() => {
     dedupedCharacters.slice(0, 7).forEach(char => {
       if (!char.src.startsWith("http")) return
-      const url = optimizedUrl(char.src, 640)
-      // Avoid duplicates
-      if (document.querySelector(`link[href="${url}"]`)) return
-      const link = document.createElement("link")
-      link.rel = "preload"
-      link.as = "image"
-      link.href = url
-      document.head.appendChild(link)
+      ALL_RATIOS.forEach(ar => {
+        const url = charImageUrl(char, ar)
+        if (document.querySelector(`link[href="${CSS.escape(url)}"]`)) return
+        const link = document.createElement("link")
+        link.rel = "preload"
+        link.as = "image"
+        link.href = url
+        document.head.appendChild(link)
+      })
     })
   }, [dedupedCharacters])
 
@@ -208,7 +287,7 @@ export function CharacterSelection({
             <span className="text-2xl font-pixel text-black">FaceSwap</span>
           </div>
           <h2 className="text-xl font-bold text-black md:text-2xl">Choose a character</h2>
-          <p className="mt-1 text-sm text-black/40">or prompt your own</p>
+          <p className="mt-1 text-sm text-black/70">or prompt your own</p>
         </div>
 
         {/* Horizontal carousel */}
@@ -249,7 +328,7 @@ export function CharacterSelection({
           <div
             ref={scrollRef}
             className="flex gap-3 overflow-x-auto px-6 py-1 pb-2 md:gap-4 md:px-8"
-            style={{ scrollbarWidth: "none" }}
+            style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch", willChange: "scroll-position" }}
             onScroll={updateScrollButtons}
           >
             {dedupedCharacters.map((char, index) => {
@@ -264,8 +343,9 @@ export function CharacterSelection({
                   className="group flex shrink-0 flex-col items-center gap-2"
                 >
                   <div
+                    style={cardStyle}
                     className={cn(
-                      "relative h-[160px] w-[110px] overflow-hidden rounded-2xl bg-neutral-100 transition-all duration-200 md:h-[220px] md:w-[155px]",
+                      "relative overflow-hidden rounded-2xl bg-neutral-100",
                       isSelected
                         ? "outline outline-[3px] outline-black shadow-lg"
                         : "ring-1 ring-black/10 hover:ring-black/20 hover:shadow-md"
@@ -273,7 +353,7 @@ export function CharacterSelection({
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={optimizedUrl(char.src, 640)}
+                      src={charImageUrl(char, aspectRatio)}
                       alt={char.name}
                       className="h-full w-full object-cover object-top"
                       draggable={false}
@@ -281,21 +361,41 @@ export function CharacterSelection({
                       fetchPriority={isVisible ? "high" : "auto"}
                       onError={(e) => { e.currentTarget.src = char.src }}
                     />
-                    {/* Video loads ONLY on hover */}
+                    {/* Video preview — hover on desktop, auto on select for mobile */}
                     {videoUrl && (
                       <video
-                        className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                        className={cn(
+                          "absolute inset-0 h-full w-full transition-opacity duration-300",
+                          isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        )}
+                        style={{ objectFit: "cover", objectPosition: "center top" }}
                         poster={videoFrameUrl(videoUrl) || undefined}
                         muted
                         loop
                         playsInline
                         preload="none"
+                        ref={(el) => {
+                          if (!el) return
+                          if (isSelected) {
+                            if (!el.src) el.src = videoUrl
+                            el.play().catch(() => {})
+                          } else if (!el.paused && !el.matches(":hover")) {
+                            el.pause()
+                            el.currentTime = 0
+                          }
+                        }}
                         onMouseEnter={(e) => {
                           const v = e.currentTarget
                           if (!v.src) v.src = videoUrl
                           v.play().catch(() => {})
                         }}
-                        onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0 }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.pause()
+                            e.currentTarget.currentTime = 0
+                          }
+                        }}
+                        onContextMenu={(e) => e.preventDefault()}
                       />
                     )}
 
@@ -312,11 +412,72 @@ export function CharacterSelection({
                   {/* Name */}
                   <span className={cn(
                     "text-[13px] transition-colors md:text-sm",
-                    isSelected ? "font-semibold text-black" : "text-black/50 group-hover:text-black/70"
+                    isSelected ? "font-semibold text-black" : "text-black/70 group-hover:text-black/70"
                   )}>
                     {char.name}
                   </span>
                 </button>
+              )
+            })}
+
+            {/* Custom (AI-generated) characters */}
+            {customChars.map((char) => {
+              const isSelected = selectedId === char.id
+              return (
+                <div
+                  key={char.id}
+                  className="group relative flex shrink-0 flex-col items-center gap-2"
+                >
+                  <button
+                    onClick={() => onSelect(char.id)}
+                    className="flex shrink-0 flex-col items-center"
+                  >
+                    <div
+                      style={cardStyle}
+                      className={cn(
+                        "relative overflow-hidden rounded-2xl bg-neutral-100",
+                          isSelected
+                          ? "outline outline-[3px] outline-black shadow-lg"
+                          : "ring-1 ring-black/10 hover:ring-black/20 hover:shadow-md"
+                      )}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={charImageUrl(char, aspectRatio)}
+                        alt={char.name}
+                        className="h-full w-full object-cover object-top"
+                        draggable={false}
+                        loading="lazy"
+                        onError={(e) => { e.currentTarget.src = char.src }}
+                      />
+                      {isSelected && (
+                        <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black shadow">
+                          <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                  <span className={cn(
+                    "text-[13px] transition-colors md:text-sm",
+                    isSelected ? "font-semibold text-black" : "text-black/70"
+                  )}>
+                    {char.name}
+                  </span>
+                  {/* Delete button */}
+                  {onDeleteCustom && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDeleteCustom(char.id) }}
+                      className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-100 text-black/60 opacity-0 shadow-md ring-1 ring-neutral-300 transition-all hover:bg-neutral-200 hover:text-black group-hover:opacity-100"
+                      title="Delete character"
+                    >
+                      <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               )
             })}
 
@@ -328,17 +489,52 @@ export function CharacterSelection({
               }}
               className="group flex shrink-0 flex-col items-center gap-2"
             >
-              <div className="flex h-[160px] w-[110px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50 transition-all duration-200 hover:border-neutral-400 hover:bg-neutral-100 md:h-[220px] md:w-[155px]">
+              <div
+                style={cardStyle}
+                className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50 hover:border-neutral-400 hover:bg-neutral-100"
+              >
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/5">
-                  <svg className="h-6 w-6 text-black/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <svg className="h-6 w-6 text-black/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                   </svg>
                 </div>
-                <span className="text-xs font-medium text-black/40">Create with AI</span>
+                <span className="text-xs font-medium text-black/70">Create with AI</span>
               </div>
-              <span className="text-[13px] text-black/30 md:text-sm">Custom</span>
+              <span className="text-[13px] text-black/70 md:text-sm">Custom</span>
             </button>
           </div>
+        </div>
+
+        {/* Aspect ratio selector */}
+        <div className="mt-4 flex items-center justify-center gap-1.5">
+          {ASPECT_RATIO_OPTIONS.map(({ value, label, icon }) => (
+            <button
+              key={value}
+              onClick={() => setAspectRatio(value)}
+              onMouseEnter={() => {
+                // Prefetch this ratio's images on hover so click feels instant
+                if (value === aspectRatio) return
+                dedupedCharacters.slice(0, 10).forEach(char => {
+                  const img = new Image()
+                  img.src = charImageUrl(char, value)
+                })
+              }}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all",
+                aspectRatio === value
+                  ? "bg-black text-white shadow-sm"
+                  : "bg-neutral-100 text-black/60 hover:bg-neutral-200 hover:text-black/80"
+              )}
+            >
+              {/* Aspect ratio icon */}
+              <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                {icon === "portrait" && <rect x="4" y="1" width="8" height="14" rx="1" />}
+                {icon === "square" && <rect x="2" y="2" width="12" height="12" rx="1" />}
+                {icon === "landscape" && <rect x="1" y="4" width="14" height="8" rx="1" />}
+              </svg>
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* AI prompt input — below carousel */}
@@ -348,7 +544,7 @@ export function CharacterSelection({
               {isGenerating ? (
                 <div className="space-y-2">
                   <p className="text-sm text-black/70">
-                    Creating with <span className="font-medium text-black">Nano Banana Pro</span> via{" "}
+                    Creating with <span className="font-medium text-black">Grok</span> via{" "}
                     <a href="https://vercel.com/ai-gateway" target="_blank" rel="noopener noreferrer" className="font-medium text-black underline underline-offset-2 hover:text-black/60">AI Gateway</a>
                   </p>
                   <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-200">
@@ -381,7 +577,7 @@ export function CharacterSelection({
                   </button>
                   <button
                     onClick={() => { setShowCreateInput(false); setPrompt("") }}
-                    className="text-black/30 hover:text-black"
+                    className="text-black/70 hover:text-black"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -402,13 +598,13 @@ export function CharacterSelection({
         {/* Next button */}
         <div className="mt-6 w-full max-w-xs px-5 pb-20 md:mt-8 md:pb-4">
           <button
-            onClick={onNext}
+            onClick={() => onNext(aspectRatio)}
             disabled={!selectedId}
             className={cn(
               "flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[15px] font-semibold transition-all active:scale-[0.98]",
               selectedId
                 ? "bg-black text-white shadow-sm hover:bg-gray-800"
-                : "cursor-not-allowed bg-neutral-100 text-black/25"
+                : "cursor-not-allowed bg-neutral-100 text-black/70"
             )}
           >
             {selectedId ? (

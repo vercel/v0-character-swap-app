@@ -10,6 +10,7 @@ interface UseVideoGenerationOptions {
   onLoginRequired: () => void
   onSuccess: () => void
   onError: (message: string) => void
+  onGenerationCreated?: (id: number) => void
 }
 
 interface UseVideoGenerationReturn {
@@ -72,6 +73,7 @@ export function useVideoGeneration({
   onLoginRequired,
   onSuccess,
   onError,
+  onGenerationCreated,
 }: UseVideoGenerationOptions): UseVideoGenerationReturn {
   const processingRef = useRef(false)
 
@@ -146,6 +148,9 @@ export function useVideoGeneration({
         const { generationId: id } = await pendingResponse.json()
         generationId = id
 
+        // Notify caller so it can navigate to the generation page
+        onGenerationCreated?.(id)
+
         // 2. Trigger refresh so it appears in "My Videos" immediately
         // Fire multiple times to beat SWR deduping (2s interval)
         window.dispatchEvent(new CustomEvent("refresh-generations"))
@@ -210,7 +215,7 @@ export function useVideoGeneration({
             userEmail: user.email,
             characterName: character.name,
             sourceVideoAspectRatio,
-            sendEmail: sendEmail && user.email ? true : false,
+            sendEmail: !!user.email,
           }),
         })
 
@@ -249,7 +254,7 @@ export function useVideoGeneration({
 
     // Return immediately - don't wait for the async work
     onSuccess()
-  }, [user, onLoginRequired, onSuccess, onError])
+  }, [user, onLoginRequired, onSuccess, onError, onGenerationCreated])
 
   return {
     processVideo,
