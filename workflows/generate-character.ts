@@ -71,8 +71,6 @@ export async function generateCharacterWorkflow(input: GenerateCharacterInput): 
     imageUrl: url,
     sources: {
       "16:9": url,
-      "9:16": url,
-      "1:1": url,
     },
   }
 }
