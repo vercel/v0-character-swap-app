@@ -126,6 +126,7 @@ export interface ReferenceImage {
   user_id: string
   name: string
   image_url: string
+  sources: Record<string, string> | null
   category: string | null
   created_at: Date
 }
@@ -134,10 +135,11 @@ export async function createReferenceImage(data: {
   userId: string
   name: string
   imageUrl: string
+  sources?: Record<string, string>
 }): Promise<number> {
   const result = await sql`
-    INSERT INTO reference_images (user_id, name, image_url)
-    VALUES (${data.userId}, ${data.name}, ${data.imageUrl})
+    INSERT INTO reference_images (user_id, name, image_url, sources)
+    VALUES (${data.userId}, ${data.name}, ${data.imageUrl}, ${data.sources ? JSON.stringify(data.sources) : null})
     RETURNING id
   `
   return result[0]?.id

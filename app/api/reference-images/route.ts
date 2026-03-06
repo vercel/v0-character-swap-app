@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { name, imageUrl } = await request.json()
+    const { name, imageUrl, sources } = await request.json()
 
     if (!name || !imageUrl) {
       return NextResponse.json({ error: "Name and image URL are required" }, { status: 400 })
@@ -34,9 +34,10 @@ export async function POST(request: NextRequest) {
       userId: session.user.id,
       name,
       imageUrl,
+      sources,
     })
 
-    return NextResponse.json({ id, name, imageUrl })
+    return NextResponse.json({ id, name, imageUrl, sources })
   } catch (error) {
     console.error("Error creating reference image:", error)
     return NextResponse.json({ error: "Failed to create image" }, { status: 500 })

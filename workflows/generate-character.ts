@@ -1,14 +1,15 @@
 /**
- * Durable workflow for character image generation.
+ * Durable workflow for character image generation using Grok.
  *
  * Flow:
- * 1. Generate original 16:9 image with Grok via AI Gateway
- * 2. Reframe into 9:16 and 1:1 with Gemini (in parallel via separate steps)
- * 3. Upload all 3 images to Vercel Blob
- * 4. Return the URLs
+ * 1. Generate a single 1:1 image with Grok (square is the safest base for cropping)
+ * 2. Upload to Vercel Blob
+ * 3. Use the same URL for all 3 aspect ratios — Cloudinary crops with g_north
+ *
+ * The prompt ensures the character is centered with enough headroom and
+ * background padding so Cloudinary's c_fill crop looks good at any ratio.
  *
  * Steps auto-retry on transient errors (network, 500, rate limits).
- * FatalError skips retries for input errors.
  */
 
 export interface GenerateCharacterInput {
@@ -37,14 +38,19 @@ RENDERING:
 - Cinematic lighting with depth of field, rim lighting, and ambient occlusion
 - The overall image should look like a still frame from a Pixar feature film
 
+COMPOSITION (critical — follow exactly):
+- Wide establishing shot with the character small in the center
+- Character's head occupies only about 20-25% of the total image width
+- MASSIVE amounts of background visible on all sides — at least 35-40% padding on each side
+- The character is a small figure in a big scenic environment
+- Think "wide movie still where the character is in the middle of a big world"
+- The character's body ends around the waist — no legs visible
+
 CHARACTER:
 - Clearly fictional cartoon character, never photorealistic or a real person
-- Full head and upper body visible, facing the viewer directly
+- Facing the viewer directly with a friendly expression
 - Face completely unobstructed — no sunglasses, masks, or hair covering the face
 - Sharp focus on facial features with even, soft lighting`
-
-const REFRAME_PROMPT = (aspectRatio: string) =>
-  `Recreate this exact same character in the exact same Pixar 3D animation style, with the same face, same outfit, same colors, same pose, same lighting. Keep the character IDENTICAL — do not change any features. Only reframe/recompose the image to fit a ${aspectRatio} aspect ratio. Show head and upper body. Keep the background style consistent.`
 
 // ============================================
 // WORKFLOW
@@ -55,29 +61,18 @@ export async function generateCharacterWorkflow(input: GenerateCharacterInput): 
 
   const { prompt, gatewayApiKey } = input
 
-  // Step 1: Generate original 16:9 with Grok
-  const originalBase64 = await generateOriginal(prompt, gatewayApiKey)
-  const originalDataUrl = `data:image/png;base64,${originalBase64}`
+  // Generate a single 16:9 image — wide gives the most horizontal content for cropping to portrait
+  const base64 = await generateImage(PROMPT_TEMPLATE(prompt), "16:9", gatewayApiKey)
 
-  // Step 2: Reframe into 9:16 and 1:1 with Gemini (parallel steps)
-  const [portraitBase64, squareBase64] = await Promise.all([
-    reframeImage(originalDataUrl, "9:16", gatewayApiKey),
-    reframeImage(originalDataUrl, "1:1", gatewayApiKey),
-  ])
-
-  // Step 3: Upload all 3 to blob storage
-  const [url169, url916, url11] = await Promise.all([
-    uploadToBlob(originalBase64, "image/png", "16x9"),
-    uploadToBlob(portraitBase64, "image/png", "9x16"),
-    uploadToBlob(squareBase64, "image/png", "1x1"),
-  ])
+  // Upload once — same image used for all ratios (Cloudinary crops per ratio)
+  const url = await uploadToBlob(base64, "square")
 
   return {
-    imageUrl: url169,
+    imageUrl: url,
     sources: {
-      "16:9": url169,
-      "9:16": url916,
-      "1:1": url11,
+      "16:9": url,
+      "9:16": url,
+      "1:1": url,
     },
   }
 }
@@ -86,62 +81,29 @@ export async function generateCharacterWorkflow(input: GenerateCharacterInput): 
 // STEP FUNCTIONS
 // ============================================
 
-async function generateOriginal(prompt: string, gatewayApiKey?: string): Promise<string> {
+async function generateImage(
+  prompt: string,
+  aspectRatio: string,
+  gatewayApiKey?: string,
+): Promise<string> {
   "use step"
 
-  const { generateImage, createGateway } = await import("ai")
+  const { experimental_generateImage, createGateway } = await import("ai")
 
   const gateway = createGateway({
     ...(gatewayApiKey ? { apiKey: gatewayApiKey } : {}),
   })
 
-  const { image } = await generateImage({
+  const result = await experimental_generateImage({
     model: gateway.imageModel("xai/grok-imagine-image"),
-    prompt: PROMPT_TEMPLATE(prompt),
-    aspectRatio: "16:9",
+    prompt,
+    providerOptions: { xai: { aspect_ratio: aspectRatio, resolution: "2k" } },
   })
 
-  return image.base64
+  return result.image.base64
 }
 
-async function reframeImage(originalDataUrl: string, aspectRatio: string, gatewayApiKey?: string): Promise<string> {
-  "use step"
-
-  const { generateText, createGateway } = await import("ai")
-
-  const gateway = createGateway({
-    ...(gatewayApiKey ? { apiKey: gatewayApiKey } : {}),
-  })
-
-  const result = await generateText({
-    model: gateway("google/gemini-2.5-flash-image"),
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "image", image: originalDataUrl },
-          { type: "text", text: REFRAME_PROMPT(aspectRatio) },
-        ],
-      },
-    ],
-    providerOptions: {
-      google: {
-        responseModalities: ["IMAGE"],
-        imageConfig: { aspectRatio },
-      },
-    },
-  })
-
-  const imageFile = result.files?.find((f) => f.mediaType?.startsWith("image/"))
-  if (!imageFile) {
-    const { FatalError } = await import("workflow")
-    throw new FatalError(`No image generated for ${aspectRatio}`)
-  }
-
-  return imageFile.base64
-}
-
-async function uploadToBlob(base64: string, mediaType: string, suffix: string): Promise<string> {
+async function uploadToBlob(base64: string, suffix: string): Promise<string> {
   "use step"
 
   const { put } = await import("@vercel/blob")
@@ -151,7 +113,7 @@ async function uploadToBlob(base64: string, mediaType: string, suffix: string): 
 
   const { url } = await put(filename, buffer, {
     access: "public",
-    contentType: mediaType,
+    contentType: "image/png",
   })
 
   return url

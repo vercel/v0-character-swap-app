@@ -1,0 +1,1 @@
+ALTER TABLE reference_images ADD COLUMN IF NOT EXISTS sources JSONB;

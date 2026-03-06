@@ -35,9 +35,8 @@ function charImageUrl(char: Character, ar: AspectRatio): string {
   const src = char.sources?.[ar] || char.src
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
   if (cloudName && src.includes(".public.blob.vercel-storage.com")) {
-    // ?v=2 on the source URL makes Cloudinary treat it as a new resource, busting stale cache
-    const bustSrc = src + (src.includes("?") ? "&v=2" : "?v=2")
-    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_480,c_fill,g_north,f_webp,q_80/${encodeURIComponent(bustSrc)}`
+    const bustSrc = src + (src.includes("?") ? "&v=4" : "?v=4")
+    return `https://res.cloudinary.com/${cloudName}/image/fetch/w_800,c_fill,g_north,f_webp,q_85/${encodeURIComponent(bustSrc)}`
   }
   return src
 }
@@ -91,6 +90,8 @@ export function CharacterSelection({
   const aspectRatio: AspectRatio = userRatio ?? (isDesktop ? "16:9" : "9:16")
   // When user hasn't picked, cardStyle is undefined → CSS class handles sizing
   // When user picks, inline styles take over with transitions
+  const scrollToIdxRef = useRef<number | null>(null)
+
   const cardStyle = useMemo(() => {
     if (userRatio === null) return undefined
     const dims = CARD_DIMS[userRatio]
@@ -100,6 +101,29 @@ export function CharacterSelection({
       transition: "width 250ms ease, height 250ms ease",
       contain: "layout style" as const,
     }
+  }, [userRatio, isDesktop])
+
+  // After ratio change: instantly set scroll to correct position, then cards animate into place
+  useEffect(() => {
+    const idx = scrollToIdxRef.current
+    if (idx === null || !userRatio) return
+    scrollToIdxRef.current = null
+    const el = scrollRef.current
+    if (!el) return
+    const dims = CARD_DIMS[userRatio]
+    const cardW = isDesktop ? dims.w[1] : dims.w[0]
+    const gap = isDesktop ? 16 : 12
+    const pad = isDesktop ? 32 : 24
+    const target = pad + idx * (cardW + gap) + cardW / 2 - el.clientWidth / 2
+    // Set scroll immediately
+    el.scrollLeft = target
+    // Also keep adjusting during the 250ms transition as cards animate
+    const start = performance.now()
+    const tick = () => {
+      el.scrollLeft = target
+      if (performance.now() - start < 260) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
   }, [userRatio, isDesktop])
 
   // AI character generation state
@@ -220,19 +244,18 @@ export function CharacterSelection({
   }, [])
 
   // Forward vertical wheel events on the carousel to horizontal scroll
+  // Forward any vertical/horizontal wheel on the page to horizontal carousel scroll
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
     const handleWheel = (e: WheelEvent) => {
-      // Only intercept when the wheel is over the carousel itself
       const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
       if (delta === 0) return
       e.preventDefault()
       el.scrollLeft += delta
     }
-    // Attach to the scroll container, not the whole window
-    el.addEventListener("wheel", handleWheel, { passive: false })
-    return () => el.removeEventListener("wheel", handleWheel)
+    window.addEventListener("wheel", handleWheel, { passive: false })
+    return () => window.removeEventListener("wheel", handleWheel)
   }, [])
 
   // Preload first 7 characters in ALL 3 aspect ratios — switching feels instant
@@ -328,8 +351,8 @@ export function CharacterSelection({
           {/* Scroll container */}
           <div
             ref={scrollRef}
-            className="flex gap-3 overflow-x-auto px-6 py-1 pb-2 md:gap-4 md:px-8"
-            style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch", willChange: "scroll-position" }}
+            className="flex gap-3 overflow-x-auto px-6 pt-2 pb-2 md:gap-4 md:px-8"
+            style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
             onScroll={updateScrollButtons}
           >
             {dedupedCharacters.map((char, index) => {
@@ -341,8 +364,7 @@ export function CharacterSelection({
                 <button
                   key={char.id}
                   onClick={() => onSelect(char.id)}
-                  className="group flex shrink-0 flex-col items-center gap-2"
-                >
+                  className="group flex shrink-0 flex-col items-center gap-2"                >
                   <div
                     style={cardStyle}
                     className={cn(
@@ -428,8 +450,7 @@ export function CharacterSelection({
               return (
                 <div
                   key={char.id}
-                  className="group relative flex shrink-0 flex-col items-center gap-2"
-                >
+                  className="group relative flex shrink-0 flex-col items-center gap-2"                >
                   <button
                     onClick={() => onSelect(char.id)}
                     className="flex shrink-0 flex-col items-center"
@@ -513,7 +534,21 @@ export function CharacterSelection({
           {ASPECT_RATIO_OPTIONS.map(({ value, label, icon }) => (
             <button
               key={value}
-              onClick={() => setUserRatio(value)}
+              onClick={() => {
+                const el = scrollRef.current
+                if (el) {
+                  const viewCenter = el.scrollLeft + el.clientWidth / 2
+                  let closestIdx = 0
+                  let closestDist = Infinity
+                  for (let i = 0; i < el.children.length; i++) {
+                    const child = el.children[i] as HTMLElement
+                    const d = Math.abs(child.offsetLeft + child.offsetWidth / 2 - viewCenter)
+                    if (d < closestDist) { closestDist = d; closestIdx = i }
+                  }
+                  scrollToIdxRef.current = closestIdx
+                }
+                setUserRatio(value)
+              }}
               onMouseEnter={() => {
                 // Prefetch this ratio's images on hover so click feels instant
                 if (value === aspectRatio) return

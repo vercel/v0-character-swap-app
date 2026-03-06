@@ -53,6 +53,7 @@ export interface ReferenceImage {
   id: number
   name: string
   image_url: string
+  sources?: Record<string, string>
 }
 
 export interface ReferenceImagesResponse {

@@ -34,10 +34,11 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
         .then(res => res.json())
         .then(data => {
           if (data.images) {
-            const loadedCharacters: Character[] = data.images.map((img: ReferenceImage) => ({
+            const loadedCharacters: Character[] = data.images.map((img: ReferenceImage & { sources?: Record<string, string> }) => ({
               id: CUSTOM_CHARACTER_ID_OFFSET + img.id,
               name: img.name,
               src: img.image_url,
+              sources: img.sources || undefined,
               dbId: img.id,
             }))
             console.log("[use-characters] Loaded from DB:", loadedCharacters.map(c => `${c.id}:${c.name}`))
@@ -62,6 +63,7 @@ export function useCharacters({ user, authLoading = false }: UseCharactersOption
           body: JSON.stringify({
             name: character.name,
             imageUrl: character.src,
+            sources: character.sources,
           }),
         })
         const data = await res.json()
