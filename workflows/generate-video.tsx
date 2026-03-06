@@ -372,14 +372,17 @@ async function sendCompletionEmail(email: string, videoUrl: string, characterNam
       from: "v0 Face Swap <video@v0faceswap.app>",
       to: email,
       subject: `Your cartoon video is ready!`,
+      headers: {
+        "List-Unsubscribe": `<mailto:video@v0faceswap.app?subject=unsubscribe>`,
+      },
       text: [
         greeting,
         "",
-        `Your video generated with v0 Face Swap is ready${characterName ? ` (${characterName})` : ""}.`,
+        `Your ${characterName ? `${characterName} ` : ""}face swap video is ready.`,
         "",
-        `Check it out: ${appUrl}`,
+        `View your video: ${appUrl}`,
         "",
-        "— v0 Face Swap",
+        "v0 Face Swap",
       ].join("\n"),
       html: `
 <!DOCTYPE html>

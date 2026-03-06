@@ -9,6 +9,7 @@ export interface ViewerData {
   generatedAspectRatio: "9:16" | "16:9" | "fill"
   characterName: string | null
   characterImageUrl: string | null
+  uuid?: string
 }
 
 export interface ViewerError {

@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
     const { characterName, characterImageUrl, aspectRatio, sourceVideoAspectRatio } = await request.json()
 
-    const generationId = await createPendingGeneration({
+    const { id: generationId, uuid } = await createPendingGeneration({
       userId: session.user.id,
       userEmail: session.user.email,
       characterName,
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       sourceVideoAspectRatio: sourceVideoAspectRatio || "fill",
     })
 
-    return NextResponse.json({ generationId })
+    return NextResponse.json({ generationId, uuid })
   } catch (error) {
     console.error("Failed to create pending generation:", error)
     return NextResponse.json(

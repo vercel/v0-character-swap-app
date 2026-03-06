@@ -30,6 +30,7 @@ export async function getMedianCompletionTime(): Promise<number> {
 
 export interface Generation {
   id: number
+  uuid: string
   user_id: string
   user_email: string | null
   video_url: string | null
@@ -68,13 +69,13 @@ export async function createPendingGeneration(data: {
   characterImageUrl?: string
   aspectRatio?: "9:16" | "16:9" | "fill"
   sourceVideoAspectRatio?: "9:16" | "16:9" | "fill"
-}) {
+}): Promise<{ id: number; uuid: string }> {
   const result = await sql`
     INSERT INTO generations (user_id, user_email, character_name, character_image_url, aspect_ratio, source_video_aspect_ratio, status)
     VALUES (${data.userId}, ${data.userEmail || null}, ${data.characterName || null}, ${data.characterImageUrl || null}, ${data.aspectRatio || "fill"}, ${data.sourceVideoAspectRatio || "fill"}, 'uploading')
-    RETURNING id
+    RETURNING id, uuid
   `
-  return result[0]?.id
+  return { id: result[0]?.id, uuid: result[0]?.uuid }
 }
 
 // Update generation after upload is complete, then start processing
@@ -118,6 +119,16 @@ export async function getUserGenerations(userId: string): Promise<Generation[]> 
     LIMIT 50
   `
   return result as Generation[]
+}
+
+/** Public lookup by UUID — no user_id filter. For shareable /{uuid} URLs. */
+export async function getGenerationByUuid(uuid: string): Promise<Generation | null> {
+  const result = await sql`
+    SELECT * FROM generations
+    WHERE uuid = ${uuid}
+    LIMIT 1
+  `
+  return (result[0] as Generation) ?? null
 }
 
 // Reference Images

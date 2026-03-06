@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
     setTeamId(null)
     setHasApiKey(false)
+    window.location.href = "/"
   }, [])
 
   return (

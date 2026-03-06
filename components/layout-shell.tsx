@@ -8,12 +8,15 @@ import { useVideoDownload } from "@/hooks/use-video-download"
 import { useCloudinaryPrewarm } from "@/hooks/use-cloudinary-prewarm"
 import { cn } from "@/lib/utils"
 
-function toMp4Url(url: string | null): string | null {
+function toMp4Url(url: string | null, opts?: { pipSize?: boolean }): string | null {
   if (!url) return null
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
   if (!cloudName) return url
   if (!url.includes(".public.blob.vercel-storage.com")) return url
-  return `https://res.cloudinary.com/${cloudName}/video/fetch/f_mp4,vc_h264,ac_aac/${encodeURIComponent(url)}`
+  const transforms = opts?.pipSize
+    ? "w_480,q_auto,f_mp4,vc_h264,ac_aac"
+    : "f_mp4,vc_h264,ac_aac"
+  return `https://res.cloudinary.com/${cloudName}/video/fetch/${transforms}/${encodeURIComponent(url)}`
 }
 
 export function LayoutShell({ children }: { children: ReactNode }) {
@@ -35,6 +38,18 @@ export function LayoutShell({ children }: { children: ReactNode }) {
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [isViewerOpen])
+
+  // Push /{uuid} URL when viewer opens with a uuid, restore /pick on close
+  const prevViewerUuid = useRef<string | null>(null)
+  useEffect(() => {
+    const uuid = viewer.data?.uuid ?? null
+    if (uuid && uuid !== prevViewerUuid.current) {
+      window.history.pushState(null, "", `/${uuid}`)
+    } else if (!uuid && prevViewerUuid.current) {
+      window.history.pushState(null, "", "/pick")
+    }
+    prevViewerUuid.current = uuid
+  }, [viewer.data?.uuid])
 
   // Buy credits modal state
   const [showBuyOptions, setShowBuyOptions] = useState(false)
@@ -204,43 +219,26 @@ function VideoOverlay() {
 
   const [showPip, setShowPip] = useState(true)
   const [videoProgress, setVideoProgress] = useState(0)
-  const [bothReady, setBothReady] = useState(false)
+  const [mainReady, setMainReady] = useState(false)
+  const [pipReady, setPipReady] = useState(false)
   const progressBarRef = useRef<HTMLDivElement>(null)
   const isDraggingRef = useRef(false)
-  const mainReadyRef = useRef(false)
-  const pipReadyRef = useRef(false)
 
   // Reset ready state when a different video opens
-  const prevPipSrcRef = useRef<string | null>(null)
+  const prevVideoUrlRef = useRef<string | null>(null)
 
   if (!data) return null
 
   const { videoUrl, sourceVideoUrl, sourceAspectRatio, generatedAspectRatio, characterName, characterImageUrl } = data
-  const pipSrc = toMp4Url(sourceVideoUrl) || sourceVideoUrl
+  const pipSrc = toMp4Url(sourceVideoUrl, { pipSize: true }) || sourceVideoUrl
 
-  if (pipSrc !== prevPipSrcRef.current) {
-    prevPipSrcRef.current = pipSrc
-    mainReadyRef.current = false
-    pipReadyRef.current = false
-    if (bothReady) setBothReady(false)
+  if (videoUrl !== prevVideoUrlRef.current) {
+    prevVideoUrlRef.current = videoUrl
+    if (mainReady) setMainReady(false)
+    if (pipReady) setPipReady(false)
   }
   const hasPipSource = !!sourceVideoUrl
   const pipAspectRatio = sourceAspectRatio
-
-  // Start both videos simultaneously once both have loaded
-  const tryStartBoth = useCallback(() => {
-    if (!mainVideoRef.current) return
-    if (hasPipSource && !pipReadyRef.current) return
-    if (!mainReadyRef.current) return
-    const main = mainVideoRef.current
-    const pip = pipVideoRef.current
-    main.currentTime = 0
-    if (pip) pip.currentTime = 0
-    main.muted = false
-    main.play()
-    if (pip) pip.play()
-    setBothReady(true)
-  }, [hasPipSource])
 
   // Spacebar to toggle play/pause
   useEffect(() => {
@@ -303,7 +301,7 @@ function VideoOverlay() {
   })
 
   return (
-    <div className="absolute inset-0 z-40 bg-black">
+    <div className="fixed inset-0 z-40 bg-black md:absolute">
       {/* Close button */}
       <button
         onClick={close}
@@ -322,19 +320,12 @@ function VideoOverlay() {
         loop
         playsInline
         preload="auto"
-        poster={characterImageUrl
-          ? (characterImageUrl.startsWith("http")
-            ? `/_next/image?url=${encodeURIComponent(characterImageUrl)}&w=640&q=75`
-            : characterImageUrl)
-          : undefined}
         className={cn(
           "h-full w-full cursor-pointer transition-opacity duration-200",
-          // Mobile: 9:16 fills screen (cover), others fit to width (contain). Desktop: always contain.
-          // Mobile: 9:16 fills screen. Desktop: 16:9 fills screen. Others: contain.
           generatedAspectRatio === "9:16" ? "object-cover md:object-contain"
             : generatedAspectRatio === "16:9" ? "object-contain md:object-cover"
             : "object-contain",
-          bothReady || !hasPipSource ? "opacity-100" : "opacity-0"
+          mainReady ? "opacity-100" : "opacity-0"
         )}
         onClick={() => {
           const main = mainVideoRef.current
@@ -343,8 +334,12 @@ function VideoOverlay() {
           else { main.pause(); pipVideoRef.current?.pause() }
         }}
         onLoadedData={() => {
-          mainReadyRef.current = true
-          tryStartBoth()
+          const main = mainVideoRef.current
+          if (!main) return
+          main.currentTime = 0
+          main.muted = false
+          main.play()
+          setMainReady(true)
         }}
         onSeeked={() => {
           if (pipVideoRef.current && mainVideoRef.current) {
@@ -362,11 +357,11 @@ function VideoOverlay() {
         }}
       />
 
-      {/* PiP video — always mounted when source exists, both reveal together */}
+      {/* PiP video — fades in independently when ready */}
       {hasPipSource && (
         <div className={cn(
-          "absolute bottom-20 right-4 overflow-hidden rounded-lg border-2 border-black/20 shadow-lg transition-opacity duration-200",
-          showPip && bothReady ? "opacity-100" : "pointer-events-none opacity-0",
+          "absolute bottom-20 right-4 overflow-hidden rounded-lg border-2 border-black/20 shadow-lg transition-opacity duration-300",
+          showPip && pipReady ? "opacity-100" : "pointer-events-none opacity-0",
           pipAspectRatio === "9:16" && "aspect-[9/16] h-28 md:h-40",
           pipAspectRatio !== "9:16" && "aspect-video w-28 md:w-48"
         )}>
@@ -376,8 +371,17 @@ function VideoOverlay() {
             muted loop playsInline preload="auto"
             className="h-full w-full object-cover"
             onLoadedData={() => {
-              pipReadyRef.current = true
-              tryStartBoth()
+              const pip = pipVideoRef.current
+              const main = mainVideoRef.current
+              if (!pip) return
+              // Sync PiP to main's current position and play
+              if (main) {
+                pip.currentTime = main.currentTime
+                if (!main.paused) pip.play()
+              } else {
+                pip.play()
+              }
+              setPipReady(true)
             }}
           />
         </div>

@@ -75,6 +75,7 @@ function playCompletionSound() {
 
 interface Generation {
   id: number
+  uuid?: string
   video_url: string | null
   source_video_url: string | null
   character_name: string | null
@@ -325,6 +326,7 @@ export function GenerationsPanel({ className = "", variant = "default" }: Genera
                   generatedAspectRatio: gen.aspect_ratio || "fill",
                   characterName: gen.character_name,
                   characterImageUrl: gen.character_image_url,
+                  uuid: gen.uuid,
                 })}
                 className="relative h-full w-full"
                 onMouseEnter={() => {
@@ -382,8 +384,8 @@ export function GenerationsPanel({ className = "", variant = "default" }: Genera
                 className="h-full w-full cursor-pointer"
                 role="button"
                 tabIndex={0}
-                onClick={() => router.push(`/generate?id=${gen.id}`)}
-                onKeyDown={(e) => { if (e.key === "Enter") router.push(`/generate?id=${gen.id}`) }}
+                onClick={() => gen.uuid ? router.push(`/${gen.uuid}`) : router.push(`/generate?id=${gen.id}`)}
+                onKeyDown={(e) => { if (e.key === "Enter") { gen.uuid ? router.push(`/${gen.uuid}`) : router.push(`/generate?id=${gen.id}`) } }}
               >
                 <GenerationProgress
                   characterImageUrl={gen.character_image_url}

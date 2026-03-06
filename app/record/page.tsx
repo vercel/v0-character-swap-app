@@ -48,8 +48,8 @@ function RecordContent() {
       setErrorToast(message)
       setTimeout(() => setErrorToast(null), 5000)
     },
-    onGenerationCreated: (id) => {
-      router.push(`/generate?id=${id}`)
+    onGenerationCreated: (_id, uuid) => {
+      router.push(`/${uuid}`)
     },
   })
 

@@ -8,7 +8,7 @@ import type { AspectRatio } from "@/lib/utils"
 
 export default function PickPage() {
   const router = useRouter()
-  const { user, isLoading: authLoading } = useAuth()
+  const { user, isLoading: authLoading, login } = useAuth()
   const {
     selectedCharacter,
     setSelectedCharacter,
@@ -30,6 +30,8 @@ export default function PickPage() {
       allCharacters={allCharacters}
       onAddCustom={addCustomCharacter}
       onDeleteCustom={deleteCustomCharacter}
+      user={user}
+      login={login}
     />
   )
 }

@@ -10,7 +10,7 @@ interface UseVideoGenerationOptions {
   onLoginRequired: () => void
   onSuccess: () => void
   onError: (message: string) => void
-  onGenerationCreated?: (id: number) => void
+  onGenerationCreated?: (id: number, uuid: string) => void
 }
 
 interface UseVideoGenerationReturn {
@@ -145,11 +145,11 @@ export function useVideoGeneration({
           throw new Error("Failed to create generation")
         }
         
-        const { generationId: id } = await pendingResponse.json()
+        const { generationId: id, uuid } = await pendingResponse.json()
         generationId = id
 
         // Notify caller so it can navigate to the generation page
-        onGenerationCreated?.(id)
+        onGenerationCreated?.(id, uuid)
 
         // 2. Trigger refresh so it appears in "My Videos" immediately
         // Fire multiple times to beat SWR deduping (2s interval)

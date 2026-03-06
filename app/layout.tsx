@@ -57,7 +57,7 @@ export default function RootLayout({
         {/* Set data-device before React hydrates — components read it to avoid layout shift */}
         <script dangerouslySetInnerHTML={{ __html: `document.documentElement.dataset.device=window.innerWidth>=768?"desktop":"mobile"` }} />
       </head>
-      <body className={`${geistPixel.className} antialiased`}>
+      <body className={geistPixel.className}>
         <AuthProvider>
           <VideoProvider>
             <ViewerProvider>
